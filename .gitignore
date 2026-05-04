@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI 캐시 (프로젝트 ref / org id 등 식별자 포함)
+supabase/.temp
+supabase/.branches
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
