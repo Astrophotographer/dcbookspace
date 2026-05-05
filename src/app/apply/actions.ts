@@ -6,6 +6,33 @@ import { revalidatePath } from "next/cache";
 
 type SubmitResult = { id?: string; error?: string };
 
+export type ConflictInfo = {
+  id: string;
+  purpose: string;
+  start_at: string;
+  end_at: string;
+  status: "pending" | "approved";
+};
+
+// 같은 호실, 시간 겹치는 신청을 조회한다.
+// trigger 와 동일하게 (status in pending/approved) + 반열린 [) 시간 겹침 기준.
+export async function findRoomConflicts(
+  roomId: string,
+  startAt: string,
+  endAt: string,
+): Promise<ConflictInfo[]> {
+  if (!roomId || !startAt || !endAt) return [];
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("reservations")
+    .select("id, purpose, start_at, end_at, status")
+    .eq("room_id", roomId)
+    .in("status", ["pending", "approved"])
+    .lt("start_at", endAt)   // 다른 예약 시작 < 우리의 끝
+    .gt("end_at", startAt);  // 다른 예약 끝   > 우리의 시작
+  return (data as ConflictInfo[] | null) ?? [];
+}
+
 function pickRoute(routes: ApprovalRoute[], attendees: number, external: boolean) {
   // 특수 조건: 50명 이상 OR 외부행사 → 4단계
   if (attendees >= 50 || external) {
@@ -19,7 +46,10 @@ function pickRoute(routes: ApprovalRoute[], attendees: number, external: boolean
   return routes.find((r) => r.is_default) ?? routes[0];
 }
 
-export async function submitApplication(fd: FormData): Promise<SubmitResult> {
+export async function submitApplication(
+  fd: FormData,
+  options?: { forceOverlap?: boolean },
+): Promise<SubmitResult> {
   const supabase = createServiceClient();
 
   const applicantName = String(fd.get("applicant_name") ?? "").trim();
@@ -92,7 +122,7 @@ export async function submitApplication(fd: FormData): Promise<SubmitResult> {
     return { error: routesErr?.message ?? "결재선이 설정되지 않았습니다." };
   const route = pickRoute(routes as ApprovalRoute[], attendeeCount, isExternal);
 
-  // 3) reservation 생성 (충돌이 있으면 트리거가 막음)
+  // 3) reservation 생성. 충돌이 있어도 forceOverlap=true 면 trigger 우회.
   const { data: res, error: resErr } = await supabase
     .from("reservations")
     .insert({
@@ -108,6 +138,7 @@ export async function submitApplication(fd: FormData): Promise<SubmitResult> {
       status: "pending",
       route_id: route.id,
       current_step: 1,
+      force_overlap: options?.forceOverlap ?? false,
     })
     .select("id")
     .single();

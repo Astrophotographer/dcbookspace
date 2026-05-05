@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -59,14 +58,14 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
     () => floors.filter((f) => f.building_id === buildingId),
     [floors, buildingId],
   );
-  const [floorId, setFloorId] = useState(buildingFloors[0]?.id ?? "");
-
-  // 선택된 건물이 바뀌면 첫 번째 층으로
-  useEffect(() => {
-    if (!buildingFloors.find((f) => f.id === floorId)) {
-      setFloorId(buildingFloors[0]?.id ?? "");
-    }
-  }, [buildingFloors, floorId]);
+  // floorId는 derived state. 사용자가 마지막에 고른 값이 현재 건물의 층 목록에
+  // 없으면(건물 변경, realtime 삭제 등) 자동으로 첫 번째 층으로 fallback.
+  // useEffect 안 setState로 처리하면 한 프레임 깜빡이고 react-hooks/set-state-in-effect 위반.
+  const [floorIdState, setFloorId] = useState<string>("");
+  const floorId =
+    buildingFloors.find((f) => f.id === floorIdState)?.id
+    ?? buildingFloors[0]?.id
+    ?? "";
 
   const visibleRooms = useMemo(
     () => rooms.filter((r) => r.floor_id === floorId && r.active),
@@ -81,8 +80,24 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
 
+  // 이름 편집 중에 다른 박스/캔버스를 만지면 편집 폼을 빨강 + 0.45s 흔들림으로
+  // "다른 액션은 안 먹힘" 신호를 준다. PIN 오답 패턴과 동일.
+  const [shakeNonce, setShakeNonce] = useState(0);
+  const [shaking, setShaking] = useState(false);
+  const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpShake = () => {
+    setShakeNonce((n) => n + 1);
+    setShaking(true);
+    if (shakeTimer.current) clearTimeout(shakeTimer.current);
+    shakeTimer.current = setTimeout(() => setShaking(false), 450);
+  };
+
   function startDrag(e: React.PointerEvent, room: Room, mode: DragMode) {
-    if (editingId) return;
+    if (editingId) {
+      // 편집 중인 박스 자기 자신이 아닌 다른 박스를 건드린 경우만 흔들림
+      if (editingId !== room.id) bumpShake();
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -232,6 +247,10 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
 
         <div
           ref={canvasRef}
+          onPointerDown={(e) => {
+            // 편집 중에 빈 캔버스를 누른 경우만 — 박스를 누른 경우는 startDrag 가 처리
+            if (editingId && e.target === e.currentTarget) bumpShake();
+          }}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
@@ -283,20 +302,15 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
                   {isEditing ? (
                     <RoomNameForm
                       initial={r.name}
+                      shakeNonce={shakeNonce}
+                      shaking={shaking}
                       onSubmit={(v) => handleRename(r.id, v)}
                       onCancel={() => setEditingId(null)}
                     />
                   ) : (
-                    <>
-                      <span className="line-clamp-2 text-sm font-bold text-stone-800">
-                        {r.name}
-                      </span>
-                      {r.capacity != null && (
-                        <span className="text-xs text-stone-500">
-                          정원 {r.capacity}
-                        </span>
-                      )}
-                    </>
+                    <span className="line-clamp-2 text-sm font-bold text-stone-800">
+                      {r.name}
+                    </span>
                   )}
                 </div>
 
@@ -322,17 +336,27 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
 
 function RoomNameForm({
   initial,
+  shakeNonce,
+  shaking,
   onSubmit,
   onCancel,
 }: {
   initial: string;
+  // 부모가 trigger 마다 증가시키는 카운터. key 로 사용해 form remount → CSS shake 재생.
+  shakeNonce: number;
+  // 부모가 0.45s 동안 true 로 잡아 빨간 강조 유지.
+  shaking: boolean;
   onSubmit: (name: string) => void;
   onCancel: () => void;
 }) {
   const [value, setValue] = useState(initial);
   return (
     <form
-      className="flex w-full flex-col gap-1"
+      key={shakeNonce}
+      className={cn(
+        "flex w-full flex-col gap-1",
+        shaking && "animate-shake",
+      )}
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit(value);
@@ -346,7 +370,12 @@ function RoomNameForm({
         onKeyDown={(e) => {
           if (e.key === "Escape") onCancel();
         }}
-        className="w-full rounded border border-stone-300 px-1.5 py-1 text-center text-sm"
+        className={cn(
+          "w-full rounded border px-1.5 py-1 text-center text-sm transition-colors",
+          shaking
+            ? "border-red-500 bg-red-50 text-red-900 ring-2 ring-red-300"
+            : "border-stone-300",
+        )}
       />
       <div className="flex justify-center gap-1 text-xs">
         <button

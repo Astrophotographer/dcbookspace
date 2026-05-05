@@ -1,5 +1,4 @@
 import { SiteHeader } from "@/components/site-header";
-import { DatePicker } from "@/components/date-picker";
 import { DateView } from "@/components/date-view";
 import { BuildingView } from "@/components/building-view";
 import { HomeTabs } from "@/components/home-tabs";
@@ -11,14 +10,7 @@ import {
   getReservationsBetween,
 } from "@/lib/repo";
 import { isSupabaseConfigured } from "@/lib/config";
-import {
-  endOfMonth,
-  endOfWeek,
-  format,
-  parseISO,
-  startOfMonth,
-  startOfWeek,
-} from "date-fns";
+import { addDays, format, parseISO, startOfWeek } from "date-fns";
 
 export default async function Home(props: PageProps<"/">) {
   if (!isSupabaseConfigured()) {
@@ -38,15 +30,13 @@ export default async function Home(props: PageProps<"/">) {
       ? sp.date
       : format(new Date(), "yyyy-MM-dd");
 
+  // DateView 그리드는 currentDate 가 속한 주를 1행으로 두고 6주를 펼친다.
+  // 서버 fetch 범위도 그 6주에 맞춰서 가져온다.
   const date = parseISO(dateStr);
-  const monthGridStart = format(
-    startOfWeek(startOfMonth(date), { weekStartsOn: 0 }),
-    "yyyy-MM-dd",
-  );
-  const monthGridEnd = format(
-    endOfWeek(endOfMonth(date), { weekStartsOn: 0 }),
-    "yyyy-MM-dd",
-  );
+  const gridStart = startOfWeek(date, { weekStartsOn: 0 });
+  const gridEnd = addDays(gridStart, 41);
+  const monthGridStart = format(gridStart, "yyyy-MM-dd");
+  const monthGridEnd = format(gridEnd, "yyyy-MM-dd");
 
   const dayStart = `${dateStr}T00:00:00+09:00`;
   const dayEnd = `${dateStr}T23:59:59+09:00`;
@@ -71,10 +61,7 @@ export default async function Home(props: PageProps<"/">) {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-stone-900">예약 현황</h1>
-          <DatePicker value={dateStr} />
-        </div>
+        <h1 className="mb-6 text-2xl font-bold text-stone-900">예약 현황</h1>
 
         <HomeTabs
           dateView={
@@ -85,6 +72,7 @@ export default async function Home(props: PageProps<"/">) {
           }
           placeView={
             <BuildingView
+              currentDate={dateStr}
               buildings={buildings}
               floors={floors}
               rooms={rooms}

@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 const REALM = 'Basic realm="Admin Area", charset="UTF-8"';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const expectedUser = process.env.ADMIN_USERNAME;
   const expectedPass = process.env.ADMIN_PASSWORD;
 

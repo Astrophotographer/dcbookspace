@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { verifyPin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { ROLE_LABEL, type ApprovalStep } from "@/lib/supabase/types";
+import {
+  readApproverSession,
+  setApproverSessionCookie,
+} from "@/lib/approver-session";
 
 type Result = {
   error?: string;
@@ -106,12 +110,89 @@ export async function signByPin(args: {
       .eq("id", matched.id);
   }
 
+  // 5분 자동 세션 발급 (마스터 키는 제외 — 한 건만 처리되도록)
+  if (!isMaster && matched) {
+    await setApproverSessionCookie(matched.id);
+  }
+
   revalidatePath("/");
   revalidatePath(`/sign/${token}`);
   revalidatePath(`/reservations/${r.id}`);
   return {
     ok: true,
     approverName: isMaster ? "마스터 키" : matched!.name,
+    stepLabel: currentStepDef.label,
+  };
+}
+
+/**
+ * 5분 자동 세션 cookie 로 본인 단계 즉시 자동 승인.
+ * - cookie 가 없거나 만료됐으면 { error } 반환 → 클라가 일반 PIN 폼으로 fallback
+ * - cookie 의 user 가 이번 단계 담당이 아니면 자동 승인 없이 안내 (silent skip)
+ * - 자동 결재 성공 시 cookie 를 다시 5분으로 슬라이딩 갱신
+ */
+export async function signBySession(args: {
+  token: string;
+}): Promise<Result> {
+  const { token } = args;
+
+  const session = await readApproverSession();
+  if (!session) return { error: "자동 세션이 없습니다." };
+
+  const supabase = createServiceClient();
+
+  const { data: r, error: e0 } = await supabase
+    .from("reservations")
+    .select("*, route:approval_routes(*), approvals(*)")
+    .eq("qr_token", token)
+    .single();
+  if (e0 || !r) return { error: "잘못된 결재 링크입니다." };
+  if (r.status !== "pending") return { error: "진행할 수 없는 상태입니다." };
+
+  const steps = r.route.steps as ApprovalStep[];
+  const currentStepDef = steps.find((s) => s.order === r.current_step);
+  if (!currentStepDef) return { error: "결재선 단계 정의가 잘못되었습니다." };
+
+  const { data: u, error: e1 } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", session.userId)
+    .eq("active", true)
+    .maybeSingle();
+  if (e1) return { error: e1.message };
+  if (!u) return { error: "사용자를 찾을 수 없습니다." };
+  if (u.pin_locked_until && new Date(u.pin_locked_until) > new Date())
+    return { error: "잠시 후 다시 시도해주세요." };
+
+  // 본인 단계 아니면 자동 승인 거부 → 일반 안내 흐름으로
+  if (u.role !== currentStepDef.role) {
+    return {
+      error: `이번 단계(${ROLE_LABEL[currentStepDef.role]})는 본인이 아닙니다.`,
+    };
+  }
+
+  const currentAppr = (
+    r.approvals as { id: string; step_order: number; signature_token: string }[]
+  ).find((a) => a.step_order === r.current_step);
+  if (!currentAppr) return { error: "결재 행을 찾을 수 없습니다." };
+
+  const { error: e2 } = await supabase.rpc("record_approval", {
+    p_token: currentAppr.signature_token,
+    p_approver_id: u.id,
+    p_decision: "approve",
+    p_comment: "5분 자동 세션 결재",
+  });
+  if (e2) return { error: e2.message };
+
+  // 슬라이딩 갱신
+  await setApproverSessionCookie(u.id);
+
+  revalidatePath("/");
+  revalidatePath(`/sign/${token}`);
+  revalidatePath(`/reservations/${r.id}`);
+  return {
+    ok: true,
+    approverName: u.name,
     stepLabel: currentStepDef.label,
   };
 }

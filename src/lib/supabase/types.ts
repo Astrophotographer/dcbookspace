@@ -43,7 +43,6 @@ export type Room = {
   id: string;
   floor_id: string;
   name: string;
-  capacity: number | null;
   map_x: number | null;
   map_y: number | null;
   map_w: number | null;

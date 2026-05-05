@@ -10,7 +10,8 @@ import type {
 } from "@/lib/supabase/types";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { submitApplication } from "./actions";
+import { ConflictModal } from "@/components/ui/conflict-modal";
+import { findRoomConflicts, submitApplication, type ConflictInfo } from "./actions";
 
 type Props = {
   buildings: Building[];
@@ -79,6 +80,11 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // 충돌 안내 모달: 충돌 목록 + 다시 제출할 FormData 스냅샷을 함께 들고 있는다.
+  const [conflictModal, setConflictModal] = useState<{
+    conflicts: ConflictInfo[];
+    fd: FormData;
+  } | null>(null);
 
   const [phone, setPhone] = useState("");
   const today = new Date().toISOString().slice(0, 10);
@@ -101,7 +107,26 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
     [rooms, floorId],
   );
 
+  // 실제 신청 제출. 충돌이 확정된 경우 forceOverlap=true 로 한 번 더 보내준다.
+  function doSubmit(fd: FormData, forceOverlap: boolean) {
+    startTransition(async () => {
+      const res = await submitApplication(fd, { forceOverlap });
+      if (res.error) {
+        setError(res.error);
+        setConflictModal(null);
+        return;
+      }
+      if (res.id) {
+        setConflictModal(null);
+        // 신청 완료 → QR 포함 결재 서류를 새 창에서 자동 인쇄
+        window.open(`/reservations/${res.id}/print`, "_blank");
+        router.push(`/reservations/${res.id}?just=1`);
+      }
+    });
+  }
+
   return (
+    <>
     <form
       className="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
       onSubmit={(e) => {
@@ -120,14 +145,21 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
           return;
         }
         const fd = new FormData(e.currentTarget);
+        const roomId = String(fd.get("room_id") ?? "");
+        const startTime = String(fd.get("start_time") ?? "");
+        const endTime = String(fd.get("end_time") ?? "");
+        const startAt = `${date}T${startTime}:00+09:00`;
+        const endAt = `${endDate}T${endTime}:00+09:00`;
+
         startTransition(async () => {
-          const res = await submitApplication(fd);
-          if (res.error) setError(res.error);
-          else if (res.id) {
-            // 신청 완료 → QR 포함 결재 서류를 새 창에서 자동 인쇄
-            window.open(`/reservations/${res.id}/print`, "_blank");
-            router.push(`/reservations/${res.id}?just=1`);
+          // 1차 경고: 같은 호실·시간에 이미 예약이 있는지 사전 조회
+          const conflicts = await findRoomConflicts(roomId, startAt, endAt);
+          if (conflicts.length > 0) {
+            // window.confirm 대신 디자인된 모달로 안내. 사용자의 선택을 기다림.
+            setConflictModal({ conflicts, fd });
+            return;
           }
+          doSubmit(fd, false);
         });
       }}
     >
@@ -207,7 +239,6 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
               {visibleRooms.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
-                  {r.capacity ? ` (정원 ${r.capacity})` : ""}
                 </option>
               ))}
             </Select>
@@ -308,5 +339,16 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
         </Button>
       </div>
     </form>
+
+    <ConflictModal
+      conflicts={conflictModal?.conflicts ?? null}
+      pending={pending}
+      onCancel={() => setConflictModal(null)}
+      onConfirm={() => {
+        if (!conflictModal) return;
+        doSubmit(conflictModal.fd, true);
+      }}
+    />
+    </>
   );
 }

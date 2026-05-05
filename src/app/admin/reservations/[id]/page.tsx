@@ -79,6 +79,7 @@ export default async function AdminReservationDetail(
         {/* QR + 신청 정보 */}
         <section className="mb-6 grid gap-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:grid-cols-[220px_1fr]">
           <div className="flex flex-col items-center text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- QR은 base64 data URL. next/image 최적화 의미 없음 */}
             <img src={qr} alt="결재 QR" width={200} height={200} />
             <p className="mt-2 text-xs text-stone-500">QR 스캔 → PIN 결재</p>
             <p className="mt-1 break-all text-[10px] text-stone-400">

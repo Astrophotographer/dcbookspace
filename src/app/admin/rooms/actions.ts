@@ -64,7 +64,7 @@ export async function updateRoomLayout(
 
 export async function updateRoomMeta(
   id: string,
-  patch: { name?: string; capacity?: number | null },
+  patch: { name?: string },
 ): Promise<Result> {
   const supabase = createServiceClient();
   const update: Record<string, unknown> = {};
@@ -73,7 +73,6 @@ export async function updateRoomMeta(
     if (!trimmed) return { error: "이름을 입력해주세요." };
     update.name = trimmed;
   }
-  if (patch.capacity !== undefined) update.capacity = patch.capacity;
   if (Object.keys(update).length === 0) return {};
 
   const { error } = await supabase.from("rooms").update(update).eq("id", id);

@@ -9,6 +9,7 @@ import {
   STATUS_BADGE_CLASS,
   STATUS_LABEL,
 } from "@/lib/reservation-status";
+import { readApproverSession } from "@/lib/approver-session";
 import { SignByPinForm, ChairmanCancelForm } from "./sign-form";
 
 export default async function SignPage(props: PageProps<"/sign/[token]">) {
@@ -59,7 +60,10 @@ export default async function SignPage(props: PageProps<"/sign/[token]">) {
 
       {/* 상태별 액션 영역 */}
       {r.status === "pending" && (
-        <SignByPinForm token={token} />
+        <SignByPinForm
+          token={token}
+          hasAutoSession={!!(await readApproverSession())}
+        />
       )}
 
       {r.status === "approved" && (

@@ -59,12 +59,18 @@ export default async function PrintPage(
     <>
       <PrintAuto />
       <main className="print-main">
+        <div className="print-notice">
+          <strong>인쇄 팁:</strong> 인쇄 대화상자에서{" "}
+          <b>추가 설정(More settings) → 머리글 및 바닥글(Headers and footers)</b>{" "}
+          체크를 해제하시면 상·하단의 URL·시간·페이지 번호가 사라집니다.
+        </div>
         <div className="container">
           <h1 className="title">장소 사용 신청서</h1>
 
           {/* 우측 상단: QR + 결재란 */}
           <div className="approval-wrapper">
             <div className="qr-box">
+              {/* eslint-disable-next-line @next/next/no-img-element -- QR은 인쇄용 base64 data URL. next/image의 lazy load·WebP 변환은 인쇄 품질 저하 */}
               <img src={qr} alt="전자결재용 QR" width={92} height={92} />
               <div className="qr-caption">전자결재용 QR</div>
             </div>
@@ -147,6 +153,17 @@ export default async function PrintPage(
             background: #d8d8d8;
             padding: 24px 0;
             min-height: 100vh;
+          }
+          .print-notice {
+            max-width: 170mm;
+            margin: 0 auto 16px;
+            padding: 12px 16px;
+            background: #fff8db;
+            border: 1px solid #e8c84a;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #5a4a00;
           }
           .container {
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
@@ -305,8 +322,8 @@ export default async function PrintPage(
           }
           .ref-no {
             position: absolute;
-            right: 12mm;
-            bottom: 8mm;
+            right: 8mm;
+            bottom: 4mm;
             font-size: 9pt;
             color: #555;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -315,12 +332,14 @@ export default async function PrintPage(
           @media print {
             html, body { background: #fff !important; margin: 0; padding: 0; }
             .print-main { background: #fff; padding: 0; min-height: 0; }
+            .print-notice { display: none; }
             .container {
               width: auto;
-              min-height: 0;
-              padding: 0;
+              min-height: calc(297mm - 40mm);
+              max-height: calc(297mm - 40mm);
               margin: 0;
               box-shadow: none;
+              overflow: hidden;
             }
           }
         `}</style>

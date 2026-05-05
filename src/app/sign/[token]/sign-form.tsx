@@ -1,33 +1,87 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { cancelByChairman, signByPin } from "./actions";
+import { cancelByChairman, signByPin, signBySession } from "./actions";
 
 /**
  * 단일 QR + PIN으로 본인 단계를 자동 승인.
  * 0000은 마스터 키 (모든 단계 강제 승인). 반려는 결재자 폼에서 제공하지 않음.
+ *
+ * hasAutoSession=true 면 5분 자동 세션 cookie 가 있다는 뜻 → mount 직후
+ * signBySession 한 번 시도. 성공하면 done, 본인 단계가 아니거나 만료면 일반 PIN 폼.
  */
-export function SignByPinForm({ token }: { token: string }) {
+export function SignByPinForm({
+  token,
+  hasAutoSession = false,
+}: {
+  token: string;
+  hasAutoSession?: boolean;
+}) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState<{ name: string; label: string } | null>(null);
+  const [done, setDone] = useState<{
+    name: string;
+    label: string;
+    auto?: boolean;
+  } | null>(null);
+
+  // hasAutoSession 이면 mount 시 한 번만 자동 결재 시도. 실패 (단계 불일치/만료) 시
+  // 그냥 일반 PIN 폼으로 fallback. autoTried ref 로 중복 호출 방지.
+  const autoTried = useRef(false);
+  const [autoChecking, setAutoChecking] = useState(hasAutoSession);
+  // mount 시점의 1회 자동 결재 시도. setState 는 promise.then 안에 있어
+  // react-hooks/set-state-in-effect 룰을 우회한다.
+  useEffect(() => {
+    if (!hasAutoSession || autoTried.current) return;
+    autoTried.current = true;
+    signBySession({ token }).then((res) => {
+      if (res.ok) {
+        setDone({
+          name: res.approverName ?? "",
+          label: res.stepLabel ?? "",
+          auto: true,
+        });
+        router.refresh();
+      } else {
+        setAutoChecking(false);
+      }
+    });
+  }, [hasAutoSession, token, router]);
+
+  if (autoChecking && !done) {
+    return (
+      <div className="rounded-2xl border-2 border-blue-300 bg-blue-50 p-6 text-center">
+        <div className="mb-2 flex justify-center">
+          <Zap className="h-8 w-8 animate-pulse text-blue-600" strokeWidth={2.5} />
+        </div>
+        <p className="text-xl font-bold text-blue-900">자동 결재 진행 중...</p>
+        <p className="mt-2 text-sm text-blue-700">
+          5분 자동 세션이 활성화되어 있어 PIN 입력 없이 즉시 처리됩니다.
+        </p>
+      </div>
+    );
+  }
 
   if (done) {
     return (
       <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-6 text-center text-emerald-900">
-        <p className="text-xl font-bold">✅ 결재 완료</p>
+        <p className="text-xl font-bold">
+          {done.auto ? "⚡ 자동 결재 완료" : "✅ 결재 완료"}
+        </p>
         <p className="mt-2 text-base">
           {done.label} · {done.name} 님 처리 완료
         </p>
         <p className="mt-3 text-sm text-stone-600">
-          위 진행 상황에서 누가 어디까지 결재했는지 확인하실 수 있습니다.
+          {done.auto
+            ? "다음 QR도 5분 안에 같은 휴대폰에서 스캔하면 자동으로 진행됩니다."
+            : "위 진행 상황에서 누가 어디까지 결재했는지 확인하실 수 있습니다."}
         </p>
       </div>
     );
