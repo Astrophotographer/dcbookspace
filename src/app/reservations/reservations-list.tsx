@@ -7,11 +7,11 @@ type Props = {
   reservations: ReservationDetail[];
 };
 
-export function ReservationsAdmin({ reservations }: Props) {
+export function ReservationsList({ reservations }: Props) {
   return (
     <ReservationsTable
       reservations={reservations}
-      rowLink={(r) => ({ href: `/admin/reservations/${r.id}` })}
+      rowLink={(r) => ({ href: `/reservations/${r.id}` })}
     />
   );
 }

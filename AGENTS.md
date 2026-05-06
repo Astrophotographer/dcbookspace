@@ -18,7 +18,8 @@
 ## 핵심 아키텍처
 - **인증 모델**: 사용자 계정 없음. 결재자는 PIN 4자리(bcrypt)로 식별
 - **QR 토큰**: 신청서당 1개(`reservations.qr_token`). 모든 결재 단계가 같은 QR을 공유, PIN으로 단계 라우팅
-- **마스터 키 `0000`**: 어떤 단계든 강제 승인 (운영자용, 코드 내 하드코딩 유지)
+- **마스터 키 `0000`**: 비상용. 어떤 단계든 강제 승인 (코드 내 하드코딩 유지, 절대 제거 금지)
+- **관리자 마스터 PIN**: `users.role='admin'` 사용자의 PIN(휴대폰 뒷 4자리, bcrypt)도 마스터처럼 동작 — 어떤 단계든 강제 승인. `/admin/admins` 에서 관리. 관리자가 0명이 되지 않도록 시드(`홍길동`) 보장 ([0009 마이그레이션](supabase/migrations/0009_default_admin.sql))
 - **Derived status**: `reservations.status='pending'` 동안 화면은 진행도에 따라 `결재대기중 / 결재진행중`으로 표시 — DB enum 변경 금지, derive 로직 사용
 - **Realtime**: rooms / reservations / approvals는 publication에 추가됨. 새 테이블 추가 시 마이그레이션에서 publication 등록도 함께
 

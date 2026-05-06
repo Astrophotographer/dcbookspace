@@ -141,7 +141,7 @@ export function ConflictModal({ conflicts, pending, onCancel, onConfirm }: Props
 
         <div className="mx-6 mt-5 mb-6 rounded-lg border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm leading-relaxed text-amber-900 sm:mx-8 sm:mb-7">
           그래도 진행하시면 위 일정과 <strong className="font-semibold">중복으로 신청</strong>되며,
-          이후 운영자가 검토하여 조정할 수 있습니다.
+          이후 관리자가 검토하여 조정할 수 있습니다.
         </div>
 
         <div className="flex flex-col-reverse gap-2 border-t border-stone-200 bg-stone-50/60 px-6 py-4 sm:flex-row sm:justify-end sm:px-8">

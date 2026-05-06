@@ -10,6 +10,7 @@ import { SetupNeeded } from "@/components/setup-needed";
 import { formatDateTime } from "@/lib/utils";
 import type { ReservationDetail } from "@/lib/repo";
 import { Printer, FileText } from "lucide-react";
+import { OwnerActions } from "./owner-actions";
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
   if (!isSupabaseConfigured()) {
@@ -59,6 +60,15 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           </h1>
           <ReservationBadge reservation={r} />
         </div>
+
+        <OwnerActions
+          reservationId={r.id}
+          refNo={r.ref_no}
+          purpose={r.purpose}
+          applicantName={r.applicant.name}
+          applicantPhone={r.applicant.phone ?? ""}
+          editable={r.status === "pending" && r.current_step === 1}
+        />
 
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">

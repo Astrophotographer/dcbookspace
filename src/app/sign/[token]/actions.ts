@@ -21,7 +21,8 @@ const MASTER_PIN = "0000";
 /**
  * 단일 QR 토큰 + PIN으로 본인 단계를 자동 승인.
  * - PIN으로 사용자 식별 → 그 사용자의 role이 현재 단계의 role과 일치하면 결재 진행
- * - PIN이 0000(마스터 키)이면 어떤 단계든 자동 승인 (approver_id = null, comment에 흔적)
+ * - PIN이 0000(비상용 마스터 키)이면 어떤 단계든 자동 승인 (approver_id = null, comment에 흔적)
+ * - 매칭된 사용자의 role이 'admin'(관리자)이면 어떤 단계든 강제 승인 (approver_id = 본인, comment에 흔적)
  * - 반려는 결재자 폼에서 노출하지 않음. (취소는 cancelByChairman)
  */
 export async function signByPin(args: {
@@ -53,6 +54,7 @@ export async function signByPin(args: {
 
   const isMaster = pin === MASTER_PIN;
   let matched: { id: string; role: string; name: string; pin_attempts: number } | null = null;
+  let isAdminMaster = false;
 
   if (!isMaster) {
     // PIN으로 사용자 식별
@@ -75,7 +77,10 @@ export async function signByPin(args: {
     }
     if (!matched) return { error: "PIN이 일치하지 않습니다." };
 
-    if (matched.role !== currentStepDef.role) {
+    // 관리자(admin) PIN 은 마스터 키처럼 어떤 단계든 강제 승인
+    isAdminMaster = matched.role === "admin";
+
+    if (!isAdminMaster && matched.role !== currentStepDef.role) {
       const myStep = steps.find((s) => s.role === matched!.role);
       if (myStep && myStep.order < r.current_step) {
         return {
@@ -98,7 +103,11 @@ export async function signByPin(args: {
     p_token: currentAppr.signature_token,
     p_approver_id: isMaster ? null : matched!.id,
     p_decision: "approve",
-    p_comment: isMaster ? "마스터 키 결재" : null,
+    p_comment: isMaster
+      ? "마스터 키 결재"
+      : isAdminMaster
+        ? `관리자 마스터 결재 (${matched!.name})`
+        : null,
   });
   if (e2) return { error: e2.message };
 
@@ -110,8 +119,8 @@ export async function signByPin(args: {
       .eq("id", matched.id);
   }
 
-  // 5분 자동 세션 발급 (마스터 키는 제외 — 한 건만 처리되도록)
-  if (!isMaster && matched) {
+  // 5분 자동 세션 발급 (비상용 마스터 키, 관리자 마스터 결재는 제외 — 한 건만 처리되도록)
+  if (!isMaster && !isAdminMaster && matched) {
     await setApproverSessionCookie(matched.id);
   }
 
@@ -120,7 +129,11 @@ export async function signByPin(args: {
   revalidatePath(`/reservations/${r.id}`);
   return {
     ok: true,
-    approverName: isMaster ? "마스터 키" : matched!.name,
+    approverName: isMaster
+      ? "마스터 키"
+      : isAdminMaster
+        ? `관리자 ${matched!.name}`
+        : matched!.name,
     stepLabel: currentStepDef.label,
   };
 }

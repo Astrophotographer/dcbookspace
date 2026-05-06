@@ -11,13 +11,44 @@ import type {
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConflictModal } from "@/components/ui/conflict-modal";
-import { findRoomConflicts, submitApplication, type ConflictInfo } from "./actions";
+import { setMe } from "@/lib/me";
+import {
+  findRoomConflicts,
+  submitApplication,
+  updateApplication,
+  type ConflictInfo,
+} from "./actions";
+
+export type ApplyFormDefaults = {
+  applicant_name: string;
+  applicant_phone: string;
+  dept_id: string;
+  building_id: string;
+  floor_id: string;
+  room_id: string;
+  date: string;
+  end_date: string;
+  start_time: string;
+  end_time: string;
+  purpose: string;
+  attendee_count: number;
+  is_external: boolean;
+  notes: string;
+};
+
+type EditTarget = {
+  id: string;
+  ownerName: string;
+  ownerPhone: string;
+};
 
 type Props = {
   buildings: Building[];
   floors: Floor[];
   rooms: Room[];
   departments: Department[];
+  defaults?: ApplyFormDefaults;
+  editTarget?: EditTarget;
 };
 
 // 한국 휴대폰 포맷: 010-XXXX-XXXX
@@ -76,8 +107,16 @@ function formatDateInput(raw: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
+export function ApplyForm({
+  buildings,
+  floors,
+  rooms,
+  departments,
+  defaults,
+  editTarget,
+}: Props) {
   const router = useRouter();
+  const isEdit = !!editTarget;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // 충돌 안내 모달: 충돌 목록 + 다시 제출할 FormData 스냅샷을 함께 들고 있는다.
@@ -86,11 +125,15 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
     fd: FormData;
   } | null>(null);
 
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(defaults?.applicant_name ?? "");
+  const [phone, setPhone] = useState(defaults?.applicant_phone ?? "");
+
   const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
-  const [buildingId, setBuildingId] = useState(buildings[0]?.id ?? "");
+  const [date, setDate] = useState(defaults?.date ?? today);
+  const [endDate, setEndDate] = useState(defaults?.end_date ?? today);
+  const [buildingId, setBuildingId] = useState(
+    defaults?.building_id ?? buildings[0]?.id ?? "",
+  );
 
   // 시작 날짜 변경 시 종료가 더 빠르면 시작과 같게 자동 동기화
   function onStartDateChange(v: string) {
@@ -101,7 +144,9 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
     () => floors.filter((f) => f.building_id === buildingId),
     [floors, buildingId],
   );
-  const [floorId, setFloorId] = useState(visibleFloors[0]?.id ?? "");
+  const [floorId, setFloorId] = useState(
+    defaults?.floor_id ?? visibleFloors[0]?.id ?? "",
+  );
   const visibleRooms = useMemo(
     () => rooms.filter((r) => r.floor_id === floorId),
     [rooms, floorId],
@@ -110,6 +155,23 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
   // 실제 신청 제출. 충돌이 확정된 경우 forceOverlap=true 로 한 번 더 보내준다.
   function doSubmit(fd: FormData, forceOverlap: boolean) {
     startTransition(async () => {
+      if (isEdit && editTarget) {
+        // 수정 모드: 본인 검증을 위해 owner 정보 동봉
+        fd.set("owner_name", editTarget.ownerName);
+        fd.set("owner_phone", editTarget.ownerPhone);
+        const res = await updateApplication(editTarget.id, fd, { forceOverlap });
+        if (res.error) {
+          setError(res.error);
+          setConflictModal(null);
+          return;
+        }
+        if (res.id) {
+          setConflictModal(null);
+          router.push(`/reservations/${res.id}/print`);
+        }
+        return;
+      }
+
       const res = await submitApplication(fd, { forceOverlap });
       if (res.error) {
         setError(res.error);
@@ -118,6 +180,12 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
       }
       if (res.id) {
         setConflictModal(null);
+        // 본인 정보 기억 → 다음에 모든신청내역에서 수정/삭제 노출에 사용
+        const submittedName = String(fd.get("applicant_name") ?? "").trim();
+        const submittedPhone = String(fd.get("applicant_phone") ?? "").trim();
+        if (submittedName && submittedPhone) {
+          setMe({ name: submittedName, phone: submittedPhone });
+        }
         // 신청 완료 → QR 포함 결재 서류를 새 창에서 자동 인쇄
         window.open(`/reservations/${res.id}/print`, "_blank");
         router.push(`/reservations/${res.id}?just=1`);
@@ -152,8 +220,14 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
         const endAt = `${endDate}T${endTime}:00+09:00`;
 
         startTransition(async () => {
-          // 1차 경고: 같은 호실·시간에 이미 예약이 있는지 사전 조회
-          const conflicts = await findRoomConflicts(roomId, startAt, endAt);
+          // 1차 경고: 같은 호실·시간에 이미 예약이 있는지 사전 조회.
+          // 수정 모드에서는 자기 자신을 제외해야 자가 충돌이 안 잡힌다.
+          const conflicts = await findRoomConflicts(
+            roomId,
+            startAt,
+            endAt,
+            isEdit && editTarget ? editTarget.id : undefined,
+          );
           if (conflicts.length > 0) {
             // window.confirm 대신 디자인된 모달로 안내. 사용자의 선택을 기다림.
             setConflictModal({ conflicts, fd });
@@ -174,9 +248,16 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
               required
               maxLength={20}
               placeholder="홍길동"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              readOnly={isEdit}
+              disabled={isEdit}
             />
           </Field>
-          <Field label="휴대폰" hint="결재 진행 알림에 사용됩니다">
+          <Field
+            label="휴대폰"
+            hint={isEdit ? "신청자 정보는 수정할 수 없습니다." : "결재 진행 알림에 사용됩니다"}
+          >
             <Input
               name="applicant_phone"
               required
@@ -186,11 +267,13 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
               pattern="[0-9\-]{9,13}"
               value={phone}
               onChange={(e) => setPhone(formatPhone(e.target.value))}
+              readOnly={isEdit}
+              disabled={isEdit}
             />
           </Field>
         </div>
         <Field label="소속 부서">
-          <Select name="dept_id" required>
+          <Select name="dept_id" required defaultValue={defaults?.dept_id ?? ""}>
             <option value="">선택하세요</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>
@@ -235,7 +318,11 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
             </Select>
           </Field>
           <Field label="호실">
-            <Select name="room_id" required>
+            <Select
+              name="room_id"
+              required
+              defaultValue={defaults?.room_id ?? ""}
+            >
               {visibleRooms.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -283,10 +370,20 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="시작 시간">
-            <Input type="time" name="start_time" required defaultValue="09:00" />
+            <Input
+              type="time"
+              name="start_time"
+              required
+              defaultValue={defaults?.start_time ?? "09:00"}
+            />
           </Field>
           <Field label="종료 시간">
-            <Input type="time" name="end_time" required defaultValue="11:00" />
+            <Input
+              type="time"
+              name="end_time"
+              required
+              defaultValue={defaults?.end_time ?? "11:00"}
+            />
           </Field>
         </div>
       </fieldset>
@@ -296,7 +393,12 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
           사용 목적
         </legend>
         <Field label="목적/행사명" hint="예: 청년부 수련회 사전모임">
-          <Input name="purpose" required maxLength={80} />
+          <Input
+            name="purpose"
+            required
+            maxLength={80}
+            defaultValue={defaults?.purpose ?? ""}
+          />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="참석 인원">
@@ -305,18 +407,27 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
               name="attendee_count"
               required
               min={1}
-              defaultValue={10}
+              defaultValue={defaults?.attendee_count ?? 10}
             />
           </Field>
           <Field label="외부 행사 여부">
             <label className="flex h-11 items-center gap-2">
-              <input type="checkbox" name="is_external" className="h-5 w-5" />
+              <input
+                type="checkbox"
+                name="is_external"
+                className="h-5 w-5"
+                defaultChecked={defaults?.is_external ?? false}
+              />
               <span className="text-stone-700">외부 단체와 공동 진행</span>
             </label>
           </Field>
         </div>
         <Field label="비고 (선택)">
-          <Textarea name="notes" maxLength={500} />
+          <Textarea
+            name="notes"
+            maxLength={500}
+            defaultValue={defaults?.notes ?? ""}
+          />
         </Field>
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
           참석 인원 50명 이상이거나 외부 행사일 경우 담임목사님 결재까지
@@ -335,7 +446,13 @@ export function ApplyForm({ buildings, floors, rooms, departments }: Props) {
           취소
         </Button>
         <Button type="submit" disabled={pending} size="lg">
-          {pending ? "신청 중..." : "신청하기"}
+          {pending
+            ? isEdit
+              ? "수정 중..."
+              : "신청 중..."
+            : isEdit
+              ? "수정 저장"
+              : "신청하기"}
         </Button>
       </div>
     </form>

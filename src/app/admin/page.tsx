@@ -2,25 +2,38 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
-import { Users, Building, Briefcase, Network, FileText } from "lucide-react";
+import {
+  Users,
+  Building,
+  Briefcase,
+  Network,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
 
 const TILES = [
   {
-    href: "/admin/reservations",
-    label: "신청서 관리",
-    desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
-    Icon: FileText,
+    href: "/admin/admins",
+    label: "관리자정보",
+    desc: "관리자 추가·삭제, 마스터 PIN 발급",
+    Icon: ShieldCheck,
   },
   {
     href: "/admin/users",
-    label: "사용자/결재자 PIN",
+    label: "결재자정보",
     desc: "결재자 등록 및 PIN 관리",
     Icon: Users,
   },
   {
+    href: "/admin/reservations",
+    label: "신청서관리",
+    desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
+    Icon: FileText,
+  },
+  {
     href: "/admin/departments",
-    label: "부서",
-    desc: "부서장·담당장로 매핑",
+    label: "부서관리",
+    desc: "부서 생성·삭제·이름 변경, 부서장·담당장로 등록",
     Icon: Briefcase,
   },
   {

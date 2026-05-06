@@ -7,13 +7,13 @@ import { Field, Input, Select } from "@/components/ui/input";
 import { createUser, deleteUser, issuePin } from "./actions";
 
 const APPROVER_ROLES: UserRole[] = ["dept_head", "elder", "manager", "senior_pastor"];
+// 관리자(admin) 는 /admin/admins 별도 페이지에서 관리한다.
 const ALL_ROLES: UserRole[] = [
   "applicant",
   "dept_head",
   "elder",
   "manager",
   "senior_pastor",
-  "admin",
 ];
 
 type Props = {

@@ -30,7 +30,7 @@ export function SiteHeader() {
             href="/reservations"
             className="rounded-lg px-3 py-2 hover:bg-stone-100"
           >
-            내 신청
+            모든 신청내역
           </Link>
           <Link
             href="/admin"
