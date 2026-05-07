@@ -18,14 +18,10 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "DCbookspace",
+    title: "장소사용신청",
   },
-  icons: {
-    // PNG 한 장으로 desktop·iOS·Android 다 커버 (이상적이진 않지만 추가 자산
-    // 만들기 전 임시. 추후 192/512 별도 png 만들어 대체).
-    icon: "/deungchon-logo.png",
-    apple: "/deungchon-logo.png",
-  },
+  // icons 는 src/app/icon.tsx · src/app/apple-icon.tsx 가 자동으로 link 태그
+  // 주입하므로 metadata 에 직접 명시 안 함.
 };
 
 // 모바일 브라우저 주소창·노치 색을 시스템 테마와 통일.
