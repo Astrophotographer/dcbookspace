@@ -350,14 +350,25 @@ export default async function SeriesPrintPage(props: PageArgs) {
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
           }
           @media print {
-            html, body { background: #fff !important; margin: 0; padding: 0; }
-            .print-main { background: #fff; padding: 0; min-height: 0; }
+            html, body {
+              background: #fff !important;
+              margin: 0;
+              padding: 0;
+              height: calc(297mm - 40mm);
+              overflow: hidden;
+            }
+            .print-main { background: #fff; padding: 0; min-height: 0; height: auto; }
             .print-notice { display: none; }
             .container {
               width: auto;
-              min-height: calc(297mm - 40mm);
+              height: calc(297mm - 40mm);
+              min-height: 0;
+              max-height: calc(297mm - 40mm);
               margin: 0;
               box-shadow: none;
+              overflow: hidden;
+              page-break-inside: avoid;
+              page-break-after: avoid;
             }
           }
         `}</style>

@@ -110,6 +110,20 @@ export default async function AdminReservationDetail(
           </dl>
         </section>
 
+        {/* 관리자 작업 — 결재 진행 위에 노출해서 강제 처리 액션을 가장 먼저 눈에 띄게 */}
+        <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
+          <h2 className="mb-1 text-lg font-semibold text-amber-900">
+            관리자 작업
+          </h2>
+          <p className="mb-4 text-sm text-amber-800">
+            신청서를 삭제하거나, 결재 없이 즉시 예약 완료 처리할 수 있습니다.
+          </p>
+          <AdminActions
+            reservationId={r.id}
+            canForce={r.status === "pending"}
+          />
+        </section>
+
         {/* 결재 진행 상황 */}
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">결재 진행 상황</h2>
@@ -121,7 +135,7 @@ export default async function AdminReservationDetail(
         </section>
 
         {/* 출력 / 다운로드 */}
-        <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">서류 출력</h2>
           <p className="mb-3 text-sm text-stone-600">
             결재 서류를 다시 출력하거나 PDF로 저장할 수 있습니다. 신청 확정 ·
@@ -140,20 +154,6 @@ export default async function AdminReservationDetail(
               </Button>
             </Link>
           </div>
-        </section>
-
-        {/* 관리자 액션 (우측 하단) */}
-        <section className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
-          <h2 className="mb-1 text-lg font-semibold text-amber-900">
-            관리자 작업
-          </h2>
-          <p className="mb-4 text-sm text-amber-800">
-            신청서를 삭제하거나, 결재 없이 즉시 예약 완료 처리할 수 있습니다.
-          </p>
-          <AdminActions
-            reservationId={r.id}
-            canForce={r.status === "pending"}
-          />
         </section>
       </main>
     </>

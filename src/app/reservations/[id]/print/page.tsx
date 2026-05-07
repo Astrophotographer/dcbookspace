@@ -330,17 +330,36 @@ export default async function PrintPage(
           }
 
           @media print {
-            html, body { background: #fff !important; margin: 0; padding: 0; }
-            .print-main { background: #fff; padding: 0; min-height: 0; }
+            /* 두번째 페이지 생성 차단 — html/body 자체를 페이지 영역으로 클램프 */
+            html, body {
+              background: #fff !important;
+              margin: 0;
+              padding: 0;
+              height: calc(297mm - 40mm);
+              overflow: hidden;
+            }
+            .print-main { background: #fff; padding: 0; min-height: 0; height: auto; }
             .print-notice { display: none; }
             .container {
               width: auto;
-              min-height: calc(297mm - 40mm);
+              height: calc(297mm - 40mm);
+              min-height: 0;
               max-height: calc(297mm - 40mm);
               margin: 0;
               box-shadow: none;
               overflow: hidden;
+              page-break-inside: avoid;
+              page-break-after: avoid;
             }
+            /* 인쇄용 컴팩트 — 화면 미리보기와는 마진 다르게 */
+            .title { margin: 16px 0 20px; }
+            .approval-wrapper { margin-bottom: 24px; }
+            .content-body { margin: 22px 0 28px; }
+            .form-section { margin-bottom: 24px; }
+            .form-group { margin-bottom: 16px; }
+            .signature-section { margin-top: 16px; }
+            .sig-row { margin-bottom: 10px; }
+            .date-section { padding-top: 20px; padding-bottom: 8mm; }
           }
         `}</style>
       </main>
