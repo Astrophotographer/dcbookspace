@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -105,9 +106,26 @@ export default async function ReservationsListPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">모든 신청내역</h1>
-          <span className="text-sm text-stone-500">총 {entries.length}건</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-stone-500">
+              총 {entries.length}건
+            </span>
+            {admin && (
+              // CSV 라우트로 직접 a href 다운로드 — server 가 Content-Disposition
+              // 헤더로 파일명·attachment 지정해 클릭 한 번에 저장됨.
+              <a
+                href="/api/admin/reservations/csv"
+                download
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                title="모든 신청내역을 CSV(엑셀) 파일로 다운로드"
+              >
+                <Download className="h-4 w-4" aria-hidden />
+                엑셀 다운로드
+              </a>
+            )}
+          </div>
         </div>
         <ReservationsList entries={entries} isAdmin={admin} />
       </main>

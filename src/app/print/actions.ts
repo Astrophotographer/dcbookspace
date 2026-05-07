@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { PrintStatus } from "@/lib/supabase/types";
+import {
+  emitReservationEventAfter,
+  emitSeriesEventAfter,
+} from "@/lib/webhook";
 
 type Result = { error?: string };
 
@@ -35,5 +39,15 @@ export async function setPrintStatus(args: {
       ? `/series/${args.id}`
       : `/reservations/${args.id}`,
   );
+
+  // 운영자 알림용: 인쇄 실패가 가장 중요한 이벤트라 이것만 발사.
+  // requested/printing/completed 는 정상 흐름이라 시끄럽지 않게 패스.
+  if (args.status === "failed") {
+    if (args.kind === "series") {
+      emitSeriesEventAfter("reservation.print_failed", args.id);
+    } else {
+      emitReservationEventAfter("reservation.print_failed", args.id);
+    }
+  }
   return {};
 }

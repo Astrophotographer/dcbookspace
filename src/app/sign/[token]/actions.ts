@@ -12,6 +12,11 @@ import {
   findActiveConflictsFor,
   type ActiveConflictItem,
 } from "@/lib/conflicts";
+import {
+  emitApprovalAfter,
+  emitReservationEventAfter,
+  emitSeriesEventAfter,
+} from "@/lib/webhook";
 
 type Result = {
   error?: string;
@@ -115,12 +120,18 @@ async function cancelConflictTargets(
         .from("reservations")
         .update({ status: "cancelled" })
         .eq("id", t.id);
+      emitReservationEventAfter("reservation.cancelled", t.id, {
+        reason: "conflict_resolution",
+      });
     } else {
       // 시리즈 트리거가 children reservations 까지 cascade
       await supabase
         .from("reservation_series")
         .update({ status: "cancelled" })
         .eq("id", t.id);
+      emitSeriesEventAfter("reservation.cancelled", t.id, {
+        reason: "conflict_resolution",
+      });
     }
   }
 }
@@ -224,6 +235,16 @@ export async function signByPin(args: {
   });
   if (e2) return { error: e2.message };
 
+  emitApprovalAfter(ctx.kind, ctx.id, {
+    step_order: ctx.current_step,
+    step_role: currentStepDef.role,
+    step_label: currentStepDef.label,
+    total_steps: steps.length,
+    approver_name: isMaster ? "마스터 키" : matched!.name,
+    is_master_pin: isMaster,
+    is_admin_master: isAdminMaster,
+  });
+
   // 결재자가 같이 취소하기로 한 충돌 신청서들 처리
   if (args.cancelConflicts && args.cancelConflicts.length > 0) {
     await cancelConflictTargets(supabase, args.cancelConflicts);
@@ -318,6 +339,17 @@ export async function signBySession(args: {
     p_comment: "5분 자동 세션 결재",
   });
   if (e2) return { error: e2.message };
+
+  emitApprovalAfter(ctx.kind, ctx.id, {
+    step_order: ctx.current_step,
+    step_role: currentStepDef.role,
+    step_label: currentStepDef.label,
+    total_steps: steps.length,
+    approver_name: u.name,
+    is_master_pin: false,
+    is_admin_master: false,
+    via_auto_session: true,
+  });
 
   if (args.cancelConflicts && args.cancelConflicts.length > 0) {
     await cancelConflictTargets(supabase, args.cancelConflicts);

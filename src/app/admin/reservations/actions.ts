@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { emitReservationEventAfter } from "@/lib/webhook";
 
 type Result = { error?: string; ok?: true };
 
@@ -58,5 +59,54 @@ export async function forceReserve(id: string): Promise<Result> {
   revalidatePath("/admin/reservations");
   revalidatePath(`/admin/reservations/${id}`);
   revalidatePath(`/reservations/${id}`);
+  emitReservationEventAfter("reservation.approved", id, {
+    admin_forced: true,
+  });
+  return { ok: true };
+}
+
+/**
+ * 결재 단계와 무관하게 즉시 반려.
+ * 미처리 approvals 는 'rejected' 로 표시 (관리자 강제 반려 표식).
+ * forceReserve 와 대칭 — 흐름·검증 동일, 결과 status 만 'rejected'.
+ */
+export async function forceReject(id: string): Promise<Result> {
+  if (!id) return { error: "잘못된 요청입니다." };
+  const supabase = createServiceClient();
+
+  const { data: r, error: e0 } = await supabase
+    .from("reservations")
+    .select("status")
+    .eq("id", id)
+    .single();
+  if (e0 || !r) return { error: "신청서를 찾을 수 없습니다." };
+  if (r.status === "approved") return { error: "이미 예약 완료된 신청입니다." };
+  if (r.status === "rejected") return { error: "이미 반려된 신청입니다." };
+  if (r.status === "cancelled") return { error: "취소된 신청입니다." };
+
+  const { error: e1 } = await supabase
+    .from("approvals")
+    .update({
+      status: "rejected",
+      signed_at: new Date().toISOString(),
+      comment: "관리자 강제 반려",
+    })
+    .eq("reservation_id", id)
+    .eq("status", "pending");
+  if (e1) return { error: e1.message };
+
+  const { error: e2 } = await supabase
+    .from("reservations")
+    .update({ status: "rejected" })
+    .eq("id", id);
+  if (e2) return { error: e2.message };
+
+  revalidatePath("/");
+  revalidatePath("/admin/reservations");
+  revalidatePath(`/admin/reservations/${id}`);
+  revalidatePath(`/reservations/${id}`);
+  emitReservationEventAfter("reservation.rejected", id, {
+    admin_forced: true,
+  });
   return { ok: true };
 }

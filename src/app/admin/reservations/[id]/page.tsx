@@ -116,7 +116,8 @@ export default async function AdminReservationDetail(
             관리자 작업
           </h2>
           <p className="mb-4 text-sm text-amber-800">
-            신청서를 삭제하거나, 결재 없이 즉시 예약 완료 처리할 수 있습니다.
+            결재 없이 즉시 예약 확정·반려 처리하거나, 신청서 자체를 삭제할 수
+            있습니다.
           </p>
           <AdminActions
             reservationId={r.id}

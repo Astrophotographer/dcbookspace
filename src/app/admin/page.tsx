@@ -3,17 +3,23 @@ import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
 import { adminLogout } from "@/lib/admin-actions";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
-  Users,
+  AlertTriangle,
   Building,
   Briefcase,
-  Network,
+  CalendarCheck,
+  CalendarClock,
+  Clock,
   FileText,
+  Inbox,
   LogOut,
+  Network,
   QrCode,
   ShieldCheck,
-  CalendarClock,
+  Users,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const TILES = [
   {
@@ -66,7 +72,72 @@ const TILES = [
   },
 ];
 
-export default function AdminHome() {
+/**
+ * 한국시간 기준 "이번 주 시작(일요일 00:00)" 과 "이번 주 + 7일" 의 ISO.
+ * Vercel/Supabase 모두 UTC 기반이라 KST(+9) 오프셋을 명시.
+ */
+function weekRange(): { weekStart: string; nextWeekEnd: string; today: string } {
+  const now = new Date();
+  // 한국시간으로 변환: UTC + 9h.
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const dow = kstNow.getUTCDay(); // 0=일요일
+  const weekStartKst = new Date(kstNow);
+  weekStartKst.setUTCDate(kstNow.getUTCDate() - dow);
+  weekStartKst.setUTCHours(0, 0, 0, 0);
+  const nextWeekEndKst = new Date(weekStartKst);
+  nextWeekEndKst.setUTCDate(weekStartKst.getUTCDate() + 14); // 이번 주 + 다음 주
+
+  // KST 자정을 ISO(+09:00) 로 다시 표현
+  const fmt = (d: Date) =>
+    `${d.toISOString().slice(0, 10)}T00:00:00+09:00`;
+  return {
+    weekStart: fmt(weekStartKst),
+    nextWeekEnd: fmt(nextWeekEndKst),
+    today: kstNow.toISOString().slice(0, 10),
+  };
+}
+
+async function fetchStats() {
+  const supabase = createServiceClient();
+  const { weekStart, nextWeekEnd, today } = weekRange();
+
+  // 모두 head:true 로 row 안 가져오고 count 만 — 최소 부하.
+  const pendingP = supabase
+    .from("reservations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+  const newThisWeekP = supabase
+    .from("reservations")
+    .select("*", { count: "exact", head: true })
+    .gte("created_at", weekStart);
+  const upcomingApprovedP = supabase
+    .from("reservations")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "approved")
+    .gte("start_at", `${today}T00:00:00+09:00`)
+    .lte("start_at", nextWeekEnd);
+  const printFailedP = supabase
+    .from("reservations")
+    .select("*", { count: "exact", head: true })
+    .in("status", ["pending", "approved"])
+    .eq("print_status", "failed");
+
+  const [pendingR, newR, upcomingR, printFailR] = await Promise.all([
+    pendingP,
+    newThisWeekP,
+    upcomingApprovedP,
+    printFailedP,
+  ]);
+
+  return {
+    pending: pendingR.count ?? 0,
+    newThisWeek: newR.count ?? 0,
+    upcoming: upcomingR.count ?? 0,
+    printFail: printFailR.count ?? 0,
+  };
+}
+
+export default async function AdminHome() {
   if (!isSupabaseConfigured()) {
     return (
       <>
@@ -77,6 +148,8 @@ export default function AdminHome() {
       </>
     );
   }
+
+  const stats = await fetchStats();
 
   return (
     <>
@@ -97,6 +170,44 @@ export default function AdminHome() {
             </button>
           </form>
         </div>
+
+        {/* 한눈에 보는 운영 지표 — count 쿼리 4개로 가볍게 */}
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="결재 대기"
+            value={stats.pending}
+            unit="건"
+            href="/admin/reservations"
+            Icon={Clock}
+            tone="amber"
+          />
+          <StatCard
+            label="이번 주 신규 신청"
+            value={stats.newThisWeek}
+            unit="건"
+            href="/admin/reservations"
+            Icon={Inbox}
+            tone="sky"
+          />
+          <StatCard
+            label="2주 내 확정 예약"
+            value={stats.upcoming}
+            unit="건"
+            href="/admin/reservations"
+            Icon={CalendarCheck}
+            tone="emerald"
+          />
+          <StatCard
+            label="인쇄 실패"
+            value={stats.printFail}
+            unit="건"
+            href="/admin/reservations"
+            Icon={AlertTriangle}
+            tone={stats.printFail > 0 ? "red" : "stone"}
+            emphasized={stats.printFail > 0}
+          />
+        </section>
+
         <div className="grid gap-3 sm:grid-cols-2">
           {TILES.map((t) => (
             <Link
@@ -114,5 +225,85 @@ export default function AdminHome() {
         </div>
       </main>
     </>
+  );
+}
+
+type Tone = "amber" | "sky" | "emerald" | "red" | "stone";
+
+const TONE_CLASS: Record<
+  Tone,
+  { bg: string; ring: string; icon: string; value: string }
+> = {
+  amber: {
+    bg: "bg-amber-50",
+    ring: "ring-amber-200",
+    icon: "text-amber-600",
+    value: "text-amber-900",
+  },
+  sky: {
+    bg: "bg-sky-50",
+    ring: "ring-sky-200",
+    icon: "text-sky-600",
+    value: "text-sky-900",
+  },
+  emerald: {
+    bg: "bg-emerald-50",
+    ring: "ring-emerald-200",
+    icon: "text-emerald-600",
+    value: "text-emerald-900",
+  },
+  red: {
+    bg: "bg-red-50",
+    ring: "ring-red-200",
+    icon: "text-red-600",
+    value: "text-red-900",
+  },
+  stone: {
+    bg: "bg-stone-50",
+    ring: "ring-stone-200",
+    icon: "text-stone-500",
+    value: "text-stone-700",
+  },
+};
+
+function StatCard({
+  label,
+  value,
+  unit,
+  href,
+  Icon,
+  tone,
+  emphasized = false,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  href: string;
+  Icon: typeof Clock;
+  tone: Tone;
+  emphasized?: boolean;
+}) {
+  const t = TONE_CLASS[tone];
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex flex-col rounded-2xl p-4 shadow-sm transition-colors ring-1",
+        t.bg,
+        t.ring,
+        emphasized ? "hover:brightness-95" : "hover:bg-white",
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-stone-600">{label}</div>
+        <Icon className={cn("h-4 w-4 flex-none", t.icon)} aria-hidden />
+      </div>
+      <div className={cn("mt-1 text-2xl font-bold", t.value)}>
+        {value.toLocaleString()}
+        <span className="ml-0.5 text-sm font-normal text-stone-500">
+          {unit}
+        </span>
+      </div>
+    </Link>
   );
 }

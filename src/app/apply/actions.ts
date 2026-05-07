@@ -15,6 +15,10 @@ import {
   validateTimeBlocks,
 } from "@/lib/recurrence";
 import { revalidatePath } from "next/cache";
+import {
+  emitReservationEventAfter,
+  emitSeriesEventAfter,
+} from "@/lib/webhook";
 
 type SubmitResult = { id?: string; error?: string };
 type Result = { error?: string };
@@ -288,6 +292,7 @@ export async function submitApplication(
   if (apErr) return { error: apErr.message };
 
   revalidatePath("/");
+  emitReservationEventAfter("reservation.created", res.id);
   return { id: res.id };
 }
 
@@ -788,6 +793,7 @@ export async function submitSeriesApplication(
 
   revalidatePath("/");
   revalidatePath("/reservations");
+  emitSeriesEventAfter("series.created", series.id);
   return { id: series.id };
 }
 

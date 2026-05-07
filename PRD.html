@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DCbookspace — 교회 장소 사용 신청·결재 시스템 PRD</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --bg-card: #ffffff;
+    --fg: #1c1917;
+    --fg-muted: #57534e;
+    --fg-faint: #78716c;
+    --border: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --accent: #1e3a8a;
+    --accent-fg: #1d4ed8;
+    --accent-bg: #eff6ff;
+    --accent-ring: #bfdbfe;
+    --code-bg: #f5f5f4;
+    --code-fg: #44403c;
+    --warn-bg: #fffbeb;
+    --warn-fg: #78350f;
+    --warn-border: #fde68a;
+    --maxw: 1200px;
+    --side: 260px;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo",
+            "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  a { color: var(--accent-fg); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ===== Layout ===== */
+  .header {
+    background: linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 36px 24px 28px;
+  }
+  .header-eyebrow {
+    color: var(--fg-faint);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .header-title {
+    font-size: 32px;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .header-sub {
+    color: var(--fg-muted);
+    margin: 0 0 20px;
+    font-size: 16px;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .meta-cell {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  .meta-cell .k {
+    color: var(--fg-faint);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .meta-cell .v {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg);
+    word-break: break-all;
+  }
+
+  .layout {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    display: grid;
+    grid-template-columns: var(--side) 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; }
+    .toc { position: static !important; max-height: none !important; }
+  }
+
+  /* ===== TOC ===== */
+  .toc {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    font-size: 14px;
+  }
+  .toc h2 {
+    font-size: 12px;
+    color: var(--fg-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 12px;
+    font-weight: 700;
+  }
+  .toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: tocsec;
+  }
+  .toc li {
+    counter-increment: tocsec;
+    margin: 0;
+  }
+  .toc li > a {
+    display: block;
+    padding: 5px 8px;
+    border-radius: 6px;
+    color: var(--fg-muted);
+    border-left: 2px solid transparent;
+  }
+  .toc li > a::before {
+    content: counter(tocsec) ". ";
+    color: var(--fg-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .toc li > a:hover {
+    background: var(--code-bg);
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  /* ===== Main content ===== */
+  main { min-width: 0; }
+  section + section { margin-top: 56px; }
+  section h1 {
+    font-size: 24px;
+    line-height: 1.3;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--fg);
+    display: inline-block;
+  }
+  section .sec-num {
+    color: var(--accent-fg);
+    margin-right: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  section h2 {
+    font-size: 18px;
+    margin: 28px 0 8px;
+    color: var(--fg);
+  }
+  section h3 {
+    font-size: 16px;
+    margin: 20px 0 6px;
+    color: var(--fg);
+  }
+  section p { margin: 8px 0; color: var(--fg); }
+  section ul { padding-left: 22px; }
+  section li { margin: 4px 0; }
+  section li::marker { color: var(--fg-faint); }
+
+  strong { font-weight: 700; }
+  code {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.93em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  blockquote.quote {
+    border-left: 3px solid var(--accent);
+    margin: 12px 0;
+    padding: 8px 16px;
+    background: var(--accent-bg);
+    color: var(--fg);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 15px;
+  }
+
+  /* ===== Tables ===== */
+  .table-wrap { overflow-x: auto; margin: 12px 0; }
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    overflow: hidden;
+  }
+  thead th {
+    background: var(--code-bg);
+    color: var(--fg-muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafaf9; }
+  td code, th code { white-space: normal; }
+
+  /* ===== Lists with description ===== */
+  .goals { display: grid; gap: 6px; }
+  .goal {
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .goal .id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: white;
+    background: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  /* ===== Footer ===== */
+  footer {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 24px;
+    color: var(--fg-faint);
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  /* ===== Print ===== */
+  @media print {
+    body { background: white; }
+    .toc { display: none; }
+    .layout { grid-template-columns: 1fr; padding: 0 16px; }
+    section { break-inside: avoid; }
+    section h1 { page-break-after: avoid; }
+    a { color: var(--fg); text-decoration: none; }
+    .header { background: white; border: none; }
+    pre, table { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-eyebrow">Product Requirements Document</div>
+    <h1 class="header-title">DCbookspace — 교회 장소 사용 신청·결재 시스템</h1>
+    <p class="header-sub">종이 신청서를 없애되, 어르신 결재자가 추가 학습 없이 그대로 쓸 수 있게.</p>
+    <div class="meta-grid">
+      <div class="meta-cell"><div class="k">Project</div><div class="v">DCbookspace</div></div>
+      <div class="meta-cell"><div class="k">Version</div><div class="v">1.0 (운영 가능)</div></div>
+      <div class="meta-cell"><div class="k">최초 배포</div><div class="v">2026-05</div></div>
+      <div class="meta-cell"><div class="k">Repo</div><div class="v"><a href="https://github.com/Astrophotographer/dcbookspace" target="_blank" rel="noopener">github.com/Astrophotographer/dcbookspace</a></div></div>
+      <div class="meta-cell"><div class="k">Production</div><div class="v"><a href="https://dcbookspace.vercel.app" target="_blank" rel="noopener">dcbookspace.vercel.app</a></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ===== TOC ===== -->
+  <nav class="toc" aria-label="목차">
+    <h2>목차</h2>
+    <ol>
+      <li><a href="#sec-1">개요</a></li>
+      <li><a href="#sec-2">배경 — 풀려는 문제</a></li>
+      <li><a href="#sec-3">목표 / 비목표</a></li>
+      <li><a href="#sec-4">사용자 페르소나</a></li>
+      <li><a href="#sec-5">핵심 사용자 흐름</a></li>
+      <li><a href="#sec-6">기능 요구사항</a></li>
+      <li><a href="#sec-7">비기능 요구사항</a></li>
+      <li><a href="#sec-8">시스템 아키텍처</a></li>
+      <li><a href="#sec-9">데이터 모델</a></li>
+      <li><a href="#sec-10">권한 매트릭스</a></li>
+      <li><a href="#sec-11">성공 지표 (KPI)</a></li>
+      <li><a href="#sec-12">출시 후 로드맵</a></li>
+      <li><a href="#sec-13">참고 문서</a></li>
+    </ol>
+  </nav>
+
+  <!-- ===== Main ===== -->
+  <main>
+
+    <section id="sec-1">
+      <h1><span class="sec-num">1</span> 개요</h1>
+      <p>교회 시설(예배실·교육실·회의실 등)의 사용 신청과 다단계 결재를 디지털화하는 시스템. 종이 양식 + 도장 회람 흐름을 그대로 보존하면서 <strong>종이 분실·정체·중복 신청</strong> 같은 운영 마찰을 제거한다.</p>
+      <blockquote class="quote">
+        <strong>미션</strong> — 종이 신청서를 없애되, 어르신 결재자가 추가 학습 없이 그대로 쓸 수 있어야 한다.
+      </blockquote>
+    </section>
+
+    <section id="sec-2">
+      <h1><span class="sec-num">2</span> 배경 — 풀려는 문제</h1>
+      <p>기존 종이 흐름의 5가지 페인포인트:</p>
+      <ol>
+        <li><strong>결재 진행도 추적 불가</strong> — 신청서가 어느 책상에 있는지 알 수 없음</li>
+        <li><strong>결재자 한 분 부재 시 며칠씩 정체</strong> — 우회 수단 없음</li>
+        <li><strong>동일 시간·호실 중복 발견 못 함</strong> — 행사 당일에야 충돌 확인</li>
+        <li><strong>빈 시간/호실이 한 눈에 안 보임</strong> — 사무실에 전화로 확인</li>
+        <li><strong>신청자 결과 확인 불가</strong> — 사무실까지 가야 진행 상황 알 수 있음</li>
+      </ol>
+      <p>추가 제약: <strong>사용자 평균 연령 60대 후반</strong>. 회원가입/비밀번호 학습 비용을 감수할 수 없음.</p>
+    </section>
+
+    <section id="sec-3">
+      <h1><span class="sec-num">3</span> 목표 / 비목표</h1>
+
+      <h2>Goals</h2>
+      <div class="goals">
+        <div class="goal"><span class="id">G1</span><span>신청부터 최종 확정까지 종이 없이 진행</span></div>
+        <div class="goal"><span class="id">G2</span><span>결재 진행 상태를 신청자·결재자·운영자가 실시간 공유</span></div>
+        <div class="goal"><span class="id">G3</span><span>회원가입 / 비밀번호 / 앱 설치 모두 없이 동작</span></div>
+        <div class="goal"><span class="id">G4</span><span>호실·시간 충돌을 신청 시점에 즉시 감지 + 빈 시간 추천</span></div>
+        <div class="goal"><span class="id">G5</span><span>운영자가 결재자 부재·긴급 행사에 강제로 끼어들 수 있는 비상 경로 보장</span></div>
+      </div>
+
+      <h2>Non-goals</h2>
+      <ul>
+        <li>외부 시설 예약 (교회 내부 시설만)</li>
+        <li>회계/유료 결제 연동</li>
+        <li>일반 신자용 회원 페이지 (마이페이지 등)</li>
+        <li>다국어 지원</li>
+      </ul>
+    </section>
+
+    <section id="sec-4">
+      <h1><span class="sec-num">4</span> 사용자 페르소나</h1>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>페르소나</th><th>비중</th><th>디지털 친숙도</th><th>핵심 동작</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>신청자 (각 부서)</td><td>다수</td><td>중간</td><td><code>/apply</code> 폼 작성 → QR/링크 받아 결재 회람</td></tr>
+          <tr><td>결재자 (부서장·관리장로·차장·당회장)</td><td>10~20명</td><td><strong>낮음 (60+ 다수)</strong></td><td>QR 스캔 → PIN 4자리 입력 → 승인/반려</td></tr>
+          <tr><td>운영자 (사무처)</td><td>1~3명</td><td>중상</td><td><code>/admin/*</code> 데이터 관리 + 비상 강제 승인</td></tr>
+          <tr><td>관리자 (마스터 PIN 보유자)</td><td>2~3명</td><td>중간</td><td>어떤 결재 단계든 강제 승인 가능</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="sec-5">
+      <h1><span class="sec-num">5</span> 핵심 사용자 흐름</h1>
+
+      <h2>5-1. 일회성 신청</h2>
+<pre><code>신청자: /apply 진입 → 부서·호실·일시·목적 입력
+  ↓ 충돌 검사 (실시간)
+  ├─ 빈 시간이면 그대로 제출
+  ├─ 충돌 시: 모달에 [기존 일정 + 그날 빈 시간대] 표시
+  │            → "그래도 신청" or "취소"
+  ↓
+신청서 1장 발급 (ref_no = "26-0042" + QR 토큰 1개)
+  ↓
+인쇄 회람 or 카톡 링크 전달
+  ↓
+결재자별로 QR 스캔 → /sign/[token]
+  ├─ PIN 4자리 입력 (휴대폰 뒷자리)
+  │   ├─ 본인 단계와 매칭되면 자동 승인
+  │   ├─ 5분 안에 다른 QR 스캔 시 PIN 없이 자동 결재
+  │   └─ admin role PIN 또는 0000 → 어떤 단계든 강제 승인
+  └─ 모든 단계 승인 → status='approved' 확정</code></pre>
+
+      <h2>5-2. 정기(시리즈) 신청</h2>
+      <ul>
+        <li>매주 같은 요일·시간대 반복 (예: 매주 일요일 오후 2시 1청년회 모임)</li>
+        <li>시작일·종료일 + 요일 + 시간 블록 입력 → 회차 자동 생성 (<code>reservation_series</code> + 하위 <code>reservations</code>)</li>
+        <li>결재 1회로 시리즈 전체 확정</li>
+      </ul>
+
+      <h2>5-3. 신청 수정/취소 (신청자)</h2>
+      <ul>
+        <li><strong>1단계 결재 시작 전</strong>까지만 본인 수정·삭제 가능</li>
+        <li>본인 인증: 신청 시 입력한 휴대폰 번호 매칭</li>
+      </ul>
+
+      <h2>5-4. 결재 취소 (당회장 권한)</h2>
+      <ul>
+        <li>모든 단계 끝난 신청서를 다시 검토하고 싶을 때</li>
+        <li>당회장 PIN으로 취소 → 모든 approval 초기화 + reservation status='pending'</li>
+      </ul>
+
+      <h2>5-5. 운영자 비상 경로</h2>
+      <ul>
+        <li>마스터 키 <code>0000</code> (비상용, 코드 하드코딩)</li>
+        <li>관리자 PIN (<code>role='admin'</code> 사용자, 휴대폰 뒷 4자리)</li>
+        <li>강제 예약 (결재 우회 즉시 확정)</li>
+        <li>신청서 삭제</li>
+      </ul>
+    </section>
+
+    <section id="sec-6">
+      <h1><span class="sec-num">6</span> 기능 요구사항</h1>
+
+      <h2>6-1. 신청 폼 <code>/apply</code></h2>
+      <ul>
+        <li>부서 cascading select (대분류 → 소분류, 약 62개 leaf)</li>
+        <li>호실 cascading (건물 → 층 → 호실)</li>
+        <li>일회성 / 정기 토글</li>
+        <li>휴대폰 자동 포맷 (<code>010-1234-5678</code>)</li>
+        <li>날짜 자동 포맷 + 월/일 범위 자동 보정 (윤년 반영)</li>
+        <li>충돌 검사 + 빈 시간대 추천 + 강제 진행 옵션</li>
+        <li>고정 행사(주일 예배 등) 충돌도 함께 감지</li>
+      </ul>
+
+      <h2>6-2. 결재 화면 <code>/sign/[token]</code></h2>
+      <ul>
+        <li>QR 토큰 1개로 모든 단계 공유</li>
+        <li>PIN 4자리 (<code>bcrypt</code> 해시)</li>
+        <li>5분 자동 세션 쿠키 (휴대폰 분실 트레이드오프 안내)</li>
+        <li>PIN 오답 시 0.45초 흔들림 + 빨간 강조 + 즉시 비움</li>
+        <li>1차 안내 화면 → PIN 입력 → 결과 화면</li>
+        <li>토큰 만료/이미 처리됨 등 에러 케이스 명확</li>
+      </ul>
+
+      <h2>6-3. 현황 보기 <code>/</code></h2>
+      <ul>
+        <li><strong>날짜별</strong> (캘린더 6주 그리드): 마우스 휠 ±7일, 모바일 스와이프, 일/토 색 강조, 짝수달 배경</li>
+        <li><strong>장소별</strong> (건물 평면도): 호실 좌표 도면, 점유 상태 색·아이콘·텍스트, 그리드 폴백</li>
+        <li>두 뷰 토글 + 좌우 스와이프 + 세션 기억</li>
+      </ul>
+
+      <h2>6-4. 신청 목록 <code>/reservations</code>, <code>/admin/reservations</code></h2>
+      <ul>
+        <li>정렬: 신청번호·작성일·부서·장소·사용일시·상태·결재 라인</li>
+        <li>결재 라인 정렬: 마지막 통과 단계 기준 (당회장 → 관리장로 → 차장 → 부서장 → 대기)</li>
+        <li>검색: 신청번호·부서명·신청자명 통합 (대시·#·공백 무시)</li>
+        <li>충돌 그룹 번호 칩 (색약 사용자 대응)</li>
+        <li>페이지네이션 10/50/100</li>
+      </ul>
+
+      <h2>6-5. 관리자 <code>/admin/*</code></h2>
+      <ul>
+        <li>BasicAuth + DB-stored 비밀번호 (env 비상 키 영구 유효)</li>
+        <li>신청서 관리 (강제 확정·삭제·결재 취소)</li>
+        <li>결재자 관리 (PIN 발급, 신청 이력 있으면 soft delete + PIN 무효화)</li>
+        <li>관리자 정보 (다중 마스터 PIN, 최소 1명 보장 — 시드 "홍길동")</li>
+        <li>부서 트리 관리 (그룹 좌측 탭, leaf 드래그앤드롭 순서 변경)</li>
+        <li>호실 관리 (건물·층·호실, 도면 좌표 드래그앤드롭 + 리사이즈)</li>
+        <li>고정 행사 (주일 예배 등 매주 정기)</li>
+        <li>인쇄 진행 상태 (사무실 프린터 연동)</li>
+      </ul>
+    </section>
+
+    <section id="sec-7">
+      <h1><span class="sec-num">7</span> 비기능 요구사항</h1>
+
+      <h2>7-1. UX (어르신 친화 — 절대 원칙)</h2>
+      <ul>
+        <li>루트 폰트 17px (Tailwind 기본 16px 아님)</li>
+        <li>모든 터치 타겟 44px 이상</li>
+        <li><strong>상태 표시는 색 단독 금지</strong> — 항상 색 + 아이콘 + 텍스트 다중 신호</li>
+        <li>모달은 최소화. 버튼 라벨은 동작 그대로 ("결재 취소", "강제 승인" 등 — "확인" 금지)</li>
+        <li>입력값 검증은 거부가 아니라 자동 보정 우선</li>
+      </ul>
+
+      <h2>7-2. 보안 불변식</h2>
+      <ul>
+        <li><code>/admin/*</code> BasicAuth (server actions POST 포함)</li>
+        <li><code>ADMIN_PASSWORD</code> 빈 값이면 503 (실수로 풀린 채 배포 방지)</li>
+        <li><code>SUPABASE_SERVICE_ROLE_KEY</code> 서버 전용</li>
+        <li>마스터 키 <code>0000</code> 코드 하드코딩 유지 (비상용)</li>
+        <li>PIN은 bcrypt 해시. 평문 DB 저장 금지</li>
+      </ul>
+
+      <h2>7-3. 성능</h2>
+      <ul>
+        <li>홈 페이지 TTFB &lt; 1초 (Suspense streaming + cache 메모화)</li>
+        <li>달력 네비 시각 피드백 (useTransition isPending opacity)</li>
+        <li>BuildingView dynamic import (탭 진입까지 ~30~40KB 절약)</li>
+        <li>DB 인덱스: <code>reservations(start_at, end_at)</code> 부분 인덱스, <code>reservation_series(created_at desc)</code></li>
+        <li>master fetch 함수 React <code>cache()</code> 래핑</li>
+      </ul>
+
+      <h2>7-4. Realtime</h2>
+      <ul>
+        <li>관리자 / 신청 상세 페이지: rooms · reservations · approvals 구독</li>
+        <li>홈은 조회 전용이라 구독 없음</li>
+      </ul>
+    </section>
+
+    <section id="sec-8">
+      <h1><span class="sec-num">8</span> 시스템 아키텍처</h1>
+<pre><code>[브라우저]
+  ├─ Next.js 16 (App Router, Turbopack)
+  ├─ React 19 server/client component
+  └─ Tailwind v4
+        │
+        ▼
+[Vercel] (서버 + Edge)
+  ├─ Server Components (데이터 fetch)
+  ├─ Server Actions (mutation)
+  └─ Proxy 미들웨어 (BasicAuth)
+        │
+        ▼
+[Supabase Tokyo region]
+  ├─ Postgres
+  │   ├─ buildings / floors / rooms
+  │   ├─ departments (parent_id self-ref, 2뎁스)
+  │   ├─ users (PIN bcrypt 해시)
+  │   ├─ reservations / reservation_series
+  │   ├─ approvals (signature_token, status)
+  │   ├─ approval_routes (steps jsonb)
+  │   ├─ fixed_events
+  │   └─ audit/print 관련
+  ├─ Realtime publication
+  └─ Service-role key (서버 전용)</code></pre>
+    </section>
+
+    <section id="sec-9">
+      <h1><span class="sec-num">9</span> 데이터 모델</h1>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>테이블</th><th>핵심 컬럼</th><th>비고</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>buildings</code> / <code>floors</code> / <code>rooms</code></td>
+            <td>name, display_order, map_x/y/w/h(rooms)</td>
+            <td>호실 좌표는 0~100% 비율</td>
+          </tr>
+          <tr>
+            <td><code>departments</code></td>
+            <td>name, parent_id, dept_head_id, elder_id</td>
+            <td>2뎁스 트리. 결재 라인은 leaf만</td>
+          </tr>
+          <tr>
+            <td><code>users</code></td>
+            <td>name, phone, role, dept_id, pin_hash, active</td>
+            <td>role: applicant·dept_head·elder·manager·senior_pastor·admin</td>
+          </tr>
+          <tr>
+            <td><code>approval_routes</code></td>
+            <td>name, steps (jsonb), conditions</td>
+            <td>"기본"·"대규모/외부행사" 두 템플릿</td>
+          </tr>
+          <tr>
+            <td><code>reservations</code></td>
+            <td>ref_no, qr_token, room_id, applicant_id, dept_id, start_at, end_at, purpose, status, route_id, current_step, force_overlap</td>
+            <td>status enum: draft·pending·approved·rejected·cancelled</td>
+          </tr>
+          <tr>
+            <td><code>reservation_series</code></td>
+            <td>weekday, start_date, end_date, time_blocks</td>
+            <td>매주 반복. 자식 <code>reservations</code> 자동 생성</td>
+          </tr>
+          <tr>
+            <td><code>approvals</code></td>
+            <td>reservation_id (or series_id), step_order, role, approver_id, status, signature_token, comment</td>
+            <td>step_order별 1행</td>
+          </tr>
+          <tr>
+            <td><code>fixed_events</code></td>
+            <td>name, weekday, start_time, end_time, room_id, effective_from/until</td>
+            <td>결재 없는 정규 일정</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="margin-top:12px;">화면 표시용 derived status (<code>displayStatus</code>): <code>submitted / in_review / confirmed / rejected / cancelled / draft</code></p>
+    </section>
+
+    <section id="sec-10">
+      <h1><span class="sec-num">10</span> 보안 / 권한 매트릭스</h1>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>동작</th><th>신청자</th><th>결재자</th><th>당회장</th><th>관리자(admin)</th><th>마스터 0000</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>신청 작성</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>본인 신청 수정 (1단계 전)</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>본인 단계 결재</td><td>—</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+          <tr><td>어떤 단계든 강제 승인</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>✅</td></tr>
+          <tr><td>결재 취소 (모든 단계 reset)</td><td>—</td><td>—</td><td>✅</td><td>(사무처 권한)</td><td>—</td></tr>
+          <tr><td><code>/admin/*</code> 접근</td><td>—</td><td>—</td><td>—</td><td>✅ (BasicAuth 통과)</td><td>—</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="sec-11">
+      <h1><span class="sec-num">11</span> 성공 지표 (KPI)</h1>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>지표</th><th>측정법</th><th>1차 목표</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>종이 양식 사용률 0%</td><td>사무처 자체 추적</td><td>도입 3개월 내</td></tr>
+          <tr><td>신청서 평균 결재 완료 시간</td><td>DB <code>created_at</code> → <code>status=approved</code> 시각</td><td>24시간 이내 (기존 종이 대비 1/3)</td></tr>
+          <tr><td>신청 시점 충돌 감지율</td><td>폼 충돌 모달 노출 / 실제 중복 신청</td><td>95%+</td></tr>
+          <tr><td>어르신 결재 완료 자력률</td><td>사용자 인터뷰</td><td>80%+ (월 1회 인터뷰)</td></tr>
+          <tr><td>운영자 강제 개입 빈도</td><td><code>comment LIKE '관리자 마스터%'</code></td><td>월 5회 이하</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="sec-12">
+      <h1><span class="sec-num">12</span> 출시 후 로드맵</h1>
+
+      <h2>다음 분기</h2>
+      <ul>
+        <li><strong>결재 결과 알림</strong> — 카카오 알림톡 + SMS fallback (NCP SENS 또는 SOLAPI)</li>
+        <li><strong>PIN 잠금 정책 활성화</strong> — 5회 실패 시 10분 잠금 (컬럼은 이미 존재)</li>
+        <li><strong>관리자 페이지 검색</strong> — 결재자/관리자/호실 목록 통합 검색</li>
+        <li><strong>결재선 템플릿 UI</strong> — 현재 DB 직접 편집</li>
+      </ul>
+
+      <h2>향후</h2>
+      <ul>
+        <li><strong>Audit Log 테이블</strong> — 강제 승인·결재 취소 등 민감 작업 추적</li>
+        <li><strong>벌크 작업</strong> — 신청서 일괄 승인/삭제</li>
+        <li><strong>카톡 공유 버튼</strong> — 결재 링크 공유 단축</li>
+        <li><strong>본인 신청만 보기 필터</strong> — <code>/reservations</code> 휴대폰 기반 필터</li>
+      </ul>
+    </section>
+
+    <section id="sec-13">
+      <h1><span class="sec-num">13</span> 참고 문서</h1>
+      <ul>
+        <li>시스템 규칙: <a href="AGENTS.md"><code>AGENTS.md</code></a></li>
+        <li>DB 규칙: <a href="supabase/AGENTS.md"><code>supabase/AGENTS.md</code></a></li>
+        <li>관리자 동작: <a href="src/app/admin/AGENTS.md"><code>src/app/admin/AGENTS.md</code></a></li>
+        <li>어르신 친화 UX: <a href="src/components/AGENTS.md"><code>src/components/AGENTS.md</code></a></li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  © 2026 DCbookspace · 등촌교회 장소 사용 신청·결재 시스템
+</footer>
+
+</body>
+</html>
