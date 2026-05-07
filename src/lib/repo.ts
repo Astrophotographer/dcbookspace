@@ -1,6 +1,10 @@
 // repo.ts는 모두 서버 컴포넌트/액션에서만 호출된다 (브라우저로 노출되지 않음).
 // 마스터 데이터(부서/건물/호실 등)에 anon SELECT 권한이 없는 환경을 가정해
 // service-role 클라이언트를 사용한다. mutation은 별도 server action에서 처리.
+//
+// React `cache()` 로 래핑된 함수는 같은 요청(Request) 안에서 호출되면 결과를
+// 메모화한다. 여러 server component 가 같은 마스터 데이터를 fetch 해도 DB 왕복은 1회.
+import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
   Building,
@@ -38,7 +42,7 @@ export type SeriesDetail = ReservationSeries & {
   >[];
 };
 
-export async function getBuildings(): Promise<Building[]> {
+export const getBuildings = cache(async (): Promise<Building[]> => {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("buildings")
@@ -46,18 +50,18 @@ export async function getBuildings(): Promise<Building[]> {
     .order("display_order");
   if (error) throw error;
   return data ?? [];
-}
+});
 
-export async function getFloors(buildingId?: string): Promise<Floor[]> {
+export const getFloors = cache(async (buildingId?: string): Promise<Floor[]> => {
   const supabase = createServiceClient();
   let q = supabase.from("floors").select("*").order("display_order");
   if (buildingId) q = q.eq("building_id", buildingId);
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
-}
+});
 
-export async function getRooms(floorId?: string): Promise<Room[]> {
+export const getRooms = cache(async (floorId?: string): Promise<Room[]> => {
   const supabase = createServiceClient();
   let q = supabase
     .from("rooms")
@@ -68,9 +72,9 @@ export async function getRooms(floorId?: string): Promise<Room[]> {
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
-}
+});
 
-export async function getDepartments(): Promise<Department[]> {
+export const getDepartments = cache(async (): Promise<Department[]> => {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("departments")
@@ -78,14 +82,14 @@ export async function getDepartments(): Promise<Department[]> {
     .order("display_order");
   if (error) throw error;
   return data ?? [];
-}
+});
 
 /** 고정 행사 — 결재 없는 주간 정규 일정. 기본은 active=true 만.
  *  마이그레이션 미적용 환경에서 홈 화면이 깨지지 않게 fixed_events 부재는
  *  빈 배열로 처리하고, 그 외 에러는 상위로 던진다. */
-export async function getFixedEvents(
+export const getFixedEvents = cache(async (
   options: { includeInactive?: boolean } = {},
-): Promise<FixedEvent[]> {
+): Promise<FixedEvent[]> => {
   const supabase = createServiceClient();
   let q = supabase
     .from("fixed_events")
@@ -100,17 +104,17 @@ export async function getFixedEvents(
     throw error;
   }
   return (data ?? []) as FixedEvent[];
-}
+});
 
 /**
  * 충돌 안내 시 보여줄 1차 연락 관리자.
  * `admin` 우선, 없으면 `manager` 폴백. 모두 없으면 null.
  */
-export async function getPrimaryAdminContact(): Promise<{
+export const getPrimaryAdminContact = cache(async (): Promise<{
   name: string;
   phone: string | null;
   role: "admin" | "manager";
-} | null> {
+} | null> => {
   const supabase = createServiceClient();
   for (const role of ["admin", "manager"] as const) {
     const { data } = await supabase
@@ -123,13 +127,13 @@ export async function getPrimaryAdminContact(): Promise<{
     if (data) return { name: data.name, phone: data.phone, role };
   }
   return null;
-}
+});
 
 /** 특정 날짜 범위 안의 모든 예약을 호실/부서/결재자 정보까지 함께 가져옴 */
-export async function getReservationsBetween(
+export const getReservationsBetween = cache(async (
   startISO: string,
   endISO: string,
-): Promise<ReservationDetail[]> {
+): Promise<ReservationDetail[]> => {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("reservations")
@@ -147,7 +151,7 @@ export async function getReservationsBetween(
     .order("start_at");
   if (error) throw error;
   return (data ?? []) as unknown as ReservationDetail[];
-}
+});
 
 export async function getReservationByQrToken(qrToken: string) {
   const supabase = createServiceClient();

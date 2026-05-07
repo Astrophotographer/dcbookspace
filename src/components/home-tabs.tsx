@@ -1,17 +1,41 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { CalendarDays, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRealtimeRefresh } from "@/lib/supabase/use-realtime-refresh";
+import type { Building, Floor, Room } from "@/lib/supabase/types";
+import type { ReservationDetail } from "@/lib/repo";
+import type { FixedEventInstance } from "@/lib/recurrence";
 
-const REALTIME_TABLES = ["rooms", "reservations", "approvals"] as const;
+// BuildingView 는 사용자가 "장소별" 탭을 한 번이라도 열기 전까지 다운로드/평가되지 않음.
+// 첫 페이지 진입 시 ~30~40KB 의 client JS 가 절약됨.
+const BuildingViewLazy = dynamic(
+  () =>
+    import("@/components/building-view").then((m) => ({
+      default: m.BuildingView,
+    })),
+  {
+    loading: () => (
+      <div className="h-96 animate-pulse rounded-2xl bg-stone-100" />
+    ),
+  },
+);
+
+type BuildingViewProps = {
+  currentDate: string;
+  buildings: Building[];
+  floors: Floor[];
+  rooms: Room[];
+  reservations: ReservationDetail[];
+  fixedEvents?: FixedEventInstance[];
+};
 
 type Tab = "date" | "place";
 
 type Props = {
   dateView: React.ReactNode;
-  placeView: React.ReactNode;
+  buildingViewProps: BuildingViewProps;
 };
 
 /**
@@ -25,10 +49,14 @@ type Props = {
  *  - 탭 클릭은 scrollTo() 만 호출. tab state 는 onScroll 에서 갱신.
  *  - 사용자 swipe 도 onScroll 만으로 처리. 양방향 effect 루프 회피.
  */
-export function HomeTabs({ dateView, placeView }: Props) {
-  useRealtimeRefresh(REALTIME_TABLES);
+export function HomeTabs({ dateView, buildingViewProps }: Props) {
+  // 홈은 조회 전용이라 realtime 구독을 끔. /admin/* 와 /reservations 상세 페이지에만 활성.
   const [tab, setTab] = useState<Tab>("date");
   const scrollerRef = useRef<HTMLDivElement>(null);
+  // 한 번이라도 장소별을 열어 본 적 있으면 이후로는 unmount 하지 않음.
+  // 매 탭 전환마다 BuildingView 가 다시 mount 되는 비용 회피.
+  // 이벤트 핸들러에서 직접 set — effect 안 setState 룰 회피.
+  const [hasOpenedPlace, setHasOpenedPlace] = useState(false);
 
   const handleScroll = () => {
     const el = scrollerRef.current;
@@ -37,11 +65,13 @@ export function HomeTabs({ dateView, placeView }: Props) {
     const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
     const next: Tab = idx === 0 ? "date" : "place";
     if (next !== tab) setTab(next);
+    if (next === "place") setHasOpenedPlace(true);
   };
 
   const goTab = (target: Tab) => {
     const el = scrollerRef.current;
     if (!el) return;
+    if (target === "place") setHasOpenedPlace(true);
     const left = target === "date" ? 0 : el.clientWidth;
     el.scrollTo({ left, behavior: "smooth" });
   };
@@ -131,7 +161,11 @@ export function HomeTabs({ dateView, placeView }: Props) {
           aria-label="장소별 보기"
           className="w-full flex-none snap-start"
         >
-          {placeView}
+          {hasOpenedPlace ? (
+            <BuildingViewLazy {...buildingViewProps} />
+          ) : (
+            <div className="h-96 animate-pulse rounded-2xl bg-stone-100" />
+          )}
         </section>
       </div>
     </div>

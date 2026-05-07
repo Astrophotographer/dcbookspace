@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   addDays,
   addMonths,
@@ -44,6 +44,9 @@ export function DateView({
   const router = useRouter();
   const params = useSearchParams();
   const [modalDate, setModalDate] = useState<Date | null>(null);
+  // 달력 네비게이션 중에 화살표/오늘 버튼을 흐리게 처리해서 "지금 이동 중" 신호 제공.
+  // router.push 자체는 빠르지 않으니 시각적 피드백이 체감 향상의 핵심.
+  const [isNavPending, startNav] = useTransition();
 
   // 그리드는 currentDate 가 속한 주(Sun-Sat) 를 2번째 행에 두고 6주를 펼침
   // (위쪽에 한 주 여유를 둬서 직전 주 일정도 같이 보이게). 그래서 "오늘" 버튼을
@@ -63,7 +66,7 @@ export function DateView({
   const goToDate = (target: Date) => {
     const sp = new URLSearchParams(params.toString());
     sp.set("date", format(target, "yyyy-MM-dd"));
-    router.push(`?${sp.toString()}`);
+    startNav(() => router.push(`?${sp.toString()}`));
   };
 
   const shiftMonth = (delta: number) => goToDate(addMonths(date, delta));
@@ -124,24 +127,33 @@ export function DateView({
         <h2 className="text-xl font-bold text-stone-900">
           {format(headerAnchor, "yyyy년 M월")}
         </h2>
-        <div className="flex items-center gap-2">
+        <div
+          className={cn(
+            "flex items-center gap-2 transition-opacity",
+            isNavPending && "opacity-60",
+          )}
+          aria-busy={isNavPending}
+        >
           <button
             onClick={() => shiftMonth(-1)}
+            disabled={isNavPending}
             aria-label="이전 달"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white hover:bg-stone-50"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white hover:bg-stone-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={() => goToDate(today)}
-            className="h-9 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50"
+            disabled={isNavPending}
+            className="h-9 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium hover:bg-stone-50 disabled:cursor-not-allowed"
           >
             오늘
           </button>
           <button
             onClick={() => shiftMonth(1)}
+            disabled={isNavPending}
             aria-label="다음 달"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white hover:bg-stone-50"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white hover:bg-stone-50 disabled:cursor-not-allowed"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
