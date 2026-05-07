@@ -1,7 +1,7 @@
 // 사이트 하단 버전 표기. 배포할 때 두 상수만 손으로 바꿔주면 됨.
 //   - VERSION: 정식 릴리스가 아니면 끝에 `*` 로 베타 마크
 //   - RELEASE_DATE: 배포일을 MM.DD 로
-const VERSION = "v.10*";
+const VERSION = "v.20*";
 const RELEASE_DATE = "05.07";
 
 export function SiteFooter() {
