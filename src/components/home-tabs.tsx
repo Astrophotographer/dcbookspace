@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { CalendarDays, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,12 @@ type Props = {
   buildingViewProps: BuildingViewProps;
 };
 
+// 부모(page.tsx)의 <Suspense key={dateStr}> 가 날짜 변경 시 HomeTabs 를 통째로
+// remount 시킨다. URL 에 탭을 박지 않고도 사용자가 보던 탭을 유지하기 위해
+// sessionStorage 로 복원. (탭을 URL 에 넣으려면 모든 호출부가 보존해야 해서
+// 사이드 이펙트가 큼)
+const TAB_STORAGE_KEY = "dcbookspace.home-tab";
+
 /**
  * 두 뷰를 가로로 나란히 두고 scroll-snap 으로 한 번에 한 페이지씩 보이게 한다.
  *  - 모바일: 손가락 스와이프 → 네이티브 스크롤로 부드럽게 전환
@@ -58,13 +64,43 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
   // 이벤트 핸들러에서 직접 set — effect 안 setState 룰 회피.
   const [hasOpenedPlace, setHasOpenedPlace] = useState(false);
 
+  // mount 직후 sessionStorage 의 마지막 탭 복원. SSR/hydration 일치를 위해
+  // 초기 state 는 항상 "date" 로 두고 effect 에서 보정.
+  // effect 내부에서 setTab 을 직접 부르면 cascading-render lint 가 걸리므로,
+  // scrollLeft 만 조정 → 브라우저가 scroll 이벤트를 쏘면 기존 handleScroll 이
+  // 정상 경로로 setTab/setHasOpenedPlace 를 호출.
+  useEffect(() => {
+    let stored: Tab = "date";
+    try {
+      const v = window.sessionStorage.getItem(TAB_STORAGE_KEY);
+      if (v === "place") stored = "place";
+    } catch {
+      /* private mode 등 읽기 실패는 무시 */
+    }
+    if (stored === "place") {
+      const el = scrollerRef.current;
+      if (el) el.scrollLeft = el.clientWidth;
+    }
+  }, []);
+
+  const persistTab = (next: Tab) => {
+    try {
+      window.sessionStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      /* 무시 */
+    }
+  };
+
   const handleScroll = () => {
     const el = scrollerRef.current;
     if (!el) return;
     // 한 페이지 = clientWidth. round 로 가장 가까운 페이지 인덱스 결정.
     const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
     const next: Tab = idx === 0 ? "date" : "place";
-    if (next !== tab) setTab(next);
+    if (next !== tab) {
+      setTab(next);
+      persistTab(next);
+    }
     if (next === "place") setHasOpenedPlace(true);
   };
 
@@ -72,6 +108,7 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
     const el = scrollerRef.current;
     if (!el) return;
     if (target === "place") setHasOpenedPlace(true);
+    persistTab(target);
     const left = target === "date" ? 0 : el.clientWidth;
     el.scrollTo({ left, behavior: "smooth" });
   };

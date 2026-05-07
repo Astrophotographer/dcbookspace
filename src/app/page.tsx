@@ -34,12 +34,16 @@ export default async function Home(props: PageProps<"/">) {
 
   // Header + h1 만 즉시 렌더 → 첫 바이트(TTFB)가 빨라지고, 무거운 fetch 는
   // ReservationsArea 안에서 streaming.
+  // Suspense 에 key 를 박지 않는다 — 박으면 날짜·휠 스크롤마다 자식 트리 전체가
+  // unmount/remount 되면서 스켈레톤이 매번 깜빡 + 클라 state(탭, 모달 등) 리셋.
+  // RSC streaming 은 key 없이도 첫 로드에서만 fallback 을 띄워주고, 이후 nav 는
+  // 기존 화면을 유지하면서 데이터만 갈아끼움.
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
         <h1 className="mb-6 text-2xl font-bold text-stone-900">예약 현황</h1>
-        <Suspense fallback={<HomeSkeleton />} key={dateStr}>
+        <Suspense fallback={<HomeSkeleton />}>
           <ReservationsArea dateStr={dateStr} />
         </Suspense>
       </main>
