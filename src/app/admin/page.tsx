@@ -10,6 +10,7 @@ import {
   Network,
   FileText,
   LogOut,
+  QrCode,
   ShieldCheck,
   CalendarClock,
 } from "lucide-react";
@@ -56,6 +57,12 @@ const TILES = [
     label: "고정 행사",
     desc: "주일 예배 등 매주 정기 일정 관리",
     Icon: CalendarClock,
+  },
+  {
+    href: "/admin/apply-qr",
+    label: "신청 QR",
+    desc: "외부 게시용 QR 코드 — 휴대폰으로 스캔 시 신청서 바로 열림",
+    Icon: QrCode,
   },
 ];
 

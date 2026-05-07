@@ -6,7 +6,7 @@
 //   - 마이너 배포: v.NN* 의 NN 을 +1 (예: v.30* → v.31* → v.32* ...)
 //   - 메이저 배포: v4.X* 형식으로 점프 (정식 릴리스 시 `*` 제거)
 const VERSION = "v.31*";
-const RELEASE_DATE = "05.07";
+const RELEASE_DATE = "05.08";
 
 export function SiteFooter() {
   return (

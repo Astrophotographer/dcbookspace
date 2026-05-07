@@ -236,15 +236,21 @@ export function ApplyForm({
     return map;
   }, [departments]);
 
-  // 부서 선택 — 단일 select + <optgroup>. cascade 안 씀 (iOS Safari controlled
-  // select 동기화 버그 회피). 진입 시 defaults?.dept_id 가 leaf 면 그대로 채움.
+  // 부서 선택 — 대분류(parent) → 소분류(leaf) cascading 두 개 select.
+  // iOS Safari 동기화 버그는 placeholder 옵션에 `disabled` 를 안 붙이는 것으로 회피.
   const initialDeptLeaf = useMemo(
     () => departments.find((d) => d.id === defaults?.dept_id) ?? null,
     [departments, defaults?.dept_id],
   );
+  const [deptGroupId, setDeptGroupId] = useState<string>(
+    initialDeptLeaf?.parent_id ?? "",
+  );
   const [deptId, setDeptId] = useState<string>(
     initialDeptLeaf?.parent_id ? initialDeptLeaf.id : "",
   );
+  const visibleDeptLeaves = deptGroupId
+    ? (deptLeavesByGroup.get(deptGroupId) ?? [])
+    : [];
 
   // findRoomConflicts ↔ INSERT 사이 race 등으로 trigger 가 raw 에러를 던지는 경우,
   // 어떤 신청과 겹쳤는지 다시 조회해서 모달로 띄워준다. 모달 띄우는 데 성공하면 true.
@@ -526,31 +532,47 @@ export function ApplyForm({
           </Field>
         </div>
         <Field label="소속 부서">
-          {/* 단일 select + <optgroup>. native picker (iOS·Android·데스크톱)
-              가 그룹 헤더(non-selectable) + 자식 옵션을 한꺼번에 보여줌.
-              cascade 가 없어 controlled state 동기화 문제 자체를 제거. */}
-          <Select
-            name="dept_id"
-            value={deptId}
-            onChange={(e) => setDeptId(e.target.value)}
-            aria-label="소속 부서"
-            required
-          >
-            <option value="">부서 선택</option>
-            {deptGroups.map((g) => {
-              const leaves = deptLeavesByGroup.get(g.id) ?? [];
-              if (leaves.length === 0) return null;
-              return (
-                <optgroup key={g.id} label={g.name}>
-                  {leaves.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </Select>
+          {/* 대분류(parent) → 소분류(leaf) 두 단계 select. placeholder 옵션에
+              `disabled` 를 붙이면 iOS Safari 가 controlled value 와 동기화
+              안 시키는 버그가 있어 빈 value 만 사용. */}
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              value={deptGroupId}
+              onChange={(e) => {
+                setDeptGroupId(e.target.value);
+                setDeptId(""); // 대분류 바뀌면 소분류 리셋
+              }}
+              aria-label="대분류"
+            >
+              <option value="">대분류 선택</option>
+              {deptGroups.map((g) => {
+                const leaves = deptLeavesByGroup.get(g.id) ?? [];
+                if (leaves.length === 0) return null;
+                return (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                );
+              })}
+            </Select>
+            <Select
+              name="dept_id"
+              value={deptId}
+              onChange={(e) => setDeptId(e.target.value)}
+              aria-label="소분류"
+              required
+              disabled={!deptGroupId}
+            >
+              <option value="">
+                {deptGroupId ? "소분류 선택" : "대분류 먼저"}
+              </option>
+              {visibleDeptLeaves.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          </div>
         </Field>
       </fieldset>
 
