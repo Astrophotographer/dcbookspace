@@ -59,11 +59,54 @@ export async function createUser(
   return { user: data as AppUser, pin: initialPin ?? undefined };
 }
 
-export async function deleteUser(id: string): Promise<{ error?: string }> {
+/**
+ * 결재자/사용자 삭제.
+ * - 이 사용자가 신청서(reservations / reservation_series)의 applicant 로 참조 중이면
+ *   FK on delete restrict 때문에 hard delete 불가 → `active=false` 로 비활성화 (soft delete).
+ *   비활성화된 사용자는 목록·신청 폼에서 자동으로 사라지지만, 기존 신청 이력의 신청자 정보는 보존됨.
+ * - 참조가 없으면 hard delete.
+ */
+export async function deleteUser(
+  id: string,
+): Promise<{ result?: "deleted" | "deactivated"; error?: string }> {
   const supabase = createServiceClient();
+
+  const [
+    { count: rCount, error: e0 },
+    { count: sCount, error: e1 },
+  ] = await Promise.all([
+    supabase
+      .from("reservations")
+      .select("id", { count: "exact", head: true })
+      .eq("applicant_id", id),
+    supabase
+      .from("reservation_series")
+      .select("id", { count: "exact", head: true })
+      .eq("applicant_id", id),
+  ]);
+  if (e0) return { error: e0.message };
+  if (e1) return { error: e1.message };
+
+  const hasHistory = (rCount ?? 0) + (sCount ?? 0) > 0;
+
+  if (hasHistory) {
+    // 신청 이력 보존: 비활성화. PIN 도 함께 무력화해서 결재 차단.
+    const { error } = await supabase
+      .from("users")
+      .update({
+        active: false,
+        pin_hash: null,
+        pin_attempts: 0,
+        pin_locked_until: null,
+      })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    return { result: "deactivated" };
+  }
+
   const { error } = await supabase.from("users").delete().eq("id", id);
   if (error) return { error: error.message };
-  return {};
+  return { result: "deleted" };
 }
 
 /**

@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/utils";
 import type { ReservationDetail } from "@/lib/repo";
 import { Printer, FileText } from "lucide-react";
 import { OwnerActions } from "./owner-actions";
+import { PrintProgress } from "@/components/print-progress";
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
   if (!isSupabaseConfigured()) {
@@ -49,8 +50,9 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
-            <strong>신청이 접수되었습니다.</strong> 아래 결재 서류를 인쇄해서
-            결재자에게 회람하시거나, 디지털 링크로 전달할 수 있습니다.
+            <strong>신청서가 잘 접수되었습니다.</strong> 사무실 프린터로
+            결재 서류 인쇄 요청이 전송됐습니다. 아래에서 진행 상황을 확인해
+            주세요.
           </div>
         )}
 
@@ -69,6 +71,15 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           applicantPhone={r.applicant.phone ?? ""}
           editable={r.status === "pending" && r.current_step === 1}
         />
+
+        <div className="mb-6">
+          <PrintProgress
+            kind="reservation"
+            id={r.id}
+            status={r.print_status}
+            statusAt={r.print_status_at}
+          />
+        </div>
 
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">

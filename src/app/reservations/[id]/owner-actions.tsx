@@ -17,6 +17,10 @@ type Props = {
   editable: boolean;
 };
 
+// 신청 즉시 종이로 결재 회람되는 운영 흐름이라, 본인 수정/삭제 노출은 잠시
+// 숨겨둔다 (코드는 그대로 유지 — 다시 살릴 땐 SHOW_OWNER_ACTIONS = true 로).
+const SHOW_OWNER_ACTIONS = false;
+
 export function OwnerActions({
   reservationId,
   refNo,
@@ -32,6 +36,7 @@ export function OwnerActions({
   const [error, setError] = useState<string | null>(null);
 
   // 본인이 아니면 아무것도 그리지 않음 (다른 사람한텐 버튼이 보이면 안 됨)
+  if (!SHOW_OWNER_ACTIONS) return null;
   if (!hydrated) return null;
   const owner = isOwner(me, {
     name: applicantName,

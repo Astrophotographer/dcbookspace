@@ -90,6 +90,7 @@ export function EditReservationGate(props: Props) {
       departments={props.departments}
       defaults={props.defaults}
       editTarget={{
+        kind: "reservation",
         id: props.reservationId,
         ownerName: props.applicantName,
         ownerPhone: props.applicantPhone,

@@ -2,10 +2,18 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { format, parseISO } from "date-fns";
+import { ko } from "date-fns/locale";
 import { Check, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { cancelByChairman, signByPin, signBySession } from "./actions";
+import type { ActiveConflictItem } from "@/lib/conflicts";
+import {
+  cancelByChairman,
+  signByPin,
+  signBySession,
+  type CancelConflictTarget,
+} from "./actions";
 
 /**
  * 단일 QR + PIN으로 본인 단계를 자동 승인.
@@ -31,6 +39,12 @@ export function SignByPinForm({
     label: string;
     auto?: boolean;
   } | null>(null);
+  // 마지막 단계 충돌 모달 — needsConfirm 응답 받으면 노출
+  const [conflictPrompt, setConflictPrompt] = useState<{
+    conflicts: ActiveConflictItem[];
+    via: "pin" | "session";
+    pin: string;
+  } | null>(null);
 
   // hasAutoSession 이면 mount 시 한 번만 자동 결재 시도. 실패 (단계 불일치/만료) 시
   // 그냥 일반 PIN 폼으로 fallback. autoTried ref 로 중복 호출 방지.
@@ -42,7 +56,14 @@ export function SignByPinForm({
     if (!hasAutoSession || autoTried.current) return;
     autoTried.current = true;
     signBySession({ token }).then((res) => {
-      if (res.ok) {
+      if (res.needsConfirm) {
+        setConflictPrompt({
+          conflicts: res.needsConfirm,
+          via: "session",
+          pin: "",
+        });
+        setAutoChecking(false);
+      } else if (res.ok) {
         setDone({
           name: res.approverName ?? "",
           label: res.stepLabel ?? "",
@@ -101,7 +122,10 @@ export function SignByPinForm({
     }
     startTransition(async () => {
       const res = await signByPin({ token, pin });
-      if (res.error) {
+      if (res.needsConfirm) {
+        // 마지막 단계 충돌 → 모달 띄우고 사용자 결정 대기
+        setConflictPrompt({ conflicts: res.needsConfirm, via: "pin", pin });
+      } else if (res.error) {
         fail();
       } else {
         setDone({
@@ -113,9 +137,37 @@ export function SignByPinForm({
     });
   };
 
+  /** 충돌 모달 결정 후 재호출. cancelTargets 빈 배열이면 "그대로 승인". */
+  const finishWithDecision = (cancelTargets: CancelConflictTarget[]) => {
+    if (!conflictPrompt) return;
+    const { via, pin: pendingPin } = conflictPrompt;
+    setConflictPrompt(null);
+    startTransition(async () => {
+      const res =
+        via === "pin"
+          ? await signByPin({
+              token,
+              pin: pendingPin,
+              cancelConflicts: cancelTargets,
+            })
+          : await signBySession({ token, cancelConflicts: cancelTargets });
+      if (res.error) {
+        setError(res.error);
+      } else if (res.ok) {
+        setDone({
+          name: res.approverName ?? "",
+          label: res.stepLabel ?? "",
+          auto: via === "session",
+        });
+        router.refresh();
+      }
+    });
+  };
+
   const isError = !!error;
 
   return (
+    <>
     <div
       key={shakeKey}
       className={cn("space-y-4", isError && "animate-shake")}
@@ -188,6 +240,144 @@ export function SignByPinForm({
           </>
         )}
       </button>
+    </div>
+
+    {conflictPrompt && (
+      <ConflictResolveModal
+        conflicts={conflictPrompt.conflicts}
+        pending={pending}
+        onCancelAndApprove={() => {
+          finishWithDecision(
+            conflictPrompt.conflicts.map((c) => ({ kind: c.kind, id: c.id })),
+          );
+        }}
+        onKeepAndApprove={() => finishWithDecision([])}
+        onAbort={() => setConflictPrompt(null)}
+      />
+    )}
+    </>
+  );
+}
+
+function ConflictResolveModal({
+  conflicts,
+  pending,
+  onCancelAndApprove,
+  onKeepAndApprove,
+  onAbort,
+}: {
+  conflicts: ActiveConflictItem[];
+  pending: boolean;
+  onCancelAndApprove: () => void;
+  onKeepAndApprove: () => void;
+  onAbort: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onAbort();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onAbort]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="충돌 신청서 정리 확인"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onAbort();
+      }}
+    >
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
+        <div className="border-b border-stone-200 px-6 py-4">
+          <h2 className="text-xl font-bold text-stone-900">
+            같은 시간·장소에 다른 신청서가 있어요
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            지금 결재를 마치면 이 신청은 확정됩니다. 아래 신청서들도 함께
+            취소할까요? <strong>같이 취소</strong>를 누르면 자동으로 정리되고,{" "}
+            <strong>그대로 승인</strong>을 누르면 둘 다 살아남아 관리자가
+            나중에 정리합니다.
+          </p>
+        </div>
+
+        <ul className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+          {conflicts.map((c) => {
+            const start = parseISO(c.start_at);
+            const end = parseISO(c.end_at);
+            const sameDay =
+              format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd");
+            return (
+              <li
+                key={`${c.kind}-${c.id}`}
+                className="rounded-xl border border-stone-200 bg-stone-50 p-3"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-mono text-sm text-stone-700">
+                    #{c.ref_no ?? c.id.slice(0, 8)}
+                  </span>
+                  {c.kind === "series" && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                      정기
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-base font-medium text-stone-900">
+                  {c.purpose}
+                </div>
+                <div className="mt-0.5 text-sm text-stone-700">
+                  {format(start, "M월 d일 (E)", { locale: ko })}{" "}
+                  <span className="font-mono">
+                    {format(start, "HH:mm")}
+                    {sameDay
+                      ? `–${format(end, "HH:mm")}`
+                      : ` ~ ${format(end, "M/d HH:mm", { locale: ko })}`}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-xs text-stone-600">
+                  {[c.dept?.name, c.applicant?.name]
+                    .filter(Boolean)
+                    .join(" · ") || "(신청자 정보 없음)"}
+                  {c.applicant?.phone && (
+                    <span className="ml-2 font-mono text-stone-500">
+                      {c.applicant.phone}
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex flex-col gap-2 border-t border-stone-200 px-6 py-4 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={onAbort} disabled={pending}>
+            돌아가기
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={onKeepAndApprove}
+            disabled={pending}
+          >
+            그대로 승인 (둘 다 유지)
+          </Button>
+          <Button
+            variant="danger"
+            onClick={onCancelAndApprove}
+            disabled={pending}
+          >
+            {pending
+              ? "처리 중..."
+              : `같이 취소하고 승인 (${conflicts.length}건)`}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

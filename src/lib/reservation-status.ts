@@ -1,3 +1,12 @@
+import type { ComponentType, SVGProps } from "react";
+import {
+  Ban,
+  CircleCheck,
+  CircleX,
+  Clock,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import type { Approval, Reservation } from "@/lib/supabase/types";
 
 // 화면 표시용 상태. DB enum과 별도로 approvals 진행 정도까지 반영한다.
@@ -40,9 +49,9 @@ export const STATUS_BADGE_CLASS: Record<DisplayStatus, string> = {
   draft:     "bg-stone-100 text-stone-700",
   submitted: "bg-sky-100 text-sky-800",
   in_review: "bg-amber-100 text-amber-800",
-  confirmed: "bg-red-100 text-red-800",
+  confirmed: "bg-emerald-100 text-emerald-800",
   rejected:  "bg-stone-200 text-stone-700",
-  cancelled: "bg-stone-200 text-stone-500",
+  cancelled: "bg-red-100 text-red-800",
 };
 
 // 호실/캘린더 칩에 쓰는 좀 더 옅은 색
@@ -50,7 +59,18 @@ export const STATUS_CHIP_CLASS: Record<DisplayStatus, string> = {
   draft:     "bg-stone-50 text-stone-700",
   submitted: "bg-sky-50 text-sky-800",
   in_review: "bg-amber-50 text-amber-800",
-  confirmed: "bg-red-50 text-red-800",
+  confirmed: "bg-emerald-50 text-emerald-800",
   rejected:  "bg-stone-100 text-stone-600",
-  cancelled: "bg-stone-100 text-stone-500",
+  cancelled: "bg-red-50 text-red-800",
+};
+
+// 색만으로 상태 구분 못하는 어르신·색약 사용자를 위한 아이콘 신호
+type IconType = ComponentType<SVGProps<SVGSVGElement>>;
+export const STATUS_ICON: Record<DisplayStatus, IconType> = {
+  draft:     FileText,
+  submitted: Clock,
+  in_review: Loader2,
+  confirmed: CircleCheck,
+  rejected:  CircleX,
+  cancelled: Ban,
 };

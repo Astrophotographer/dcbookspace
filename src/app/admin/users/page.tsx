@@ -20,10 +20,12 @@ export default async function AdminUsersPage() {
   const supabase = createServiceClient();
   const [{ data: users }, { data: depts }] = await Promise.all([
     // 관리자(admin) 는 /admin/admins 에서 따로 관리하므로 여기 목록에서 제외
+    // 비활성(active=false) 사용자도 숨김 — soft delete 된 결재자는 신청 이력에만 남음
     supabase
       .from("users")
       .select("*")
       .neq("role", "admin")
+      .eq("active", true)
       .order("created_at", { ascending: false }),
     supabase.from("departments").select("*").order("display_order"),
   ]);

@@ -7,13 +7,19 @@ import {
   useTransition,
   type CSSProperties,
 } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Building, Floor, Room } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { useRealtimeRefresh } from "@/lib/supabase/use-realtime-refresh";
 import {
+  createBuilding,
+  createFloor,
   createRoom,
+  deleteBuilding,
+  deleteFloor,
   deleteRoom,
+  renameBuilding,
+  renameFloor,
   updateRoomLayout,
   updateRoomMeta,
 } from "./actions";
@@ -76,6 +82,13 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
   const [overrides, setOverrides] = useState<Record<string, Layout>>({});
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // 건물/층 인라인 편집 — 같은 시점엔 둘 중 하나만 활성
+  const [renamingBuildingId, setRenamingBuildingId] = useState<string | null>(null);
+  const [renamingFloorId, setRenamingFloorId] = useState<string | null>(null);
+  const [addingBuilding, setAddingBuilding] = useState(false);
+  const [addingFloor, setAddingFloor] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -172,54 +185,184 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
     setEditingId(null);
   }
 
+  // === 건물 CRUD ===
+  function handleAddBuilding(name: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await createBuilding(name);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setAddingBuilding(false);
+      if (res.building) setBuildingId(res.building.id);
+    });
+  }
+  function handleRenameBuilding(id: string, name: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await renameBuilding(id, name);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setRenamingBuildingId(null);
+    });
+  }
+  function handleDeleteBuilding(id: string, name: string) {
+    if (
+      !confirm(
+        `"${name}" 건물을 삭제하시겠어요? 이 건물의 모든 층·호실이 함께 삭제됩니다.`,
+      )
+    )
+      return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteBuilding(id);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      if (id === buildingId) {
+        const fallback = buildings.find((b) => b.id !== id);
+        setBuildingId(fallback?.id ?? "");
+      }
+    });
+  }
+
+  // === 층 CRUD ===
+  function handleAddFloor(label: string) {
+    if (!buildingId) {
+      setError("먼저 건물을 선택해주세요.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const res = await createFloor(buildingId, label);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setAddingFloor(false);
+      if (res.floor) setFloorId(res.floor.id);
+    });
+  }
+  function handleRenameFloor(id: string, label: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await renameFloor(id, label);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setRenamingFloorId(null);
+    });
+  }
+  function handleDeleteFloor(id: string, label: string) {
+    if (
+      !confirm(
+        `"${label}" 층을 삭제하시겠어요? 이 층의 모든 호실이 함께 삭제됩니다.`,
+      )
+    )
+      return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteFloor(id);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+    });
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
       {/* 좌측: 건물/층 트리 */}
       <aside className="space-y-3">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <div>
           <h3 className="mb-2 text-sm font-semibold text-stone-700">건물</h3>
           <div className="flex flex-col gap-1">
             {buildings.map((b) => (
-              <button
+              <EditableTab
                 key={b.id}
-                onClick={() => setBuildingId(b.id)}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                  buildingId === b.id
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-stone-200 bg-white hover:bg-stone-50",
-                )}
-              >
-                {b.name}
-              </button>
+                label={b.name}
+                active={buildingId === b.id}
+                renaming={renamingBuildingId === b.id}
+                disabled={isPending}
+                onSelect={() => setBuildingId(b.id)}
+                onStartRename={() => setRenamingBuildingId(b.id)}
+                onCancelRename={() => setRenamingBuildingId(null)}
+                onSubmitRename={(v) => handleRenameBuilding(b.id, v)}
+                onDelete={() => handleDeleteBuilding(b.id, b.name)}
+              />
             ))}
-            {buildings.length === 0 && (
+            {addingBuilding ? (
+              <InlineCreateForm
+                placeholder="새 건물 이름"
+                onSubmit={handleAddBuilding}
+                onCancel={() => setAddingBuilding(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingBuilding(true)}
+                className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
+              >
+                <Plus className="h-4 w-4" />
+                건물 추가
+              </button>
+            )}
+            {buildings.length === 0 && !addingBuilding && (
               <p className="text-sm text-stone-500">
-                먼저 Supabase Studio에서 건물을 추가해주세요.
+                건물이 없습니다. 위에서 추가해 주세요.
               </p>
             )}
           </div>
         </div>
+
         <div>
           <h3 className="mb-2 text-sm font-semibold text-stone-700">층</h3>
           <div className="flex flex-col gap-1">
             {buildingFloors.map((f) => (
-              <button
+              <EditableTab
                 key={f.id}
-                onClick={() => setFloorId(f.id)}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                  floorId === f.id
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-stone-200 bg-white hover:bg-stone-50",
-                )}
-              >
-                {f.label}
-              </button>
+                label={f.label}
+                active={floorId === f.id}
+                renaming={renamingFloorId === f.id}
+                disabled={isPending}
+                onSelect={() => setFloorId(f.id)}
+                onStartRename={() => setRenamingFloorId(f.id)}
+                onCancelRename={() => setRenamingFloorId(null)}
+                onSubmitRename={(v) => handleRenameFloor(f.id, v)}
+                onDelete={() => handleDeleteFloor(f.id, f.label)}
+              />
             ))}
-            {buildingFloors.length === 0 && buildings.length > 0 && (
+            {buildingId && addingFloor ? (
+              <InlineCreateForm
+                placeholder="예: 3층 / B1 / MF"
+                onSubmit={handleAddFloor}
+                onCancel={() => setAddingFloor(false)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingFloor(true)}
+                disabled={!buildingId}
+                className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                층 추가
+              </button>
+            )}
+            {buildingFloors.length === 0 && buildingId && !addingFloor && (
               <p className="text-sm text-stone-500">
-                층이 없습니다. Supabase Studio에서 추가해주세요.
+                층이 없습니다. 위에서 추가해 주세요.
               </p>
             )}
           </div>
@@ -331,6 +474,178 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * 건물·층 사이드바의 한 행. 평소엔 선택 버튼 + ✏️/🗑 인라인 아이콘,
+ * renaming=true 면 그 자리가 인라인 입력 폼으로 전환된다.
+ */
+function EditableTab({
+  label,
+  active,
+  renaming,
+  disabled,
+  onSelect,
+  onStartRename,
+  onCancelRename,
+  onSubmitRename,
+  onDelete,
+}: {
+  label: string;
+  active: boolean;
+  renaming: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  onStartRename: () => void;
+  onCancelRename: () => void;
+  onSubmitRename: (v: string) => void;
+  onDelete: () => void;
+}) {
+  if (renaming) {
+    return (
+      <InlineRenameForm
+        initial={label}
+        onSubmit={onSubmitRename}
+        onCancel={onCancelRename}
+      />
+    );
+  }
+  return (
+    <div
+      className={cn(
+        "group flex items-stretch overflow-hidden rounded-lg border transition-colors",
+        active
+          ? "border-brand-500 bg-brand-50"
+          : "border-stone-200 bg-white hover:bg-stone-50",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex-1 px-3 py-2 text-left text-sm",
+          active ? "text-brand-700" : "text-stone-800",
+        )}
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        onClick={onStartRename}
+        disabled={disabled}
+        aria-label={`${label} 이름 변경`}
+        className="flex w-8 items-center justify-center text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={disabled}
+        aria-label={`${label} 삭제`}
+        className="flex w-8 items-center justify-center text-stone-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/** 새 건물/층 추가용 인라인 폼. Enter 저장, Esc 취소. */
+function InlineCreateForm({
+  placeholder,
+  onSubmit,
+  onCancel,
+}: {
+  placeholder: string;
+  onSubmit: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  return (
+    <form
+      className="flex items-stretch gap-1 rounded-lg border-2 border-brand-300 bg-white p-1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const v = value.trim();
+        if (!v) return;
+        onSubmit(v);
+      }}
+    >
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+        }}
+        placeholder={placeholder}
+        className="flex-1 rounded px-2 py-1 text-sm focus:outline-none"
+      />
+      <button
+        type="submit"
+        className="rounded bg-brand-600 px-2 text-xs font-medium text-white hover:bg-brand-700"
+      >
+        저장
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="취소"
+        className="flex w-7 items-center justify-center rounded text-stone-500 hover:bg-stone-100"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </form>
+  );
+}
+
+/** 건물/층 이름 변경용 인라인 폼. */
+function InlineRenameForm({
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  initial: string;
+  onSubmit: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <form
+      className="flex items-stretch gap-1 rounded-lg border-2 border-brand-500 bg-white p-1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const v = value.trim();
+        if (!v) return;
+        onSubmit(v);
+      }}
+    >
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+        }}
+        className="flex-1 rounded px-2 py-1 text-sm focus:outline-none"
+      />
+      <button
+        type="submit"
+        className="rounded bg-brand-600 px-2 text-xs font-medium text-white hover:bg-brand-700"
+      >
+        저장
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="취소"
+        className="flex w-7 items-center justify-center rounded text-stone-500 hover:bg-stone-100"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </form>
   );
 }
 

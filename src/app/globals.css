@@ -10,10 +10,11 @@
   --color-brand-700: #294876;
 
   /* 결재/예약 상태 색 */
-  --color-status-empty:    #15803d;
-  --color-status-pending:  #b45309;
-  --color-status-approved: #b91c1c;
-  --color-status-rejected: #475569;
+  --color-status-empty:    #57534e; /* stone-600 — 비어있음 (중립) */
+  --color-status-pending:  #b45309; /* amber-700 — 결재중 */
+  --color-status-approved: #047857; /* emerald-700 — 예약완료 */
+  --color-status-rejected: #475569; /* slate-600 — 반려 */
+  --color-status-cancelled:#b91c1c; /* red-700 — 취소 */
 }
 
 html {

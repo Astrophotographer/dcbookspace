@@ -54,14 +54,16 @@ export function Field({
   hint,
   error,
   children,
+  className,
 }: {
   label: string;
   hint?: string;
   error?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={cn("block", className)}>
       <span className="mb-1 block text-sm font-medium text-stone-800">{label}</span>
       {children}
       {hint && !error && (

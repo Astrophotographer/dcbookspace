@@ -7,12 +7,12 @@ alter table reservations
 
 -- 기존 row 채우기
 update reservations
-   set qr_token = replace(uuid_generate_v4()::text, '-', '')
+   set qr_token = replace(gen_random_uuid()::text, '-', '')
  where qr_token is null;
 
 -- 이후 row는 자동
 alter table reservations
-  alter column qr_token set default replace(uuid_generate_v4()::text, '-', '');
+  alter column qr_token set default replace(gen_random_uuid()::text, '-', '');
 
 alter table reservations
   alter column qr_token set not null;

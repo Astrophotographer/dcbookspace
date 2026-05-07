@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { AppUser } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
+import { formatPhone } from "@/lib/phone";
 import { createAdmin, deleteAdmin, issueAdminPin } from "./actions";
 
 type Props = {
@@ -15,6 +16,7 @@ export function AdminsAdmin({ initialAdmins }: Props) {
   const [pending, startTransition] = useTransition();
   const [issuedPin, setIssuedPin] = useState<{ userId: string; pin: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
 
   return (
     <div className="space-y-6">
@@ -36,6 +38,7 @@ export function AdminsAdmin({ initialAdmins }: Props) {
                   setIssuedPin({ userId: res.user.id, pin: res.pin });
                 }
                 form.reset();
+                setPhone("");
               }
             });
           }}
@@ -44,7 +47,16 @@ export function AdminsAdmin({ initialAdmins }: Props) {
             <Input name="name" required />
           </Field>
           <Field label="휴대폰">
-            <Input name="phone" type="tel" required placeholder="010-0000-0000" />
+            <Input
+              name="phone"
+              type="tel"
+              inputMode="numeric"
+              required
+              placeholder="010-0000-0000"
+              pattern="[0-9\-]{9,13}"
+              value={phone}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+            />
           </Field>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={pending}>

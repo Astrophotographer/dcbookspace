@@ -8,7 +8,9 @@ import {
   getFloors,
   getRooms,
   getReservationsBetween,
+  getFixedEvents,
 } from "@/lib/repo";
+import { expandFixedEvents } from "@/lib/recurrence";
 import { isSupabaseConfigured } from "@/lib/config";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 
@@ -49,18 +51,23 @@ export default async function Home(props: PageProps<"/">) {
     rooms,
     dayReservations,
     monthReservations,
+    fixedEvents,
   ] = await Promise.all([
     getBuildings(),
     getFloors(),
     getRooms(),
     getReservationsBetween(dayStart, dayEnd),
     getReservationsBetween(monthStart, monthEnd),
+    getFixedEvents(),
   ]);
+
+  // 캘린더(DateView)에는 고정 행사 미표시 — 장소 뷰만 호실 상태에 함께 노출.
+  const dayFixedEvents = expandFixedEvents(fixedEvents, dateStr, dateStr);
 
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
         <h1 className="mb-6 text-2xl font-bold text-stone-900">예약 현황</h1>
 
         <HomeTabs
@@ -77,6 +84,7 @@ export default async function Home(props: PageProps<"/">) {
               floors={floors}
               rooms={rooms}
               reservations={dayReservations}
+              fixedEvents={dayFixedEvents}
             />
           }
         />

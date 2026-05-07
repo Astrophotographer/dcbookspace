@@ -31,7 +31,7 @@ export default async function ApplyPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
         <h1 className="mb-6 text-2xl font-bold text-stone-900">
           장소사용 신청
         </h1>

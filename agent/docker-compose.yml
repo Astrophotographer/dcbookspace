@@ -1,0 +1,31 @@
+# DCbookspace 인쇄 에이전트 — Synology Container Manager 용 compose
+#
+# 사용법
+#   1) 이 폴더(agent/) 통째로 NAS 의 한 디렉토리에 복사
+#   2) .env.example 을 .env 로 복사 후 값 채움
+#   3) Synology Container Manager → 프로젝트 → 생성 → 이 docker-compose.yml 선택
+#
+# 또는 SSH 로:
+#   $ docker compose up -d --build
+#
+# 문제 생기면:
+#   $ docker compose logs -f
+
+services:
+  print-agent:
+    container_name: dcbookspace-print-agent
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    # 프린터(LAN)·Vercel(WAN) 모두 접근 가능해야 하므로 호스트 네트워크 권장.
+    # Synology DSM 에서는 일부 모델이 호스트 모드 미지원 — 그 경우엔 bridge + 라우팅 OK.
+    network_mode: bridge
+    # 헬스체크: 1분 간격으로 단순 ping (TODO: 차후 /healthz 엔드포인트 추가하면 더 정밀)
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'process.exit(0)' || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3

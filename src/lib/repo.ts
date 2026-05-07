@@ -11,6 +11,8 @@ import type {
   Department,
   AppUser,
   ApprovalRoute,
+  FixedEvent,
+  ReservationSeries,
 } from "@/lib/supabase/types";
 
 export type RoomWithFloor = Room & { floor: Floor & { building: Building } };
@@ -21,6 +23,19 @@ export type ReservationDetail = Reservation & {
   dept: Department | null;
   approvals: ApprovalWithApprover[];
   route: ApprovalRoute;
+};
+
+export type SeriesDetail = ReservationSeries & {
+  room: RoomWithFloor;
+  applicant: AppUser;
+  dept: Department | null;
+  approvals: ApprovalWithApprover[];
+  route: ApprovalRoute;
+  /** 시리즈에 속한 회차 reservations (간략 정보) */
+  reservations: Pick<
+    Reservation,
+    "id" | "start_at" | "end_at" | "status" | "ref_no"
+  >[];
 };
 
 export async function getBuildings(): Promise<Building[]> {
@@ -65,6 +80,51 @@ export async function getDepartments(): Promise<Department[]> {
   return data ?? [];
 }
 
+/** 고정 행사 — 결재 없는 주간 정규 일정. 기본은 active=true 만.
+ *  마이그레이션 미적용 환경에서 홈 화면이 깨지지 않게 fixed_events 부재는
+ *  빈 배열로 처리하고, 그 외 에러는 상위로 던진다. */
+export async function getFixedEvents(
+  options: { includeInactive?: boolean } = {},
+): Promise<FixedEvent[]> {
+  const supabase = createServiceClient();
+  let q = supabase
+    .from("fixed_events")
+    .select("*")
+    .order("weekday")
+    .order("start_time");
+  if (!options.includeInactive) q = q.eq("active", true);
+  const { data, error } = await q;
+  if (error) {
+    // PGRST205: PostgREST schema cache에 테이블 없음 (마이그레이션 미적용)
+    if ((error as { code?: string }).code === "PGRST205") return [];
+    throw error;
+  }
+  return (data ?? []) as FixedEvent[];
+}
+
+/**
+ * 충돌 안내 시 보여줄 1차 연락 관리자.
+ * `admin` 우선, 없으면 `manager` 폴백. 모두 없으면 null.
+ */
+export async function getPrimaryAdminContact(): Promise<{
+  name: string;
+  phone: string | null;
+  role: "admin" | "manager";
+} | null> {
+  const supabase = createServiceClient();
+  for (const role of ["admin", "manager"] as const) {
+    const { data } = await supabase
+      .from("users")
+      .select("name, phone")
+      .eq("role", role)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+    if (data) return { name: data.name, phone: data.phone, role };
+  }
+  return null;
+}
+
 /** 특정 날짜 범위 안의 모든 예약을 호실/부서/결재자 정보까지 함께 가져옴 */
 export async function getReservationsBetween(
   startISO: string,
@@ -105,6 +165,58 @@ export async function getReservationByQrToken(qrToken: string) {
     .single();
   if (error || !data) return null;
   return data as unknown as ReservationDetail;
+}
+
+export async function getSeries(id: string): Promise<SeriesDetail | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("reservation_series")
+    .select(
+      `*,
+       room:rooms (*, floor:floors (*, building:buildings(*))),
+       applicant:users!applicant_id (*),
+       dept:departments (*),
+       approvals (*, approver:users!approver_id (*)),
+       route:approval_routes (*),
+       reservations (id, start_at, end_at, status, ref_no)`,
+    )
+    .eq("id", id)
+    .single();
+  if (error || !data) return null;
+  return data as unknown as SeriesDetail;
+}
+
+/**
+ * QR 토큰으로 결재 대상 조회. 시리즈 토큰을 먼저 시도하고 없으면 일회성 reservation.
+ */
+export type SignTarget =
+  | { kind: "series"; series: SeriesDetail }
+  | { kind: "reservation"; reservation: ReservationDetail }
+  | null;
+
+export async function getSignTargetByQrToken(
+  token: string,
+): Promise<SignTarget> {
+  const supabase = createServiceClient();
+  const { data: series } = await supabase
+    .from("reservation_series")
+    .select(
+      `*,
+       room:rooms (*, floor:floors (*, building:buildings(*))),
+       applicant:users!applicant_id (*),
+       dept:departments (*),
+       approvals (*, approver:users!approver_id (*)),
+       route:approval_routes (*),
+       reservations (id, start_at, end_at, status, ref_no)`,
+    )
+    .eq("qr_token", token)
+    .maybeSingle();
+  if (series) {
+    return { kind: "series", series: series as unknown as SeriesDetail };
+  }
+  const r = await getReservationByQrToken(token);
+  if (r) return { kind: "reservation", reservation: r };
+  return null;
 }
 
 export async function getReservationByToken(token: string) {

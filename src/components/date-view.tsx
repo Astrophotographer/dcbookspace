@@ -16,6 +16,8 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { ReservationDetail } from "@/lib/repo";
+import type { FixedEventInstance } from "@/lib/recurrence";
+import { fixedEventsByDate } from "@/lib/recurrence";
 import { cn, formatTime } from "@/lib/utils";
 import { ko } from "date-fns/locale";
 import {
@@ -28,11 +30,16 @@ import {
 type Props = {
   currentDate: string;
   reservations: ReservationDetail[];
+  fixedEvents?: FixedEventInstance[];
 };
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-export function DateView({ currentDate, reservations }: Props) {
+export function DateView({
+  currentDate,
+  reservations,
+  fixedEvents = [],
+}: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const [modalDate, setModalDate] = useState<Date | null>(null);
@@ -108,6 +115,7 @@ export function DateView({ currentDate, reservations }: Props) {
       byDate.get(key)!.push(r);
     }
   }
+  const fixedByDate = fixedEventsByDate(fixedEvents);
 
   return (
     <div className="space-y-3">
@@ -148,7 +156,7 @@ export function DateView({ currentDate, reservations }: Props) {
             <div
               key={wd}
               className={cn(
-                "bg-stone-50 px-2 py-2 text-center text-xs font-semibold",
+                "bg-stone-50 px-1 py-1.5 text-center text-[11px] font-semibold sm:px-2 sm:py-2 sm:text-xs",
                 i === 0 && "text-red-600",
                 i === 6 && "text-blue-600",
                 i !== 0 && i !== 6 && "text-stone-700",
@@ -162,6 +170,7 @@ export function DateView({ currentDate, reservations }: Props) {
           {days.map((day) => {
             const key = format(day, "yyyy-MM-dd");
             const list = byDate.get(key) ?? [];
+            const fixedList = fixedByDate.get(key) ?? [];
             const isToday = isSameDay(day, today);
             const dow = day.getDay();
             const month = day.getMonth() + 1; // 1~12
@@ -177,16 +186,16 @@ export function DateView({ currentDate, reservations }: Props) {
               <div
                 key={key}
                 className={cn(
-                  "relative flex min-h-28 flex-col p-1.5",
+                  "relative flex min-h-20 flex-col p-1 sm:min-h-28 sm:p-1.5",
                   isEvenMonth ? "bg-orange-50" : "bg-white",
                 )}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-1">
                   <button
                     onClick={() => setModalDate(day)}
                     aria-label={`${format(day, "yyyy년 M월 d일")} 예약 ${list.length}건 보기`}
                     className={cn(
-                      "inline-flex h-6 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors",
+                      "inline-flex h-5 items-center justify-center rounded-full px-1.5 text-xs font-medium transition-colors sm:h-6 sm:px-2 sm:text-sm",
                       isToday
                         ? "bg-brand-600 text-white"
                         : cn(
@@ -203,17 +212,30 @@ export function DateView({ currentDate, reservations }: Props) {
                   >
                     {dayLabel}
                   </button>
-                  {list.length > 0 && (
+                  {(list.length > 0 || fixedList.length > 0) && (
                     <button
                       type="button"
                       onClick={() => setModalDate(day)}
-                      className="text-[10px] text-stone-500 hover:text-stone-800"
+                      className="hidden text-[10px] text-stone-500 hover:text-stone-800 sm:inline"
                     >
-                      {list.length}건
+                      {list.length + fixedList.length}건
                     </button>
                   )}
                 </div>
-                <ul className="mt-1 space-y-0.5 overflow-hidden">
+                <ul className="mt-0.5 space-y-0.5 overflow-hidden sm:mt-1">
+                  {fixedList.slice(0, 2).map((ev) => (
+                    <li key={ev.id}>
+                      <span
+                        title={`[고정] ${ev.name} · ${formatTime(ev.start_at)}–${formatTime(ev.end_at)}`}
+                        className="block truncate rounded bg-stone-200 px-0.5 py-0.5 text-[10px] text-stone-800 sm:px-1 sm:text-[11px]"
+                      >
+                        <span className="font-mono">
+                          {formatTime(ev.start_at)}
+                        </span>{" "}
+                        {ev.name}
+                      </span>
+                    </li>
+                  ))}
                   {list.slice(0, 3).map((r) => {
                     const ds = displayStatus(r);
                     return (
@@ -222,7 +244,7 @@ export function DateView({ currentDate, reservations }: Props) {
                           href={`/reservations/${r.id}`}
                           title={`[${STATUS_LABEL[ds]}] ${formatTime(r.start_at)}–${formatTime(r.end_at)} · ${r.dept?.name ?? ""} · ${r.purpose}`}
                           className={cn(
-                            "block truncate rounded px-1 py-0.5 text-[11px] hover:opacity-80",
+                            "block truncate rounded px-0.5 py-0.5 text-[10px] hover:opacity-80 sm:px-1 sm:text-[11px]",
                             STATUS_CHIP_CLASS[ds],
                           )}
                         >
@@ -234,9 +256,9 @@ export function DateView({ currentDate, reservations }: Props) {
                       </li>
                     );
                   })}
-                  {list.length > 3 && (
+                  {list.length + fixedList.length > 5 && (
                     <li className="px-1 text-[10px] text-stone-500">
-                      +{list.length - 3}건
+                      +{list.length + fixedList.length - 5}건
                     </li>
                   )}
                 </ul>
@@ -250,6 +272,7 @@ export function DateView({ currentDate, reservations }: Props) {
         <DayReservationsModal
           date={modalDate}
           list={byDate.get(format(modalDate, "yyyy-MM-dd")) ?? []}
+          fixedList={fixedByDate.get(format(modalDate, "yyyy-MM-dd")) ?? []}
           onClose={() => setModalDate(null)}
         />
       )}
@@ -260,10 +283,12 @@ export function DateView({ currentDate, reservations }: Props) {
 function DayReservationsModal({
   date,
   list,
+  fixedList,
   onClose,
 }: {
   date: Date;
   list: ReservationDetail[];
+  fixedList: FixedEventInstance[];
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -297,6 +322,7 @@ function DayReservationsModal({
             <h2 className="text-xl font-bold text-stone-900">{heading}</h2>
             <p className="mt-0.5 text-sm text-stone-500">
               예약 {list.length}건
+              {fixedList.length > 0 && ` · 고정 행사 ${fixedList.length}건`}
             </p>
           </div>
           <button
@@ -310,11 +336,38 @@ function DayReservationsModal({
         </div>
 
         <div className="overflow-y-auto px-6 py-4">
-          {list.length === 0 ? (
+          {fixedList.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-2 text-xs font-semibold text-stone-500">
+                고정 행사
+              </div>
+              <ul className="space-y-2">
+                {fixedList.map((ev) => (
+                  <li
+                    key={ev.id}
+                    className="rounded-xl border border-stone-300 bg-stone-100 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm text-stone-700">
+                        {formatTime(ev.start_at)} – {formatTime(ev.end_at)}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-800">
+                        고정
+                      </span>
+                    </div>
+                    <div className="mt-1 text-base font-medium text-stone-900">
+                      {ev.name}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {list.length === 0 && fixedList.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-sm text-stone-500">
               이 날짜에 신청된 예약이 없습니다.
             </div>
-          ) : (
+          ) : list.length === 0 ? null : (
             <ul className="space-y-2">
               {list.map((r) => {
                 const ds = displayStatus(r);
@@ -337,9 +390,11 @@ function DayReservationsModal({
                           {STATUS_LABEL[ds]}
                         </span>
                       </div>
-                      <div className="text-base font-medium text-stone-900">
-                        {r.room.floor.building.name} {r.room.floor.label}{" "}
-                        {r.room.name}
+                      <div className="text-base text-stone-900">
+                        <div>
+                          {r.room.floor.building.name} {r.room.floor.label}
+                        </div>
+                        <div className="font-medium">{r.room.name}</div>
                       </div>
                       <div className="text-xs text-stone-500">
                         {r.dept?.name ?? "(부서 미지정)"} · {r.purpose}

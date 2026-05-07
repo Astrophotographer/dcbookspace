@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { AppUser, Department, UserRole } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
+import { formatPhone } from "@/lib/phone";
 import { createUser, deleteUser, issuePin } from "./actions";
 
 const APPROVER_ROLES: UserRole[] = ["dept_head", "elder", "manager", "senior_pastor"];
@@ -31,6 +32,35 @@ export function UsersAdmin({
   const [pending, startTransition] = useTransition();
   const [issuedPin, setIssuedPin] = useState<{ userId: string; pin: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // 부서 cascading. 신청 폼과 동일 정책 — leaf 만 dept_id 로.
+  const deptGroups = useMemo(
+    () =>
+      [...departments]
+        .filter((d) => d.parent_id === null)
+        .sort((a, b) => a.display_order - b.display_order),
+    [departments],
+  );
+  const deptLeavesByGroup = useMemo(() => {
+    const map = new Map<string, Department[]>();
+    for (const d of departments) {
+      if (d.parent_id) {
+        const arr = map.get(d.parent_id) ?? [];
+        arr.push(d);
+        map.set(d.parent_id, arr);
+      }
+    }
+    for (const arr of map.values())
+      arr.sort((a, b) => a.display_order - b.display_order);
+    return map;
+  }, [departments]);
+  const [deptGroupId, setDeptGroupId] = useState<string>("");
+  const [deptId, setDeptId] = useState<string>("");
+  const [phone, setPhone] = useState("");
+  const visibleDeptLeaves = deptGroupId
+    ? deptLeavesByGroup.get(deptGroupId) ?? []
+    : [];
 
   const isApprover = (r: UserRole) => APPROVER_ROLES.includes(r);
 
@@ -39,11 +69,14 @@ export function UsersAdmin({
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-lg font-semibold">새 사용자 추가</h2>
         <form
-          className="grid gap-3 sm:grid-cols-2 md:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-2 md:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
-            const fd = new FormData(e.currentTarget);
+            const form = e.currentTarget;
+            const fd = new FormData(form);
+            // cascading 두 셀렉트의 leaf 값을 dept_id 로 전달
+            fd.set("dept_id", deptId);
             startTransition(async () => {
               const res = await createUser(fd);
               if (res.error) setError(res.error);
@@ -52,7 +85,10 @@ export function UsersAdmin({
                 if (res.pin) {
                   setIssuedPin({ userId: res.user.id, pin: res.pin });
                 }
-                (e.target as HTMLFormElement).reset();
+                form.reset();
+                setDeptGroupId("");
+                setDeptId("");
+                setPhone("");
               }
             });
           }}
@@ -61,7 +97,16 @@ export function UsersAdmin({
             <Input name="name" required />
           </Field>
           <Field label="휴대폰">
-            <Input name="phone" type="tel" required />
+            <Input
+              name="phone"
+              type="tel"
+              inputMode="numeric"
+              required
+              placeholder="010-0000-0000"
+              pattern="[0-9\-]{9,13}"
+              value={phone}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
+            />
           </Field>
           <Field label="역할">
             <Select name="role" required defaultValue="applicant">
@@ -72,17 +117,39 @@ export function UsersAdmin({
               ))}
             </Select>
           </Field>
-          <Field label="부서 (선택)">
-            <Select name="dept_id">
+          <Field label="부서 분류 (선택)">
+            <Select
+              value={deptGroupId}
+              onChange={(e) => {
+                setDeptGroupId(e.target.value);
+                setDeptId("");
+              }}
+              aria-label="부서 분류"
+            >
               <option value="">없음</option>
-              {departments.map((d) => (
+              {deptGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="부서 (선택)">
+            <Select
+              value={deptId}
+              onChange={(e) => setDeptId(e.target.value)}
+              aria-label="소속 부서"
+              disabled={!deptGroupId}
+            >
+              <option value="">{deptGroupId ? "없음" : "분류 먼저"}</option>
+              {visibleDeptLeaves.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
               ))}
             </Select>
           </Field>
-          <div className="sm:col-span-2 md:col-span-4">
+          <div className="sm:col-span-2 md:col-span-5">
             <Button type="submit" disabled={pending}>
               추가
             </Button>
@@ -94,6 +161,20 @@ export function UsersAdmin({
           </div>
         )}
       </section>
+
+      {notice && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="text-xs text-sky-700 hover:text-sky-900"
+            aria-label="알림 닫기"
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       {issuedPin && (
         <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-5">
@@ -174,11 +255,26 @@ export function UsersAdmin({
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      if (!confirm(`${u.name} 님을 삭제할까요?`)) return;
+                      if (
+                        !confirm(
+                          `${u.name} 님을 삭제할까요?\n신청 이력이 있으면 비활성화로 처리되어 PIN이 즉시 무효화됩니다.`,
+                        )
+                      )
+                        return;
+                      setError(null);
+                      setNotice(null);
                       startTransition(async () => {
                         const res = await deleteUser(u.id);
-                        if (res.error) setError(res.error);
-                        else setUsers((arr) => arr.filter((x) => x.id !== u.id));
+                        if (res.error) {
+                          setError(res.error);
+                          return;
+                        }
+                        setUsers((arr) => arr.filter((x) => x.id !== u.id));
+                        setNotice(
+                          res.result === "deactivated"
+                            ? `${u.name} 님은 신청 이력이 있어 비활성화 처리되었습니다. 결재 라인에서 제외되고 PIN도 무효화됩니다.`
+                            : `${u.name} 님이 삭제되었습니다.`,
+                        );
                       });
                     }}
                   >

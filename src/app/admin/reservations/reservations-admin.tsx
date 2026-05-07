@@ -1,17 +1,25 @@
 "use client";
 
-import { ReservationsTable } from "@/components/reservations-table";
-import type { ReservationDetail } from "@/lib/repo";
+import {
+  ReservationsTable,
+  type TableEntry,
+} from "@/components/reservations-table";
 
 type Props = {
-  reservations: ReservationDetail[];
+  entries: TableEntry[];
 };
 
-export function ReservationsAdmin({ reservations }: Props) {
+export function ReservationsAdmin({ entries }: Props) {
   return (
     <ReservationsTable
-      reservations={reservations}
-      rowLink={(r) => ({ href: `/admin/reservations/${r.id}` })}
+      entries={entries}
+      rowLink={(e) => ({
+        // 시리즈는 별도 admin 상세 페이지가 없어 공개 시리즈 페이지로
+        href:
+          e.kind === "series"
+            ? `/series/${e.data.id}`
+            : `/admin/reservations/${e.data.id}`,
+      })}
     />
   );
 }

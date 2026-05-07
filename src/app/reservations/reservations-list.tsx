@@ -1,17 +1,24 @@
 "use client";
 
-import { ReservationsTable } from "@/components/reservations-table";
-import type { ReservationDetail } from "@/lib/repo";
+import {
+  ReservationsTable,
+  type TableEntry,
+} from "@/components/reservations-table";
 
 type Props = {
-  reservations: ReservationDetail[];
+  entries: TableEntry[];
 };
 
-export function ReservationsList({ reservations }: Props) {
+export function ReservationsList({ entries }: Props) {
   return (
     <ReservationsTable
-      reservations={reservations}
-      rowLink={(r) => ({ href: `/reservations/${r.id}` })}
+      entries={entries}
+      rowLink={(e) => ({
+        href:
+          e.kind === "series"
+            ? `/series/${e.data.id}`
+            : `/reservations/${e.data.id}`,
+      })}
     />
   );
 }

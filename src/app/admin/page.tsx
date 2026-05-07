@@ -9,6 +9,7 @@ import {
   Network,
   FileText,
   ShieldCheck,
+  CalendarClock,
 } from "lucide-react";
 
 const TILES = [
@@ -47,6 +48,12 @@ const TILES = [
     label: "결재선",
     desc: "결재 단계 템플릿 관리",
     Icon: Network,
+  },
+  {
+    href: "/admin/fixed-events",
+    label: "고정 행사",
+    desc: "주일 예배 등 매주 정기 일정 관리",
+    Icon: CalendarClock,
   },
 ];
 
