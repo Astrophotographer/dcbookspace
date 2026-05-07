@@ -14,7 +14,8 @@ import {
   parseISO,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { fixedEventsByDate } from "@/lib/recurrence";
@@ -149,14 +150,14 @@ export function DateView({
 
       <div
         ref={gridRef}
-        className="overflow-hidden rounded-2xl border border-stone-300 bg-stone-300"
+        className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 shadow-sm"
       >
         <div className="grid grid-cols-7 gap-px">
           {WEEKDAYS.map((wd, i) => (
             <div
               key={wd}
               className={cn(
-                "bg-stone-50 px-1 py-1.5 text-center text-[11px] font-semibold sm:px-2 sm:py-2 sm:text-xs",
+                "bg-stone-50 px-1 py-2 text-center text-sm font-semibold sm:px-2",
                 i === 0 && "text-red-600",
                 i === 6 && "text-blue-600",
                 i !== 0 && i !== 6 && "text-stone-700",
@@ -186,7 +187,7 @@ export function DateView({
               <div
                 key={key}
                 className={cn(
-                  "relative flex min-h-20 flex-col p-1 sm:min-h-28 sm:p-1.5",
+                  "relative flex min-h-24 flex-col p-1.5 sm:min-h-28 sm:p-1.5",
                   isEvenMonth ? "bg-orange-50" : "bg-white",
                 )}
               >
@@ -195,7 +196,7 @@ export function DateView({
                     onClick={() => setModalDate(day)}
                     aria-label={`${format(day, "yyyy년 M월 d일")} 예약 ${list.length}건 보기`}
                     className={cn(
-                      "inline-flex h-5 items-center justify-center rounded-full px-1.5 text-xs font-medium transition-colors sm:h-6 sm:px-2 sm:text-sm",
+                      "inline-flex h-6 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 sm:h-7",
                       isToday
                         ? "bg-brand-600 text-white"
                         : cn(
@@ -216,7 +217,7 @@ export function DateView({
                     <button
                       type="button"
                       onClick={() => setModalDate(day)}
-                      className="hidden text-[10px] text-stone-500 hover:text-stone-800 sm:inline"
+                      className="hidden text-xs text-stone-500 hover:text-stone-800 sm:inline"
                     >
                       {list.length + fixedList.length}건
                     </button>
@@ -227,7 +228,7 @@ export function DateView({
                     <li key={ev.id}>
                       <span
                         title={`[고정] ${ev.name} · ${formatTime(ev.start_at)}–${formatTime(ev.end_at)}`}
-                        className="block truncate rounded bg-stone-200 px-0.5 py-0.5 text-[10px] text-stone-800 sm:px-1 sm:text-[11px]"
+                        className="block truncate rounded bg-stone-200 px-1 py-0.5 text-xs text-stone-800"
                       >
                         <span className="font-mono">
                           {formatTime(ev.start_at)}
@@ -244,7 +245,7 @@ export function DateView({
                           href={`/reservations/${r.id}`}
                           title={`[${STATUS_LABEL[ds]}] ${formatTime(r.start_at)}–${formatTime(r.end_at)} · ${r.dept?.name ?? ""} · ${r.purpose}`}
                           className={cn(
-                            "block truncate rounded px-0.5 py-0.5 text-[10px] hover:opacity-80 sm:px-1 sm:text-[11px]",
+                            "block truncate rounded px-1 py-0.5 text-xs transition-opacity hover:opacity-80",
                             STATUS_CHIP_CLASS[ds],
                           )}
                         >
@@ -257,7 +258,7 @@ export function DateView({
                     );
                   })}
                   {list.length + fixedList.length > 5 && (
-                    <li className="px-1 text-[10px] text-stone-500">
+                    <li className="px-1 text-xs text-stone-500">
                       +{list.length + fixedList.length - 5}건
                     </li>
                   )}
@@ -364,9 +365,10 @@ function DayReservationsModal({
             </div>
           )}
           {list.length === 0 && fixedList.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-sm text-stone-500">
-              이 날짜에 신청된 예약이 없습니다.
-            </div>
+            <EmptyState
+              icon={CalendarOff}
+              title="이 날짜에 신청된 예약이 없습니다"
+            />
           ) : list.length === 0 ? null : (
             <ul className="space-y-2">
               {list.map((r) => {

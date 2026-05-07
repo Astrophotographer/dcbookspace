@@ -22,6 +22,7 @@ import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { cn, formatTime } from "@/lib/utils";
 import { displayStatus, STATUS_LABEL } from "@/lib/reservation-status";
+import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 
 type Props = {
@@ -143,7 +144,7 @@ export function BuildingView({
           <button
             type="button"
             onClick={() => goToDate(new Date())}
-            className="h-9 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-800 hover:bg-stone-50 sm:h-11 sm:px-4 sm:text-base"
+            className="h-11 rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:text-base"
           >
             오늘
           </button>
@@ -172,7 +173,7 @@ export function BuildingView({
             setFloorId(ALL);
           }}
           className={cn(
-            "h-11 rounded-lg border px-4 font-medium transition-colors",
+            "h-11 rounded-lg border px-4 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
             buildingId === ALL
               ? "border-brand-600 bg-brand-600 text-white"
               : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50",
@@ -189,7 +190,7 @@ export function BuildingView({
               setFloorId(firstFloor?.id ?? "");
             }}
             className={cn(
-              "h-11 rounded-lg border px-4 font-medium transition-colors",
+              "h-11 rounded-lg border px-4 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
               buildingId === b.id
                 ? "border-brand-600 bg-brand-600 text-white"
                 : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50",
@@ -206,7 +207,7 @@ export function BuildingView({
           <button
             onClick={() => setFloorId(ALL)}
             className={cn(
-              "h-9 rounded-lg border px-3 text-sm font-medium",
+              "h-11 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
               floorId === ALL
                 ? "border-brand-500 bg-brand-50 text-brand-700"
                 : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50",
@@ -219,7 +220,7 @@ export function BuildingView({
               key={f.id}
               onClick={() => setFloorId(f.id)}
               className={cn(
-                "h-9 rounded-lg border px-3 text-sm font-medium",
+                "h-11 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
                 floorId === f.id
                   ? "border-brand-500 bg-brand-50 text-brand-700"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50",
@@ -357,11 +358,7 @@ function FloorsOverview({
   bare?: boolean;
 }) {
   if (floors.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-sm text-stone-500">
-        등록된 층이 없습니다.
-      </div>
-    );
+    return <EmptyState title="등록된 층이 없습니다." />;
   }
 
   const inner = (
@@ -379,9 +376,10 @@ function FloorsOverview({
               </span>
             </div>
             {floorRooms.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-stone-200 px-3 py-4 text-xs text-stone-400">
-                이 층에는 등록된 호실이 없어요.
-              </div>
+              <EmptyState
+                variant="compact"
+                title="이 층에는 등록된 호실이 없어요"
+              />
             ) : (
               <RoomGrid
                 rooms={floorRooms}
@@ -418,7 +416,7 @@ function DatePickerButton({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <label className="relative flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-50 sm:h-11 sm:px-4 sm:text-base">
+    <label className="relative flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 focus-within:ring-2 focus-within:ring-brand-400 focus-within:ring-offset-2 sm:text-base">
       <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
       <span className="hidden sm:inline">달력</span>
       <input
@@ -465,7 +463,7 @@ function NavButton({
       onClick={onClick}
       aria-label={label}
       title={title ?? label}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-50 sm:h-11 sm:w-11"
+      className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
     >
       {children}
     </button>
@@ -511,7 +509,7 @@ function RoomMap({
               type="button"
               onClick={() => setModalRoomId(r.id)}
               className={cn(
-                "absolute flex flex-col overflow-hidden rounded-lg border-2 p-2 text-left text-[11px] leading-tight",
+                "absolute flex flex-col overflow-hidden rounded-lg border p-2 text-left text-[11px] leading-tight transition-colors",
                 STATE_COLOR[state],
               )}
               style={{
@@ -530,7 +528,7 @@ function RoomMap({
                         aria-hidden
                         className={cn(
                           "h-3.5 w-3.5 self-center",
-                          state === "mixed" && "animate-spin",
+                          state === "mixed" && "animate-spin-slow",
                         )}
                       />
                     );
@@ -689,9 +687,7 @@ function RoomDetailModal({
             </div>
           )}
           {list.length === 0 && fixedList.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center text-sm text-stone-500">
-              이 호실에 신청된 예약이 없습니다.
-            </div>
+            <EmptyState title="이 호실에 신청된 예약이 없습니다" />
           ) : list.length === 0 ? null : (
             <ul className="space-y-2">
               {list.map((res) => {
@@ -766,7 +762,7 @@ function RoomGrid({
             key={r.id}
             id={`room-${r.id}`}
             className={cn(
-              "flex min-h-32 flex-col rounded-lg border-2 p-3",
+              "flex min-h-32 flex-col rounded-lg border p-3",
               STATE_COLOR[state],
             )}
           >
@@ -786,7 +782,7 @@ function RoomGrid({
                     aria-hidden
                     className={cn(
                       "h-3.5 w-3.5",
-                      state === "mixed" && "animate-spin",
+                      state === "mixed" && "animate-spin-slow",
                     )}
                   />
                 );

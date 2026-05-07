@@ -13,7 +13,9 @@ type Props = {
   compact?: boolean;
 };
 
-function stepIcon(state: "approved" | "current" | "rejected" | "pending") {
+type StepState = "approved" | "current" | "rejected" | "pending";
+
+function stepIcon(state: StepState) {
   if (state === "approved")
     return <CircleCheckBig className="h-5 w-5 text-emerald-600" />;
   if (state === "current") return <Clock className="h-5 w-5 text-amber-600" />;
@@ -21,6 +23,13 @@ function stepIcon(state: "approved" | "current" | "rejected" | "pending") {
     return <CircleX className="h-5 w-5 text-red-600" />;
   return <Circle className="h-5 w-5 text-stone-300" />;
 }
+
+const STATE_TITLE: Record<StepState, string> = {
+  approved: "승인 완료",
+  current: "결재 진행중",
+  rejected: "반려",
+  pending: "대기",
+};
 
 export function ApprovalTracker({
   route,
@@ -49,7 +58,11 @@ export function ApprovalTracker({
                 ? "current"
                 : "pending";
         return (
-          <div key={step.order} className="flex flex-none items-center gap-2">
+          <div
+            key={step.order}
+            className="flex flex-none items-center gap-2"
+            title={`${step.label} — ${STATE_TITLE[state]}`}
+          >
             <div className="flex items-center gap-1.5">
               {stepIcon(state)}
               <span

@@ -262,7 +262,7 @@ export function ReservationsTable({
               changePageSize(Number(e.target.value) as PageSize)
             }
             aria-label="페이지당 표시 개수"
-            className="h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm"
+            className="h-10 rounded-lg border border-stone-300 bg-white px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           >
             {PAGE_SIZES.map((s) => (
               <option key={s} value={s}>
@@ -288,7 +288,7 @@ export function ReservationsTable({
             }}
             placeholder="신청번호 · 부서 · 신청자"
             aria-label="신청번호, 부서, 신청자 검색"
-            className="h-9 w-full rounded-lg border border-stone-300 bg-white pl-9 pr-9 text-sm placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="h-10 w-full rounded-lg border border-stone-300 bg-white pl-9 pr-9 text-sm placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
           />
           {isSearching && (
             <button
@@ -486,7 +486,7 @@ export function ReservationsTable({
               onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
               aria-label="이전 페이지"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -500,7 +500,7 @@ export function ReservationsTable({
               }
               disabled={safePage >= totalPages - 1}
               aria-label="다음 페이지"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

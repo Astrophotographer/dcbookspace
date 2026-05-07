@@ -27,7 +27,7 @@ export function ReservationBadge({ reservation }: { reservation: BadgeInput }) {
     >
       <Icon
         aria-hidden
-        className={cn("h-3.5 w-3.5 flex-none", isInReview && "animate-spin")}
+        className={cn("h-3.5 w-3.5 flex-none", isInReview && "animate-spin-slow")}
       />
       {STATUS_LABEL[s]}
     </span>

@@ -22,28 +22,28 @@ export function SiteHeader() {
         <nav className="flex flex-none items-center gap-1 text-sm sm:gap-1.5 sm:text-base">
           <Link
             href="/"
-            className="rounded-lg px-3 py-2.5 hover:bg-stone-100 sm:px-4 sm:py-3"
+            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
           >
             <span className="sm:hidden">현황판</span>
             <span className="hidden sm:inline">현황판보기</span>
           </Link>
           <Link
             href="/reservations"
-            className="rounded-lg px-3 py-2.5 hover:bg-stone-100 sm:px-4 sm:py-3"
+            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
           >
             <span className="sm:hidden">신청내역</span>
             <span className="hidden sm:inline">모든 신청내역</span>
           </Link>
           <Link
             href="/admin"
-            className="rounded-lg px-3 py-2.5 hover:bg-stone-100 sm:px-4 sm:py-3"
+            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
           >
             관리
           </Link>
           {/* 장소신청 — primary CTA. brand color, 약간 더 두꺼운 글씨로 한눈에 띄게. */}
           <Link
             href="/apply"
-            className="rounded-lg bg-brand-600 px-3 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 sm:px-4 sm:py-3"
+            className="rounded-lg bg-brand-600 px-3 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
           >
             장소신청
           </Link>

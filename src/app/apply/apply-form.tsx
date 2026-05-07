@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import type {
@@ -138,7 +138,28 @@ export function ApplyForm({
     useState<ConflictModalState | null>(null);
 
   const [name, setName] = useState(defaults?.applicant_name ?? "");
-  const [phone, setPhone] = useState(defaults?.applicant_phone ?? "");
+  // 신규 신청은 "010-" 프리필 — 모바일에서 010 매번 직접 입력하는 부담 제거.
+  // 수정 모드는 기존 번호 그대로.
+  const [phone, setPhone] = useState(
+    defaults?.applicant_phone ?? "010-",
+  );
+  const phoneRef = useRef<HTMLInputElement>(null);
+
+  // 포커스 시 "010-" 뒤로 커서 이동. 사용자가 010 부분 위에 커서 두지 않도록.
+  // 이미 그 외 값이 입력되어 있으면 (수정 모드 또는 사용자가 일부 입력 후 다시 클릭)
+  // 자연스러운 위치에 두기 위해 끝으로 보냄.
+  const onPhoneFocus = () => {
+    const inp = phoneRef.current;
+    if (!inp) return;
+    requestAnimationFrame(() => {
+      const len = inp.value.length;
+      try {
+        inp.setSelectionRange(len, len);
+      } catch {
+        /* type=tel 일부 브라우저는 selectionRange 미지원 — 무시 */
+      }
+    });
+  };
 
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(defaults?.date ?? today);
@@ -215,20 +236,14 @@ export function ApplyForm({
     return map;
   }, [departments]);
 
-  // 진입 시 defaults?.dept_id 가 leaf 면 부모 그룹을 derive 해서 1단계 선택값 채움
+  // 부서 선택 — 단일 select + <optgroup>. cascade 안 씀 (iOS Safari controlled
+  // select 동기화 버그 회피). 진입 시 defaults?.dept_id 가 leaf 면 그대로 채움.
   const initialDeptLeaf = useMemo(
     () => departments.find((d) => d.id === defaults?.dept_id) ?? null,
     [departments, defaults?.dept_id],
   );
-  const [deptGroupId, setDeptGroupId] = useState<string>(
-    initialDeptLeaf?.parent_id ?? "",
-  );
   const [deptId, setDeptId] = useState<string>(
     initialDeptLeaf?.parent_id ? initialDeptLeaf.id : "",
-  );
-  const visibleDeptLeaves = useMemo(
-    () => (deptGroupId ? deptLeavesByGroup.get(deptGroupId) ?? [] : []),
-    [deptGroupId, deptLeavesByGroup],
   );
 
   // findRoomConflicts ↔ INSERT 사이 race 등으로 trigger 가 raw 에러를 던지는 경우,
@@ -474,7 +489,7 @@ export function ApplyForm({
       }}
     >
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-lg font-semibold text-stone-800">
+        <legend className="mb-3 text-base font-semibold text-stone-900">
           신청자 정보
         </legend>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -495,6 +510,7 @@ export function ApplyForm({
             hint={isEdit ? "신청자 정보는 수정할 수 없습니다." : "결재 진행 알림에 사용됩니다"}
           >
             <Input
+              ref={phoneRef}
               name="applicant_phone"
               required
               type="tel"
@@ -502,64 +518,44 @@ export function ApplyForm({
               placeholder="010-0000-0000"
               pattern="[0-9\-]{9,13}"
               value={phone}
-              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              onFocus={onPhoneFocus}
+              onChange={(e) => setPhone(formatPhone(e.target.value, phone))}
               readOnly={isEdit}
               disabled={isEdit}
             />
           </Field>
         </div>
         <Field label="소속 부서">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Select
-              value={deptGroupId}
-              onChange={(e) => {
-                const newGroup = e.target.value;
-                setDeptGroupId(newGroup);
-                // 그룹 바뀌면 자식이 1개뿐이면 자동 선택, 아니면 비움
-                const leaves = newGroup
-                  ? deptLeavesByGroup.get(newGroup) ?? []
-                  : [];
-                setDeptId(leaves.length === 1 ? leaves[0].id : "");
-              }}
-              aria-label="부서 분류"
-              required
-            >
-              {/* placeholder는 selectable 으로 둠 — iOS Safari 에서 disabled
-                  placeholder 와 controlled value="" 조합 시 picker 가 잠기는 사례가 있어
-                  required 로만 빈값 차단. */}
-              <option value="">분류 선택</option>
-              {deptGroups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </Select>
-            {/* iOS Safari 에서 disabled 를 동적으로 토글하면 그 다음 탭에 native
-                picker 가 안 열리는 케이스가 있어 disabled 사용 안 함. 분류 미선택 시
-                옵션은 placeholder 하나뿐이라 의미 있는 값이 골라지지 않고,
-                required 가 빈값 제출을 막아 동등한 가드가 된다. */}
-            <Select
-              name="dept_id"
-              value={deptId}
-              onChange={(e) => setDeptId(e.target.value)}
-              aria-label="소속 부서"
-              required
-            >
-              <option value="">
-                {deptGroupId ? "부서 선택" : "분류 먼저 선택"}
-              </option>
-              {visibleDeptLeaves.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+          {/* 단일 select + <optgroup>. native picker (iOS·Android·데스크톱)
+              가 그룹 헤더(non-selectable) + 자식 옵션을 한꺼번에 보여줌.
+              cascade 가 없어 controlled state 동기화 문제 자체를 제거. */}
+          <Select
+            name="dept_id"
+            value={deptId}
+            onChange={(e) => setDeptId(e.target.value)}
+            aria-label="소속 부서"
+            required
+          >
+            <option value="">부서 선택</option>
+            {deptGroups.map((g) => {
+              const leaves = deptLeavesByGroup.get(g.id) ?? [];
+              if (leaves.length === 0) return null;
+              return (
+                <optgroup key={g.id} label={g.name}>
+                  {leaves.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </Select>
         </Field>
       </fieldset>
 
       <fieldset className="space-y-4 border-t border-stone-200 pt-5">
-        <legend className="mb-2 text-lg font-semibold text-stone-800">
+        <legend className="mb-3 text-base font-semibold text-stone-900">
           사용 장소
         </legend>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -608,7 +604,7 @@ export function ApplyForm({
       </fieldset>
 
       <fieldset className="space-y-4 border-t border-stone-200 pt-5">
-        <legend className="mb-2 text-lg font-semibold text-stone-800">
+        <legend className="mb-3 text-base font-semibold text-stone-900">
           사용 일시
         </legend>
 
@@ -813,7 +809,7 @@ export function ApplyForm({
       </fieldset>
 
       <fieldset className="space-y-4 border-t border-stone-200 pt-5">
-        <legend className="mb-2 text-lg font-semibold text-stone-800">
+        <legend className="mb-3 text-base font-semibold text-stone-900">
           사용 목적
         </legend>
         <Field label="목적/행사명" hint="예: 청년부 수련회 사전모임">
@@ -853,7 +849,7 @@ export function ApplyForm({
             defaultValue={defaults?.notes ?? ""}
           />
         </Field>
-        <p className="rounded-lg bg-brand-50 p-3 text-sm text-brand-700">
+        <p className="rounded-lg bg-brand-50 p-4 text-sm leading-relaxed text-brand-700">
           원활한 결재 진행을 위해 <strong className="font-semibold">사용 예정일 최소 1주일 전</strong>에
           신청해 주시기를 부탁드립니다.
         </p>
@@ -868,7 +864,7 @@ export function ApplyForm({
       {/* 출력 안내 — 신청 버튼 바로 위에 배치해 클릭 직전에 인지하도록.
           신규 신청에만 노출 (수정 모드에선 이미 출력된 종이가 있으므로 불필요). */}
       {!isEdit && (
-        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
           <strong className="font-semibold">안내.</strong>{" "}
           <strong className="font-semibold">신청하기</strong> 버튼을 누르면
           신청서가 <strong className="font-semibold">사무실 프린터로 자동 출력</strong>될

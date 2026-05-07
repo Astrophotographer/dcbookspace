@@ -872,7 +872,7 @@ function ContactRow({
               inputMode="numeric"
               placeholder="010-0000-0000"
               value={phone}
-              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              onChange={(e) => setPhone(formatPhone(e.target.value, phone))}
             />
           </Field>
           <div className="flex gap-2">

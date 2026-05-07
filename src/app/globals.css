@@ -44,3 +44,10 @@ body {
 }
 .animate-modal-overlay { animation: modal-overlay-in 180ms ease-out both; }
 .animate-modal-panel   { animation: modal-panel-in   240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* 상태 인디케이터용 느린 회전 (결재 진행중 등). 기본 animate-spin(1s) 보다 절반 속도 */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spin-slow 2s linear infinite; }

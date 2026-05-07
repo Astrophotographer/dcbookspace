@@ -55,7 +55,7 @@ export function AdminsAdmin({ initialAdmins }: Props) {
               placeholder="010-0000-0000"
               pattern="[0-9\-]{9,13}"
               value={phone}
-              onChange={(e) => setPhone(formatPhone(e.target.value))}
+              onChange={(e) => setPhone(formatPhone(e.target.value, phone))}
             />
           </Field>
           <div className="sm:col-span-2">
