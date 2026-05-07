@@ -85,6 +85,8 @@ export type AppUser = {
   pin_attempts: number;
   pin_locked_until: string | null;
   active: boolean;
+  /** 텔레그램 봇 메시지 발송 대상 식별자. nullable. */
+  telegram_chat_id: string | null;
   created_at: string;
   updated_at: string;
 };

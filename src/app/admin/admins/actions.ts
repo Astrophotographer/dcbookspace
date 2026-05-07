@@ -3,6 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
 import { updateAdminPassword } from "@/lib/admin-credentials";
+import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser } from "@/lib/supabase/types";
 
 /**
@@ -46,6 +47,7 @@ export async function createAdmin(
   const phone = String(fd.get("phone") ?? "").trim();
 
   if (!name || !phone) return { error: "이름과 휴대폰은 필수입니다." };
+  if (!isValidPhone(phone)) return { error: PHONE_INVALID_MESSAGE };
 
   const tail = phoneTail(phone);
   if (tail.length !== 4) {

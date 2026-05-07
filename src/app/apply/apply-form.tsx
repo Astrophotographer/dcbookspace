@@ -32,6 +32,7 @@ import {
   type RoomConflictResult,
   type SeriesConflictResult,
 } from "./actions";
+import { AvailabilityPreview } from "./availability-preview";
 
 export type ApplyFormDefaults = {
   applicant_name: string;
@@ -213,6 +214,20 @@ export function ApplyForm({
     () => rooms.filter((r) => r.floor_id === floorId),
     [rooms, floorId],
   );
+  // 호실 cascading 의 leaf — controlled 로 두어 AvailabilityPreview 가
+  // roomId 변경을 감지할 수 있게.
+  const [roomId, setRoomId] = useState<string>(
+    defaults?.room_id ?? visibleRooms[0]?.id ?? "",
+  );
+  // 층이 바뀌어 현재 roomId 가 그 층의 호실 목록에 더 이상 없으면 첫 호실로 보정.
+  // React 19 의 "render-time setState" 패턴 — 같은 컴포넌트 안이라 안전, 즉시 다시
+  // render 되면서 새 값 적용. 조건이 false 가 되면 멈춤(무한 루프 X).
+  if (
+    visibleRooms.length > 0 &&
+    !visibleRooms.some((r) => r.id === roomId)
+  ) {
+    setRoomId(visibleRooms[0].id);
+  }
 
   // 부서 cascading: 그룹(대분류) → 소분류(leaf). dept_id 는 leaf 만.
   const deptGroups = useMemo(
@@ -522,7 +537,9 @@ export function ApplyForm({
               type="tel"
               inputMode="numeric"
               placeholder="010-0000-0000"
-              pattern="[0-9\-]{9,13}"
+              // 010 + 4자리 + 4자리 (dash 옵셔널). 미완성 제출 시 브라우저가 즉시 거부.
+              pattern="010-?\d{4}-?\d{4}"
+              title="010 뒤 8자리(가운데 4 + 뒷 4)를 모두 입력해주세요."
               value={phone}
               onFocus={onPhoneFocus}
               onChange={(e) => setPhone(formatPhone(e.target.value, phone))}
@@ -613,7 +630,8 @@ export function ApplyForm({
             <Select
               name="room_id"
               required
-              defaultValue={defaults?.room_id ?? ""}
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
             >
               {visibleRooms.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -738,6 +756,10 @@ export function ApplyForm({
             />
           </Field>
         </div>
+
+        {/* 호실 + 시작 날짜가 정해지면 그 날 이미 잡힌 일정을 미리 보여줘
+            사용자가 충돌 시간대를 피해 입력하도록 안내 */}
+        <AvailabilityPreview roomId={roomId} date={date} />
 
         {/* 시간대 — 정기 모드에서는 [+ 시간대 추가] 버튼 노출 */}
         <div className="space-y-2">

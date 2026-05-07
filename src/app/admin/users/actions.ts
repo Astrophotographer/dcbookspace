@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
+import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser, UserRole } from "@/lib/supabase/types";
 
 const APPROVER_ROLES: UserRole[] = [
@@ -28,6 +29,7 @@ export async function createUser(
   const deptId = String(fd.get("dept_id") ?? "") || null;
 
   if (!name || !phone) return { error: "이름과 휴대폰은 필수입니다." };
+  if (!isValidPhone(phone)) return { error: PHONE_INVALID_MESSAGE };
 
   // 결재자면 휴대폰 뒷 4자리를 초기 PIN으로 자동 등록
   let pinHash: string | null = null;
@@ -107,6 +109,36 @@ export async function deleteUser(
   const { error } = await supabase.from("users").delete().eq("id", id);
   if (error) return { error: error.message };
   return { result: "deleted" };
+}
+
+/**
+ * 결재자별 텔레그램 chat_id 등록·삭제. 빈 문자열을 넘기면 unset.
+ * webhook 받는 쪽(n8n 등)이 이 chat_id 로 본인에게 직접 메시지 발송 가능.
+ *
+ * chat_id 형식 검증은 느슨하게: 숫자(또는 -로 시작하는 그룹 chat) 만 받음.
+ */
+export async function setTelegramChatId(
+  userId: string,
+  chatIdRaw: string,
+): Promise<{ ok?: true; error?: string }> {
+  const supabase = createServiceClient();
+  const trimmed = chatIdRaw.trim();
+  let next: string | null;
+  if (trimmed === "") {
+    next = null;
+  } else if (/^-?\d+$/.test(trimmed)) {
+    next = trimmed;
+  } else {
+    return {
+      error: "chat_id 는 숫자 (또는 그룹은 -1234... 형식) 이어야 합니다.",
+    };
+  }
+  const { error } = await supabase
+    .from("users")
+    .update({ telegram_chat_id: next })
+    .eq("id", userId);
+  if (error) return { error: error.message };
+  return { ok: true };
 }
 
 /**

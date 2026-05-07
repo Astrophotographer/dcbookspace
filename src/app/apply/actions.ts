@@ -19,6 +19,7 @@ import {
   emitReservationEventAfter,
   emitSeriesEventAfter,
 } from "@/lib/webhook";
+import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 
 type SubmitResult = { id?: string; error?: string };
 type Result = { error?: string };
@@ -196,6 +197,9 @@ export async function submitApplication(
 
   if (!applicantName || !applicantPhone || !deptId || !roomId || !date || !startTime || !endTime || !purpose) {
     return { error: "필수 입력값이 빠졌습니다." };
+  }
+  if (!isValidPhone(applicantPhone)) {
+    return { error: PHONE_INVALID_MESSAGE };
   }
 
   // 과거 날짜 차단 (KST 기준)
@@ -657,6 +661,9 @@ export async function submitSeriesApplication(
     !purpose
   ) {
     return { error: "필수 입력값이 빠졌습니다." };
+  }
+  if (!isValidPhone(applicantPhone)) {
+    return { error: PHONE_INVALID_MESSAGE };
   }
   const tbErr = validateTimeBlocks(timeBlocks);
   if (tbErr) return { error: tbErr };

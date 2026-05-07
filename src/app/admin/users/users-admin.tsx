@@ -5,7 +5,13 @@ import type { AppUser, Department, UserRole } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { formatPhone } from "@/lib/phone";
-import { createUser, deleteUser, issuePin } from "./actions";
+import {
+  createUser,
+  deleteUser,
+  issuePin,
+  setTelegramChatId,
+} from "./actions";
+import { Send } from "lucide-react";
 
 const APPROVER_ROLES: UserRole[] = ["dept_head", "elder", "manager", "senior_pastor"];
 // 관리자(admin) 는 /admin/admins 별도 페이지에서 관리한다.
@@ -224,32 +230,82 @@ export function UsersAdmin({
                   </div>
                   <div className="text-sm text-stone-500">
                     {u.phone} {u.pin_hash ? "· PIN 등록됨" : ""}
+                    {u.telegram_chat_id && (
+                      <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-800">
+                        <Send className="h-3 w-3" aria-hidden />
+                        텔레그램
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   {isApprover(u.role) && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        startTransition(async () => {
-                          const res = await issuePin(u.id);
-                          if (res.error) setError(res.error);
-                          else if (res.pin) {
-                            setIssuedPin({ userId: u.id, pin: res.pin });
-                            setUsers((arr) =>
-                              arr.map((x) =>
-                                x.id === u.id
-                                  ? { ...x, pin_hash: "set" }
-                                  : x,
-                              ),
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          // 단순 prompt 로 chat_id 입력. 빈 값은 unset.
+                          const current = u.telegram_chat_id ?? "";
+                          const next = window.prompt(
+                            `${u.name} 님의 텔레그램 chat_id\n(비우면 등록 해제)`,
+                            current,
+                          );
+                          if (next === null) return; // 취소
+                          startTransition(async () => {
+                            const res = await setTelegramChatId(
+                              u.id,
+                              next,
                             );
-                          }
-                        });
-                      }}
-                    >
-                      PIN 발급
-                    </Button>
+                            if (res.error) setError(res.error);
+                            else {
+                              const trimmed = next.trim();
+                              setUsers((arr) =>
+                                arr.map((x) =>
+                                  x.id === u.id
+                                    ? {
+                                        ...x,
+                                        telegram_chat_id:
+                                          trimmed === "" ? null : trimmed,
+                                      }
+                                    : x,
+                                ),
+                              );
+                              setNotice(
+                                trimmed === ""
+                                  ? `${u.name} 님의 텔레그램 등록을 해제했습니다.`
+                                  : `${u.name} 님의 텔레그램 chat_id 가 등록됐습니다.`,
+                              );
+                            }
+                          });
+                        }}
+                      >
+                        <Send className="h-4 w-4" aria-hidden />
+                        텔레그램
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          startTransition(async () => {
+                            const res = await issuePin(u.id);
+                            if (res.error) setError(res.error);
+                            else if (res.pin) {
+                              setIssuedPin({ userId: u.id, pin: res.pin });
+                              setUsers((arr) =>
+                                arr.map((x) =>
+                                  x.id === u.id
+                                    ? { ...x, pin_hash: "set" }
+                                    : x,
+                                ),
+                              );
+                            }
+                          });
+                        }}
+                      >
+                        PIN 발급
+                      </Button>
+                    </>
                   )}
                   <Button
                     size="sm"

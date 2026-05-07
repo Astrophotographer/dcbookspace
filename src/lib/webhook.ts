@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, randomUUID } from "node:crypto";
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import type { ApprovalStep, UserRole } from "@/lib/supabase/types";
 
 /**
  * 외부로 이벤트를 푸시하는 fire-and-forget 웹훅.
@@ -139,6 +140,95 @@ type SeriesSummaryRow = {
   };
 };
 
+/**
+ * 현재 진행 중인 단계의 결재자 후보들 (이름·전화·텔레그램 chat_id).
+ * - dept_head/elder: 신청서가 속한 부서의 dept_head_id / elder_id 1명
+ * - manager/senior_pastor: 해당 role 의 모든 활성 사용자
+ * 받는 쪽(n8n) 이 이 배열을 보고 chat_id 가 있는 사용자에게만 메시지 발송하면 됨.
+ */
+type ApproverCandidate = {
+  name: string;
+  phone: string | null;
+  telegram_chat_id: string | null;
+  role: UserRole;
+};
+
+async function findApproversByRole(
+  supabase: ReturnType<typeof createServiceClient>,
+  role: UserRole,
+  deptId: string | null,
+): Promise<ApproverCandidate[]> {
+  if (role === "dept_head" || role === "elder") {
+    if (!deptId) return [];
+    const { data: dept } = await supabase
+      .from("departments")
+      .select("dept_head_id, elder_id")
+      .eq("id", deptId)
+      .single();
+    if (!dept) return [];
+    const userId =
+      role === "dept_head" ? dept.dept_head_id : dept.elder_id;
+    if (!userId) return [];
+    const { data: u } = await supabase
+      .from("users")
+      .select("name, phone, telegram_chat_id")
+      .eq("id", userId)
+      .eq("active", true)
+      .maybeSingle();
+    return u
+      ? [
+          {
+            name: u.name as string,
+            phone: (u.phone as string | null) ?? null,
+            telegram_chat_id:
+              (u.telegram_chat_id as string | null) ?? null,
+            role,
+          },
+        ]
+      : [];
+  }
+  // manager / senior_pastor / admin / applicant — 같은 role 활성 사용자 모두
+  const { data } = await supabase
+    .from("users")
+    .select("name, phone, telegram_chat_id")
+    .eq("role", role)
+    .eq("active", true);
+  return ((data ?? []) as Array<{
+    name: string;
+    phone: string | null;
+    telegram_chat_id: string | null;
+  }>).map((u) => ({ ...u, role }));
+}
+
+type RouteSnapshot = {
+  current_step: number;
+  status: string;
+  dept_id: string | null;
+  route: { steps: ApprovalStep[] };
+};
+
+async function findCurrentApprovers(
+  supabase: ReturnType<typeof createServiceClient>,
+  table: "reservations" | "reservation_series",
+  id: string,
+): Promise<ApproverCandidate[]> {
+  const { data } = await supabase
+    .from(table)
+    .select(
+      "current_step, status, dept_id, route:approval_routes (steps)",
+    )
+    .eq("id", id)
+    .single();
+  if (!data) return [];
+  const snap = data as unknown as RouteSnapshot;
+  if (snap.status !== "pending") return [];
+  const stepDef = snap.route.steps.find(
+    (s) => s.order === snap.current_step,
+  );
+  if (!stepDef) return [];
+  return findApproversByRole(supabase, stepDef.role, snap.dept_id);
+}
+
 async function buildReservationPayload(id: string): Promise<Payload | null> {
   const supabase = createServiceClient();
   const { data } = await supabase
@@ -208,6 +298,21 @@ async function buildSeriesPayload(id: string): Promise<Payload | null> {
 // ---- 호출자 편의 래퍼 ---------------------------------------------------------
 
 /**
+ * 페이로드에 next_approvers 를 추가한다.
+ * status='pending' 상태면 현재 진행 중인 단계의 결재자 후보 목록,
+ * 아니면 빈 배열. 받는 쪽(n8n) 이 chat_id 있는 사람에게만 텔레그램 발송하도록.
+ */
+async function withNextApprovers(
+  table: "reservations" | "reservation_series",
+  id: string,
+  payload: Payload,
+): Promise<Payload> {
+  const supabase = createServiceClient();
+  const next = await findCurrentApprovers(supabase, table, id);
+  return { ...payload, next_approvers: next };
+}
+
+/**
  * 응답 전송 후 백그라운드로 reservation 이벤트 발사. 호출 사이트에서 await 불필요.
  * `extras` 로 step 정보·관리자 강제 표식 등 추가 필드 합칠 수 있음.
  */
@@ -219,8 +324,9 @@ export function emitReservationEventAfter(
   // env 미설정이면 빌더·dispatch 둘 다 no-op 되도록 짧게 끊는다 — 무의미한 DB 조회 회피.
   if (getTargets().length === 0) return;
   after(async () => {
-    const payload = await buildReservationPayload(id);
-    if (!payload) return;
+    const base = await buildReservationPayload(id);
+    if (!base) return;
+    const payload = await withNextApprovers("reservations", id, base);
     await dispatchWebhook(event, { ...payload, ...(extras ?? {}) });
   });
 }
@@ -232,8 +338,9 @@ export function emitSeriesEventAfter(
 ): void {
   if (getTargets().length === 0) return;
   after(async () => {
-    const payload = await buildSeriesPayload(id);
-    if (!payload) return;
+    const base = await buildSeriesPayload(id);
+    if (!base) return;
+    const payload = await withNextApprovers("reservation_series", id, base);
     await dispatchWebhook(event, { ...payload, ...(extras ?? {}) });
   });
 }
@@ -241,7 +348,8 @@ export function emitSeriesEventAfter(
 /**
  * 결재 한 단계 통과 직후 호출. 항상 `step_approved` 발사 + 그 결재로 마지막
  * 단계까지 통과했다면 추가로 `approved` 발사. payload 한 번만 빌드해서 두 이벤트
- * 모두 같은 데이터 사용.
+ * 모두 같은 데이터 사용. step_approved 페이로드에는 next_approvers (다음 단계
+ * 결재자 후보) 가 포함됨 → n8n 이 그 사람들에게 텔레그램 알림 발송.
  */
 export function emitApprovalAfter(
   kind: "reservation" | "series",
@@ -250,16 +358,19 @@ export function emitApprovalAfter(
 ): void {
   if (getTargets().length === 0) return;
   after(async () => {
-    const payload =
+    const base =
       kind === "reservation"
         ? await buildReservationPayload(id)
         : await buildSeriesPayload(id);
-    if (!payload) return;
+    if (!base) return;
+    const table = kind === "reservation" ? "reservations" : "reservation_series";
+    const payload = await withNextApprovers(table, id, base);
     await dispatchWebhook("reservation.step_approved", {
       ...payload,
       ...stepInfo,
     });
-    // record_approval RPC 가 마지막 단계 통과 시 status 를 'approved' 로 올림
+    // record_approval RPC 가 마지막 단계 통과 시 status 를 'approved' 로 올림.
+    // approved 상태에선 next_approvers 가 빈 배열이라 안전.
     if (payload.status === "approved") {
       await dispatchWebhook("reservation.approved", payload);
     }

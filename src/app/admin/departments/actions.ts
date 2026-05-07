@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
+import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser, Department, UserRole } from "@/lib/supabase/types";
 
 type Result<T = unknown> = T & { error?: string };
@@ -140,6 +141,7 @@ async function assignContact(
   const name = String(fd.get("name") ?? "").trim();
   const phone = String(fd.get("phone") ?? "").trim();
   if (!name || !phone) return { error: "이름과 휴대폰을 모두 입력해주세요." };
+  if (!isValidPhone(phone)) return { error: PHONE_INVALID_MESSAGE };
 
   const tail = phoneTail(phone);
   if (tail.length !== 4) {

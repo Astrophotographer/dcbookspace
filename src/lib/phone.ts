@@ -7,6 +7,20 @@
  *   - prev(이전 포맷 결과)를 넘기면, trailing `-` 만 백스페이스로 지운 케이스에서 마지막 숫자까지
  *     함께 떨어뜨려 boomerang 으로 갇히지 않게 처리
  */
+
+/**
+ * 휴대폰 번호 유효성 — 010 + 8자리(가운데 4 + 뒷 4) 모두 채워졌는지.
+ * 입력 string 의 dash/공백 등 비숫자는 무시하고 숫자만 11자리 010xxxxxxxx 형태인지 검사.
+ */
+export function isValidPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, "");
+  return /^010\d{8}$/.test(digits);
+}
+
+/** server action 등에서 공통으로 쓰는 안내 문구. */
+export const PHONE_INVALID_MESSAGE =
+  "휴대폰 번호를 정확히 입력해주세요. 010 뒤 8자리(가운데 4자리 + 뒷 4자리)를 모두 입력해야 합니다.";
 export function formatPhone(raw: string, prev?: string): string {
   let d = raw.replace(/\D/g, "");
   if (!d) return "";
