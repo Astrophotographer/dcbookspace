@@ -10,18 +10,20 @@ type Props = {
   route: ApprovalRoute;
   approvals: Approval[];
   currentStep: number;
+  /** 테이블 컬럼처럼 좁은 곳에선 라벨·화살표 빼고 상태 아이콘만 옆으로 나열. */
   compact?: boolean;
 };
 
 type StepState = "approved" | "current" | "rejected" | "pending";
 
-function stepIcon(state: StepState) {
+function stepIcon(state: StepState, size: string) {
   if (state === "approved")
-    return <CircleCheckBig className="h-5 w-5 text-emerald-600" />;
-  if (state === "current") return <Clock className="h-5 w-5 text-amber-600" />;
+    return <CircleCheckBig className={cn(size, "text-emerald-600")} />;
+  if (state === "current")
+    return <Clock className={cn(size, "text-amber-600")} />;
   if (state === "rejected")
-    return <CircleX className="h-5 w-5 text-red-600" />;
-  return <Circle className="h-5 w-5 text-stone-300" />;
+    return <CircleX className={cn(size, "text-red-600")} />;
+  return <Circle className={cn(size, "text-stone-300")} />;
 }
 
 const STATE_TITLE: Record<StepState, string> = {
@@ -38,13 +40,15 @@ export function ApprovalTracker({
   compact = false,
 }: Props) {
   const apprByStep = new Map(approvals.map((a) => [a.step_order, a]));
+  const iconSize = compact ? "h-4 w-4" : "h-5 w-5";
 
   return (
     <div
       className={cn(
-        "flex items-center gap-2",
-        // compact (테이블 컬럼) 모드는 1줄 강제 — 셀이 좁으면 가로 스크롤(table 컨테이너의 overflow-x-auto)에 위임.
-        compact ? "flex-nowrap whitespace-nowrap text-sm" : "flex-wrap",
+        "flex items-center",
+        compact
+          ? "flex-nowrap gap-1 whitespace-nowrap"
+          : "flex-wrap gap-2 text-sm",
       )}
     >
       {(route.steps as ApprovalStep[]).map((step, idx) => {
@@ -57,6 +61,20 @@ export function ApprovalTracker({
               : step.order === currentStep
                 ? "current"
                 : "pending";
+        // compact 모드는 단계별 아이콘만 한 줄로 (라벨/화살표 생략).
+        // 호버 시 title 로 단계 이름·상태가 떠서 정보는 유지.
+        if (compact) {
+          return (
+            <span
+              key={step.order}
+              className="flex flex-none items-center"
+              title={`${step.label} — ${STATE_TITLE[state]}`}
+              aria-label={`${step.label}: ${STATE_TITLE[state]}`}
+            >
+              {stepIcon(state, iconSize)}
+            </span>
+          );
+        }
         return (
           <div
             key={step.order}
@@ -64,7 +82,7 @@ export function ApprovalTracker({
             title={`${step.label} — ${STATE_TITLE[state]}`}
           >
             <div className="flex items-center gap-1.5">
-              {stepIcon(state)}
+              {stepIcon(state, iconSize)}
               <span
                 className={cn(
                   "whitespace-nowrap font-medium",

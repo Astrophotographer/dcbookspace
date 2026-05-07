@@ -2,7 +2,33 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
+import { updateAdminPassword } from "@/lib/admin-credentials";
 import type { AppUser } from "@/lib/supabase/types";
+
+/**
+ * 사이트 로그인 비밀번호 변경 (BasicAuth 대체 — DB-stored hash).
+ * env (.env.local 의 ADMIN_PASSWORD) 는 비상 키로 영구 유효.
+ */
+export async function changeSitePassword(
+  fd: FormData,
+): Promise<{ ok?: true; error?: string }> {
+  const username = String(fd.get("username") ?? "").trim();
+  const currentPassword = String(fd.get("current_password") ?? "");
+  const newPassword = String(fd.get("new_password") ?? "");
+  const confirmPassword = String(fd.get("confirm_password") ?? "");
+
+  if (newPassword !== confirmPassword) {
+    return { error: "새 비밀번호가 서로 일치하지 않습니다." };
+  }
+
+  const res = await updateAdminPassword({
+    username,
+    currentPassword,
+    newPassword,
+  });
+  if (res.error) return { error: res.error };
+  return { ok: true };
+}
 
 function phoneTail(phone: string): string {
   return phone.replace(/\D/g, "").slice(-4);

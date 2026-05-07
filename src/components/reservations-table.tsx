@@ -322,7 +322,21 @@ export function ReservationsTable({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        {/* table-fixed + colgroup 으로 컬럼 폭 고정 — 정렬·페이지 전환 시 행
+            내용이 달라져도 너비가 들썩이지 않게. 결재 라인은 가장 가변적이라
+            폭 미지정으로 두고 나머지 fixed 폭의 잔여 공간을 가져가게 함. */}
+        <table className="w-full table-fixed text-base">
+          {/* 컬럼 순서: 신청번호 / 작성일 / 부서·신청자 / 장소 / 사용일시 / 상태 / 결재 라인 / (extra) */}
+          <colgroup>
+            <col className="w-[7.5rem]" />
+            <col className="w-[9.5rem]" />
+            <col className="w-[7.5rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[12.5rem]" />
+            <col className="w-[7.5rem]" />
+            <col className="w-[6.5rem]" />
+            {extraColumn && <col className="w-[7rem]" />}
+          </colgroup>
           <thead className="bg-stone-50 text-stone-700">
             <tr>
               <SortTh field="ref_no" sortField={sortField} sortDir={sortDir} onSort={handleSort}>신청번호</SortTh>
@@ -335,7 +349,7 @@ export function ReservationsTable({
               <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>상태</SortTh>
               <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
               {extraColumn && (
-                <th className="px-3 py-2 text-left font-semibold text-stone-700">
+                <th className="px-2 py-2 text-left font-semibold text-stone-700">
                   {extraColumn.header}
                 </th>
               )}
@@ -368,7 +382,7 @@ export function ReservationsTable({
                   )}
                 >
                   <Td>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-col items-start gap-1">
                       <Link
                         {...linkProps}
                         className={cn(
@@ -383,7 +397,7 @@ export function ReservationsTable({
                       {palette && cgi != null && (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums",
                             palette.chip,
                           )}
                           title={`같은 호실·시간대로 다른 신청서와 겹쳐 있어요 (충돌 그룹 ${cgi + 1})`}
@@ -540,7 +554,7 @@ function SortTh({
 }) {
   const active = sortField === field;
   return (
-    <th className="px-3 py-2 text-left font-semibold">
+    <th className="px-2 py-2 text-left font-semibold">
       <button
         type="button"
         onClick={() => onSort(field)}
@@ -568,5 +582,5 @@ function SortTh({
 }
 
 function Td({ children }: { children: ReactNode }) {
-  return <td className="px-3 py-2 align-top">{children}</td>;
+  return <td className="px-2 py-2 align-top">{children}</td>;
 }

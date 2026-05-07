@@ -29,6 +29,7 @@ type BuildingViewProps = {
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents?: FixedEventInstance[];
+  isAdmin?: boolean;
 };
 
 type Tab = "date" | "place";

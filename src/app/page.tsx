@@ -12,6 +12,7 @@ import {
 } from "@/lib/repo";
 import { expandFixedEvents } from "@/lib/recurrence";
 import { isSupabaseConfigured } from "@/lib/config";
+import { isAdmin } from "@/lib/admin-server";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 
 export default async function Home(props: PageProps<"/">) {
@@ -67,13 +68,14 @@ async function ReservationsArea({ dateStr }: { dateStr: string }) {
 
   // monthReservations 한 번만 fetch, dayReservations 는 메모리 필터로 derive.
   // master fetch 들은 cache() 로 래핑되어 같은 요청 안에서 재호출되어도 무료.
-  const [buildings, floors, rooms, monthReservations, fixedEvents] =
+  const [buildings, floors, rooms, monthReservations, fixedEvents, admin] =
     await Promise.all([
       getBuildings(),
       getFloors(),
       getRooms(),
       getReservationsBetween(monthStart, monthEnd),
       getFixedEvents(),
+      isAdmin(),
     ]);
 
   const dayReservations = monthReservations.filter(
@@ -84,7 +86,11 @@ async function ReservationsArea({ dateStr }: { dateStr: string }) {
   return (
     <HomeTabs
       dateView={
-        <DateView currentDate={dateStr} reservations={monthReservations} />
+        <DateView
+          currentDate={dateStr}
+          reservations={monthReservations}
+          isAdmin={admin}
+        />
       }
       buildingViewProps={{
         currentDate: dateStr,
@@ -93,6 +99,7 @@ async function ReservationsArea({ dateStr }: { dateStr: string }) {
         rooms,
         reservations: dayReservations,
         fixedEvents: dayFixedEvents,
+        isAdmin: admin,
       }}
     />
   );

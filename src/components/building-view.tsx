@@ -32,7 +32,13 @@ type Props = {
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents?: FixedEventInstance[];
+  /** 관리자면 일회성 신청 클릭 시 /admin/reservations/[id] 로 직행 */
+  isAdmin?: boolean;
 };
+
+function reservationHref(id: string, isAdmin: boolean | undefined): string {
+  return isAdmin ? `/admin/reservations/${id}` : `/reservations/${id}`;
+}
 
 type RoomState = "empty" | "pending" | "approved" | "mixed";
 
@@ -81,6 +87,7 @@ export function BuildingView({
   rooms,
   reservations,
   fixedEvents = [],
+  isAdmin,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -245,6 +252,7 @@ export function BuildingView({
                   rooms={visibleRooms}
                   reservations={reservations}
                   fixedEvents={fixedEvents}
+                  isAdmin={isAdmin}
                 />
               </div>
               <div className="sm:hidden">
@@ -252,6 +260,7 @@ export function BuildingView({
                   rooms={visibleRooms}
                   reservations={reservations}
                   fixedEvents={fixedEvents}
+                  isAdmin={isAdmin}
                 />
               </div>
             </>
@@ -260,6 +269,7 @@ export function BuildingView({
               rooms={visibleRooms}
               reservations={reservations}
               fixedEvents={fixedEvents}
+              isAdmin={isAdmin}
             />
           )}
         </div>
@@ -273,6 +283,7 @@ export function BuildingView({
           )}
           reservations={reservations}
           fixedEvents={fixedEvents}
+          isAdmin={isAdmin}
         />
       )}
 
@@ -305,6 +316,7 @@ export function BuildingView({
                     reservations={reservations}
                     fixedEvents={fixedEvents}
                     bare
+                    isAdmin={isAdmin}
                   />
                 </div>
               </section>
@@ -350,12 +362,14 @@ function FloorsOverview({
   reservations,
   fixedEvents,
   bare,
+  isAdmin,
 }: {
   floors: Floor[];
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
   bare?: boolean;
+  isAdmin?: boolean;
 }) {
   if (floors.length === 0) {
     return <EmptyState title="등록된 층이 없습니다." />;
@@ -385,6 +399,7 @@ function FloorsOverview({
                 rooms={floorRooms}
                 reservations={reservations}
                 fixedEvents={fixedEvents}
+                isAdmin={isAdmin}
               />
             )}
           </div>
@@ -474,10 +489,12 @@ function RoomMap({
   rooms,
   reservations,
   fixedEvents,
+  isAdmin,
 }: {
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
+  isAdmin?: boolean;
 }) {
   const [modalRoomId, setModalRoomId] = useState<string | null>(null);
   const modalRoom = modalRoomId
@@ -594,6 +611,7 @@ function RoomMap({
           list={modalList}
           fixedList={modalFixedList}
           onClose={() => setModalRoomId(null)}
+          isAdmin={isAdmin}
         />
       )}
     </>
@@ -605,11 +623,13 @@ function RoomDetailModal({
   list,
   fixedList,
   onClose,
+  isAdmin,
 }: {
   room: Room;
   list: ReservationDetail[];
   fixedList: FixedEventInstance[];
   onClose: () => void;
+  isAdmin?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -695,7 +715,7 @@ function RoomDetailModal({
                 return (
                   <li key={res.id}>
                     <Link
-                      href={`/reservations/${res.id}`}
+                      href={reservationHref(res.id, isAdmin)}
                       className="block rounded-xl border border-stone-200 bg-white p-3 transition-colors hover:bg-stone-50"
                     >
                       <div className="flex items-center gap-2">
@@ -746,10 +766,12 @@ function RoomGrid({
   rooms,
   reservations,
   fixedEvents,
+  isAdmin,
 }: {
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
+  isAdmin?: boolean;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -807,7 +829,7 @@ function RoomGrid({
                   return (
                     <li key={res.id}>
                       <Link
-                        href={`/reservations/${res.id}`}
+                        href={reservationHref(res.id, isAdmin)}
                         className="block leading-snug hover:underline"
                       >
                         <div>

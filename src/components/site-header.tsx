@@ -1,7 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+import { isAdmin } from "@/lib/admin-server";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const admin = await isAdmin();
   return (
     <header className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
@@ -34,12 +37,28 @@ export function SiteHeader() {
             <span className="sm:hidden">신청내역</span>
             <span className="hidden sm:inline">모든 신청내역</span>
           </Link>
-          <Link
-            href="/admin"
-            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-          >
-            관리
-          </Link>
+          {admin ? (
+            // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
+            // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 font-medium text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
+              title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span>관리자</span>
+              <span className="hidden text-xs font-normal text-emerald-700 sm:inline">
+                · 활성화중
+              </span>
+            </Link>
+          ) : (
+            <Link
+              href="/admin"
+              className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
+            >
+              관리자
+            </Link>
+          )}
           {/* 장소신청 — primary CTA. brand color, 약간 더 두꺼운 글씨로 한눈에 띄게. */}
           <Link
             href="/apply"

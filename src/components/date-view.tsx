@@ -32,7 +32,13 @@ type Props = {
   currentDate: string;
   reservations: ReservationDetail[];
   fixedEvents?: FixedEventInstance[];
+  /** 관리자면 일회성 신청 클릭 시 /admin/reservations/[id] 로 직행 */
+  isAdmin?: boolean;
 };
+
+function reservationHref(id: string, isAdmin: boolean | undefined): string {
+  return isAdmin ? `/admin/reservations/${id}` : `/reservations/${id}`;
+}
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -40,6 +46,7 @@ export function DateView({
   currentDate,
   reservations,
   fixedEvents = [],
+  isAdmin,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -254,7 +261,7 @@ export function DateView({
                     return (
                       <li key={r.id}>
                         <Link
-                          href={`/reservations/${r.id}`}
+                          href={reservationHref(r.id, isAdmin)}
                           title={`[${STATUS_LABEL[ds]}] ${formatTime(r.start_at)}–${formatTime(r.end_at)} · ${r.dept?.name ?? ""} · ${r.purpose}`}
                           className={cn(
                             "block truncate rounded px-1 py-0.5 text-xs transition-opacity hover:opacity-80",
@@ -287,6 +294,7 @@ export function DateView({
           list={byDate.get(format(modalDate, "yyyy-MM-dd")) ?? []}
           fixedList={fixedByDate.get(format(modalDate, "yyyy-MM-dd")) ?? []}
           onClose={() => setModalDate(null)}
+          isAdmin={isAdmin}
         />
       )}
     </div>
@@ -298,11 +306,13 @@ function DayReservationsModal({
   list,
   fixedList,
   onClose,
+  isAdmin,
 }: {
   date: Date;
   list: ReservationDetail[];
   fixedList: FixedEventInstance[];
   onClose: () => void;
+  isAdmin?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -388,7 +398,7 @@ function DayReservationsModal({
                 return (
                   <li key={r.id}>
                     <Link
-                      href={`/reservations/${r.id}`}
+                      href={reservationHref(r.id, isAdmin)}
                       className="flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-3 transition-colors hover:bg-stone-50"
                     >
                       <div className="flex items-center gap-2">

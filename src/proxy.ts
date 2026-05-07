@@ -1,44 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  ADMIN_COOKIE_NAME,
+  getAdminSecret,
+  verifyAdminToken,
+} from "@/lib/admin-session";
 
 /**
- * /admin/* 경로(서브 페이지 + server action 호출 포함)를 BasicAuth로 보호한다.
- * 환경변수 ADMIN_USERNAME / ADMIN_PASSWORD 두 개를 등록해야 동작.
+ * /admin/* 경로(서브 페이지 + server action 호출 포함) 보호.
  *
- * Vercel: Project Settings → Environment Variables 에 추가하고 재배포.
- * 로컬: .env.local 에 추가 후 dev 서버 재시작.
+ * 인증 방식: 쿠키 세션.
+ *   - /admin/login (로그인 페이지) 자체와 그 server action POST 는 인증 면제
+ *   - 그 외 /admin/* 는 dcb_admin 쿠키가 유효해야 진입 가능
+ *   - 미인증이면 /admin/login?next=<원래경로> 으로 redirect
+ *
+ * APPROVAL_SESSION_SECRET 미설정 시 503 — 실수 보호 가드(env 비우면
+ * 모든 사람이 로그인 통과 같은 사고 방지).
  */
-const REALM = 'Basic realm="Admin Area", charset="UTF-8"';
 
-export function proxy(req: NextRequest) {
-  const expectedUser = process.env.ADMIN_USERNAME;
-  const expectedPass = process.env.ADMIN_PASSWORD;
-
-  if (!expectedUser || !expectedPass) {
+export async function proxy(req: NextRequest) {
+  const secret = getAdminSecret();
+  if (!secret) {
     return new NextResponse(
-      "ADMIN_USERNAME / ADMIN_PASSWORD 환경변수가 설정되지 않아 관리 페이지를 보호할 수 없습니다.",
+      "APPROVAL_SESSION_SECRET 환경변수가 설정되지 않아 관리 페이지를 보호할 수 없습니다. (16자 이상 임의 문자열을 설정하세요)",
       { status: 503 },
     );
   }
 
-  const header = req.headers.get("authorization");
-  if (header?.startsWith("Basic ")) {
-    try {
-      const decoded = atob(header.slice("Basic ".length));
-      const idx = decoded.indexOf(":");
-      const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
-      const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
-      if (user === expectedUser && pass === expectedPass) {
-        return NextResponse.next();
-      }
-    } catch {
-      // fall through to 401
-    }
+  const { pathname } = req.nextUrl;
+
+  // 로그인 페이지 자체와 그 액션은 인증 우회
+  if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) {
+    return NextResponse.next();
   }
 
-  return new NextResponse("관리자 인증이 필요합니다.", {
-    status: 401,
-    headers: { "WWW-Authenticate": REALM },
-  });
+  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  if (token && (await verifyAdminToken(token))) {
+    return NextResponse.next();
+  }
+
+  // 미인증 → 로그인으로 redirect (next 에 원래 가려던 경로 보존)
+  const loginUrl = req.nextUrl.clone();
+  loginUrl.pathname = "/admin/login";
+  loginUrl.search = `?next=${encodeURIComponent(pathname + (req.nextUrl.search ?? ""))}`;
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

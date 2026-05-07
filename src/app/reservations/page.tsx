@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { ReservationDetail, SeriesDetail } from "@/lib/repo";
 import type { TableEntry } from "@/components/reservations-table";
 import { computeConflictGroups, type ConflictRow } from "@/lib/conflicts";
+import { isAdmin } from "@/lib/admin-server";
 import { ReservationsList } from "./reservations-list";
 
 export default async function ReservationsListPage() {
@@ -57,8 +58,8 @@ export default async function ReservationsListPage() {
     .select("id, room_id, start_at, end_at, series_id")
     .in("status", ["pending", "approved"]);
 
-  const [{ data: rData }, { data: sData }, { data: cData }] =
-    await Promise.all([reservationsP, seriesP, conflictRowsP]);
+  const [{ data: rData }, { data: sData }, { data: cData }, admin] =
+    await Promise.all([reservationsP, seriesP, conflictRowsP, isAdmin()]);
 
   const reservations = (rData ?? []) as unknown as ReservationDetail[];
   const seriesList = (sData ?? []) as unknown as SeriesDetail[];
@@ -108,7 +109,7 @@ export default async function ReservationsListPage() {
           <h1 className="text-2xl font-bold">모든 신청내역</h1>
           <span className="text-sm text-stone-500">총 {entries.length}건</span>
         </div>
-        <ReservationsList entries={entries} />
+        <ReservationsList entries={entries} isAdmin={admin} />
       </main>
     </>
   );

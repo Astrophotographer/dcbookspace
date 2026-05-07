@@ -16,7 +16,6 @@ type BadgeInput = {
 export function ReservationBadge({ reservation }: { reservation: BadgeInput }) {
   const s = displayStatus(reservation);
   const Icon = STATUS_ICON[s];
-  const isInReview = s === "in_review";
   return (
     <span
       className={cn(
@@ -25,10 +24,7 @@ export function ReservationBadge({ reservation }: { reservation: BadgeInput }) {
         STATUS_BADGE_CLASS[s],
       )}
     >
-      <Icon
-        aria-hidden
-        className={cn("h-3.5 w-3.5 flex-none", isInReview && "animate-spin-slow")}
-      />
+      <Icon aria-hidden className="h-3.5 w-3.5 flex-none" />
       {STATUS_LABEL[s]}
     </span>
   );
