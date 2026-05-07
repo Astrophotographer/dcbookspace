@@ -123,15 +123,20 @@ const STATUS_ORDER: Record<DisplayStatus, number> = {
   cancelled: 5,
 };
 
+// "결재 라인" 컬럼 정렬 키 (마지막으로 통과한 단계의 role 기준).
+// 내림차순 정렬 시 사용자 의도가:
+//   당회장까지 결재됨 → 관리장로까지 → 차장까지 → 부서장까지 → 결재대기
+// 가 되도록 senior_pastor 가 가장 큰 값.
 const ROLE_ORDER: Record<UserRole, number> = {
   applicant: 0,
+  admin: 0,
   dept_head: 1,
-  elder: 2,
-  manager: 3,
-  senior_pastor: 4,
-  admin: 5,
+  manager: 2,         // 차장
+  elder: 3,           // 관리장로
+  senior_pastor: 4,   // 당회장 (가장 위)
 };
-const NO_ROLE = 999;
+// 아무 단계도 통과 못한(결재 대기) 신청서는 제일 아래.
+const NOT_APPROVED = -1;
 
 const PAGE_SIZES = [10, 50, 100] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
@@ -142,11 +147,20 @@ function normalizeForSearch(s: string): string {
   return s.toLowerCase().replace(/[\s\-#_]/g, "");
 }
 
-function currentApproverRole(e: TableEntry): UserRole | null {
-  const d = e.data;
-  if (d.status !== "pending") return null;
-  const step = d.route.steps.find((s) => s.order === d.current_step);
-  return step?.role ?? null;
+/** 마지막으로 통과(approved)한 결재 단계의 role. 통과한 단계 없으면 null. */
+function lastApprovedRole(e: TableEntry): UserRole | null {
+  const { approvals, route } = e.data;
+  let maxStep = -1;
+  let role: UserRole | null = null;
+  for (const a of approvals) {
+    if (a.status !== "approved") continue;
+    if (a.step_order > maxStep) {
+      maxStep = a.step_order;
+      const step = route.steps.find((s) => s.order === a.step_order);
+      role = step?.role ?? null;
+    }
+  }
+  return role;
 }
 
 function roomLabel(e: TableEntry): string {
@@ -186,10 +200,10 @@ function compareField(a: TableEntry, b: TableEntry, field: SortField): number {
         STATUS_ORDER[displayStatus(statusInputFor(b))]
       );
     case "approval": {
-      const ar = currentApproverRole(a);
-      const br = currentApproverRole(b);
-      const ao = ar ? ROLE_ORDER[ar] : NO_ROLE;
-      const bo = br ? ROLE_ORDER[br] : NO_ROLE;
+      const ar = lastApprovedRole(a);
+      const br = lastApprovedRole(b);
+      const ao = ar ? ROLE_ORDER[ar] : NOT_APPROVED;
+      const bo = br ? ROLE_ORDER[br] : NOT_APPROVED;
       return ao - bo;
     }
   }
