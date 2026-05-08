@@ -116,7 +116,11 @@ type ReservationSummaryRow = {
   end_at: string;
   purpose: string;
   series_id: string | null;
-  applicant: { name: string; phone: string | null };
+  applicant: {
+    name: string;
+    phone: string | null;
+    telegram_chat_id: string | null;
+  };
   dept: { name: string } | null;
   room: {
     name: string;
@@ -132,7 +136,11 @@ type SeriesSummaryRow = {
   end_date: string;
   weekday: number;
   purpose: string;
-  applicant: { name: string; phone: string | null };
+  applicant: {
+    name: string;
+    phone: string | null;
+    telegram_chat_id: string | null;
+  };
   dept: { name: string } | null;
   room: {
     name: string;
@@ -235,7 +243,7 @@ async function buildReservationPayload(id: string): Promise<Payload | null> {
     .from("reservations")
     .select(
       `id, ref_no, status, start_at, end_at, purpose, series_id,
-       applicant:users!applicant_id (name, phone),
+       applicant:users!applicant_id (name, phone, telegram_chat_id),
        dept:departments (name),
        room:rooms (name, floor:floors (label, building:buildings (name)))`,
     )
@@ -252,7 +260,11 @@ async function buildReservationPayload(id: string): Promise<Payload | null> {
     end_at: r.end_at,
     purpose: r.purpose,
     is_recurring_child: r.series_id != null,
-    applicant: { name: r.applicant.name, phone: r.applicant.phone },
+    applicant: {
+      name: r.applicant.name,
+      phone: r.applicant.phone,
+      telegram_chat_id: r.applicant.telegram_chat_id,
+    },
     dept_name: r.dept?.name ?? null,
     room: {
       name: r.room.name,
@@ -268,7 +280,7 @@ async function buildSeriesPayload(id: string): Promise<Payload | null> {
     .from("reservation_series")
     .select(
       `id, ref_no, status, start_date, end_date, weekday, purpose,
-       applicant:users!applicant_id (name, phone),
+       applicant:users!applicant_id (name, phone, telegram_chat_id),
        dept:departments (name),
        room:rooms (name, floor:floors (label, building:buildings (name)))`,
     )
@@ -285,7 +297,11 @@ async function buildSeriesPayload(id: string): Promise<Payload | null> {
     end_date: s.end_date,
     weekday: s.weekday,
     purpose: s.purpose,
-    applicant: { name: s.applicant.name, phone: s.applicant.phone },
+    applicant: {
+      name: s.applicant.name,
+      phone: s.applicant.phone,
+      telegram_chat_id: s.applicant.telegram_chat_id,
+    },
     dept_name: s.dept?.name ?? null,
     room: {
       name: s.room.name,

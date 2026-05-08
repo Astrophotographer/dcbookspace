@@ -239,73 +239,68 @@ export function UsersAdmin({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {isApprover(u.role) && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          // 단순 prompt 로 chat_id 입력. 빈 값은 unset.
-                          const current = u.telegram_chat_id ?? "";
-                          const next = window.prompt(
-                            `${u.name} 님의 텔레그램 chat_id\n(비우면 등록 해제)`,
-                            current,
+                  {/* 텔레그램은 신청자(applicant) 도 등록 대상 — 본인 알림용 */}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const current = u.telegram_chat_id ?? "";
+                      const next = window.prompt(
+                        `${u.name} 님의 텔레그램 chat_id\n(비우면 등록 해제)`,
+                        current,
+                      );
+                      if (next === null) return;
+                      startTransition(async () => {
+                        const res = await setTelegramChatId(u.id, next);
+                        if (res.error) setError(res.error);
+                        else {
+                          const trimmed = next.trim();
+                          setUsers((arr) =>
+                            arr.map((x) =>
+                              x.id === u.id
+                                ? {
+                                    ...x,
+                                    telegram_chat_id:
+                                      trimmed === "" ? null : trimmed,
+                                  }
+                                : x,
+                            ),
                           );
-                          if (next === null) return; // 취소
-                          startTransition(async () => {
-                            const res = await setTelegramChatId(
-                              u.id,
-                              next,
+                          setNotice(
+                            trimmed === ""
+                              ? `${u.name} 님의 텔레그램 등록을 해제했습니다.`
+                              : `${u.name} 님의 텔레그램 chat_id 가 등록됐습니다.`,
+                          );
+                        }
+                      });
+                    }}
+                  >
+                    <Send className="h-4 w-4" aria-hidden />
+                    텔레그램
+                  </Button>
+                  {isApprover(u.role) && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        startTransition(async () => {
+                          const res = await issuePin(u.id);
+                          if (res.error) setError(res.error);
+                          else if (res.pin) {
+                            setIssuedPin({ userId: u.id, pin: res.pin });
+                            setUsers((arr) =>
+                              arr.map((x) =>
+                                x.id === u.id
+                                  ? { ...x, pin_hash: "set" }
+                                  : x,
+                              ),
                             );
-                            if (res.error) setError(res.error);
-                            else {
-                              const trimmed = next.trim();
-                              setUsers((arr) =>
-                                arr.map((x) =>
-                                  x.id === u.id
-                                    ? {
-                                        ...x,
-                                        telegram_chat_id:
-                                          trimmed === "" ? null : trimmed,
-                                      }
-                                    : x,
-                                ),
-                              );
-                              setNotice(
-                                trimmed === ""
-                                  ? `${u.name} 님의 텔레그램 등록을 해제했습니다.`
-                                  : `${u.name} 님의 텔레그램 chat_id 가 등록됐습니다.`,
-                              );
-                            }
-                          });
-                        }}
-                      >
-                        <Send className="h-4 w-4" aria-hidden />
-                        텔레그램
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          startTransition(async () => {
-                            const res = await issuePin(u.id);
-                            if (res.error) setError(res.error);
-                            else if (res.pin) {
-                              setIssuedPin({ userId: u.id, pin: res.pin });
-                              setUsers((arr) =>
-                                arr.map((x) =>
-                                  x.id === u.id
-                                    ? { ...x, pin_hash: "set" }
-                                    : x,
-                                ),
-                              );
-                            }
-                          });
-                        }}
-                      >
-                        PIN 발급
-                      </Button>
-                    </>
+                          }
+                        });
+                      }}
+                    >
+                      PIN 발급
+                    </Button>
                   )}
                   <Button
                     size="sm"
