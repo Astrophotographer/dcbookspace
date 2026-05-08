@@ -11,8 +11,8 @@ import { useSearchParams } from "next/navigation";
 //   - 프로덕션 시작 선언 시: v1.0 부터 (정식 릴리스, `*` 제거)
 //   - 프로덕션 후 마이너 배포: v1.0 → v1.1 → v1.2 ...
 //   - 큰 변경: v2.0, v3.0 같이 메이저 점프
-const VERSION = "v0.8*";
-const RELEASE_DATE = "05.08";
+const VERSION = "v0.9*";
+const RELEASE_DATE = "05.09";
 
 export function SiteFooter() {
   // 키오스크 모드(?kiosk=1)에선 푸터 자체 숨김 — 사무실 태블릿 화면을 깔끔하게.
