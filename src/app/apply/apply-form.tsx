@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, FileText, Plus, Printer, X } from "lucide-react";
 import type {
   Building,
   Department,
@@ -94,6 +94,28 @@ function maxDayOfMonth(year: number, month: number): number {
   return 31;
 }
 
+/**
+ * 시프트 레지스터: 완성된 YYYY-MM-DD 상태에서 숫자 한 자 누르면 일(DD) 자리만 시프트.
+ *   2026-05-01 + "1" → 2026-05-11
+ *   2026-05-11 + "2" → 2026-05-12
+ *   2026-05-12 + "5" → 2026-05-25
+ * 일이 월의 최대일수를 넘으면 자동으로 max 로 클램프 (윤년 반영).
+ * 형식이 완성되지 않은 상태(연·월 입력 중) 에선 호출자가 normal flow 로 갈 것.
+ */
+function shiftDayDigit(current: string, digit: string): string | null {
+  const m = current.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m || !/^\d$/.test(digit)) return null;
+  const [, yyyy, mm, dd] = m;
+  let n = parseInt(dd[1] + digit, 10);
+  if (n === 0) n = 1;
+  const y = parseInt(yyyy, 10);
+  const mo = parseInt(mm, 10);
+  if (mo < 1 || mo > 12) return null;
+  const max = maxDayOfMonth(y, mo);
+  if (n > max) n = max;
+  return `${yyyy}-${mm}-${String(n).padStart(2, "0")}`;
+}
+
 function formatDateInput(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 8);
   if (d.length <= 4) return d;
@@ -131,12 +153,18 @@ export function ApplyForm({
   editTarget,
 }: Props) {
   const router = useRouter();
+  // 키오스크 모드 진입 여부 — 신청 성공 redirect URL 에 ?kiosk=1 자동 보존
+  const searchParams = useSearchParams();
+  const isKiosk = searchParams.get("kiosk") === "1";
+  const kioskParam = isKiosk ? "&kiosk=1" : "";
   const isEdit = !!editTarget;
   const isSeriesEdit = editTarget?.kind === "series";
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [conflictModal, setConflictModal] =
     useState<ConflictModalState | null>(null);
+  // 신청 확정 직전 출력 안내 모달용 — fd 가 들어 있으면 모달 노출
+  const [submitConfirmFd, setSubmitConfirmFd] = useState<FormData | null>(null);
 
   const [name, setName] = useState(defaults?.applicant_name ?? "");
   // 신규 신청은 "010-" 프리필 — 모바일에서 010 매번 직접 입력하는 부담 제거.
@@ -198,10 +226,11 @@ export function ApplyForm({
     return computeWeeklyOccurrences(date, endDate, startWeekday).length;
   }, [date, endDate, startWeekday]);
 
-  // 시작 날짜 변경 시 종료가 더 빠르면 시작과 같게 자동 동기화
+  // 시작 날짜가 바뀌면 종료 날짜도 같은 값으로 동기화.
+  // 다일 예약(예: 5/1~5/3) 이 필요한 경우 사용자가 시작 입력 후 종료를 따로 수정.
   function onStartDateChange(v: string) {
     setDate(v);
-    if (endDate < v) setEndDate(v);
+    setEndDate(v);
   }
   const visibleFloors = useMemo(
     () => floors.filter((f) => f.building_id === buildingId),
@@ -390,7 +419,7 @@ export function ApplyForm({
           if (submittedName && submittedPhone) {
             setMe({ name: submittedName, phone: submittedPhone });
           }
-          router.push(`/series/${res.id}?just=1`);
+          router.push(`/series/${res.id}?just=1${kioskParam}`);
         }
         return;
       }
@@ -408,7 +437,7 @@ export function ApplyForm({
         if (submittedName && submittedPhone) {
           setMe({ name: submittedName, phone: submittedPhone });
         }
-        router.push(`/reservations/${res.id}?just=1`);
+        router.push(`/reservations/${res.id}?just=1${kioskParam}`);
       }
     });
   }
@@ -477,7 +506,12 @@ export function ApplyForm({
               setConflictModal({ kind: "series", result, fd });
               return;
             }
-            doSubmit(fd, false);
+            // 충돌 없음 — 수정 모드는 바로 진행, 신규는 출력 안내 모달 거침
+            if (isEdit) {
+              doSubmit(fd, false);
+            } else {
+              setSubmitConfirmFd(fd);
+            }
           });
           return;
         }
@@ -505,7 +539,12 @@ export function ApplyForm({
             setConflictModal({ kind: "single", result, fd });
             return;
           }
-          doSubmit(fd, false);
+          // 충돌 없음 — 수정 모드는 바로 진행, 신규는 출력 안내 모달 거침
+          if (isEdit) {
+            doSubmit(fd, false);
+          } else {
+            setSubmitConfirmFd(fd);
+          }
         });
       }}
     >
@@ -726,6 +765,14 @@ export function ApplyForm({
               maxLength={10}
               pattern="\d{4}-\d{2}-\d{2}"
               value={date}
+              onKeyDown={(e) => {
+                // 완성된 YYYY-MM-DD + 숫자 한 자 → 일(DD) 시프트
+                const next = shiftDayDigit(date, e.key);
+                if (next) {
+                  e.preventDefault();
+                  onStartDateChange(next);
+                }
+              }}
               onChange={(e) => onStartDateChange(formatDateInput(e.target.value))}
             />
           </Field>
@@ -752,6 +799,13 @@ export function ApplyForm({
               maxLength={10}
               pattern="\d{4}-\d{2}-\d{2}"
               value={endDate}
+              onKeyDown={(e) => {
+                const next = shiftDayDigit(endDate, e.key);
+                if (next) {
+                  e.preventDefault();
+                  setEndDate(next);
+                }
+              }}
               onChange={(e) => setEndDate(formatDateInput(e.target.value))}
             />
           </Field>
@@ -893,26 +947,32 @@ export function ApplyForm({
             defaultValue={defaults?.notes ?? ""}
           />
         </Field>
-        <p className="rounded-lg bg-brand-50 p-4 text-sm leading-relaxed text-brand-700">
-          원활한 결재 진행을 위해 <strong className="font-semibold">사용 예정일 최소 1주일 전</strong>에
-          신청해 주시기를 부탁드립니다.
-        </p>
+        {/* 1주일 미만 경고 — 사용일이 오늘부터 7일 이내일 때만 노출.
+            결재선 통과까지 시간이 빠듯하다는 안내. */}
+        {(() => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+          const todayKey = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Seoul",
+          }).format(new Date());
+          const today = new Date(`${todayKey}T00:00:00+09:00`);
+          const target = new Date(`${date}T00:00:00+09:00`);
+          const days = Math.ceil(
+            (target.getTime() - today.getTime()) / 86_400_000,
+          );
+          if (days < 0 || days >= 7) return null;
+          return (
+            <p className="rounded-lg bg-brand-50 p-4 text-sm leading-relaxed text-brand-700">
+              원활한 결재 진행을 위해{" "}
+              <strong className="font-semibold">사용 예정일 최소 1주일 전</strong>
+              에 신청해 주시기를 부탁드립니다.
+            </p>
+          );
+        })()}
       </fieldset>
 
       {error && (
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
           {error}
-        </div>
-      )}
-
-      {/* 출력 안내 — 신청 버튼 바로 위에 배치해 클릭 직전에 인지하도록.
-          신규 신청에만 노출 (수정 모드에선 이미 출력된 종이가 있으므로 불필요). */}
-      {!isEdit && (
-        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-          <strong className="font-semibold">안내.</strong>{" "}
-          <strong className="font-semibold">신청하기</strong> 버튼을 누르면
-          신청서가 <strong className="font-semibold">사무실 프린터로 자동 출력</strong>될
-          예정입니다. (대면 결재용 종이 서류)
         </div>
       )}
 
@@ -947,6 +1007,104 @@ export function ApplyForm({
         doSubmit(conflictModal.fd, true);
       }}
     />
+
+    {/* 출력 안내 모달 — 충돌 없이 진짜 신청 직전에 한 번 더 확인. 수정 모드는 우회.
+        디자인: 종이가 프린터에서 막 빠져나오는 모티브로 "지금 종이가 출력될 거예요"
+        를 시각적으로 전달. 어르신 가독성을 위해 본문 큼직한 활자 + 핵심 정보는
+        chip 형태로 강조. */}
+    {submitConfirmFd && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="신청 확인"
+        className="animate-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-stone-900/55 p-4 backdrop-blur-sm"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !pending) setSubmitConfirmFd(null);
+        }}
+      >
+        <div className="animate-modal-panel relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.25)] ring-1 ring-stone-900/5">
+          {/* 상단 — 프린터에서 종이가 빠져나오는 시각적 모티브 */}
+          <div className="bg-paper-grain relative bg-gradient-to-b from-amber-50 via-amber-50/50 to-white px-8 pt-9 pb-7">
+            <div className="relative mx-auto h-20 w-20">
+              {/* 프린터 아이콘 — 진한 amber 배경의 둥근 사각 */}
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/80 shadow-inner ring-1 ring-amber-300/60">
+                <Printer
+                  className="h-9 w-9 text-amber-700"
+                  strokeWidth={2.2}
+                  aria-hidden
+                />
+              </div>
+              {/* 빠져나오는 종이 — animate-paper-emerge 로 1.6s 동안 슬쩍 내려옴 */}
+              <div
+                className="animate-paper-emerge absolute left-1/2 top-full flex h-9 w-12 items-center justify-center rounded-md border border-amber-300 bg-white shadow-md"
+                aria-hidden
+              >
+                {/* 종이 위에 작은 가로선들 — 본문 텍스트 흉내 */}
+                <div className="space-y-1">
+                  <div className="h-0.5 w-7 rounded-full bg-amber-300/80" />
+                  <div className="h-0.5 w-5 rounded-full bg-amber-300/60" />
+                  <div className="h-0.5 w-6 rounded-full bg-amber-300/70" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 본문 */}
+          <div className="px-8 pt-12 pb-7 text-center">
+            <h2 className="mb-3 text-2xl font-bold tracking-tight text-stone-900 sm:text-[26px]">
+              정말 신청하시겠습니까?
+            </h2>
+            <p className="mb-5 text-base leading-relaxed text-stone-600">
+              <strong className="font-semibold text-stone-900">신청하기</strong>{" "}
+              를 누르는 순간
+            </p>
+            {/* 핵심 정보 — chip 으로 강조해 한눈에 들어오게 */}
+            <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-base font-semibold text-amber-900 ring-1 ring-amber-300/70 shadow-sm">
+              <Printer className="h-4 w-4 flex-none" aria-hidden />
+              사무실 프린터로 자동 출력됩니다
+            </div>
+            <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-stone-500">
+              <FileText className="h-3.5 w-3.5" aria-hidden />
+              대면 결재용 종이 서류
+            </p>
+          </div>
+
+          {/* 푸터 — 두 버튼 동등 폭, 1차 액션은 우측 + 아이콘 */}
+          <div className="flex gap-3 border-t border-stone-200/70 bg-stone-50/70 px-6 py-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setSubmitConfirmFd(null)}
+              disabled={pending}
+              size="lg"
+              className="flex-1"
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              disabled={pending}
+              className="flex-1"
+              onClick={() => {
+                const fd = submitConfirmFd;
+                setSubmitConfirmFd(null);
+                doSubmit(fd, false);
+              }}
+            >
+              {pending ? (
+                "신청 중..."
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5" aria-hidden />
+                  신청하기
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

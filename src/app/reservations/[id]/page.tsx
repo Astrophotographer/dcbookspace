@@ -12,6 +12,10 @@ import type { ReservationDetail } from "@/lib/repo";
 import { Printer, FileText } from "lucide-react";
 import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { KioskAutoReturn } from "@/components/kiosk-auto-return";
+
+const REALTIME_TABLES = ["reservations", "approvals"] as const;
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
   if (!isSupabaseConfigured()) {
@@ -27,6 +31,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
   const { id } = await props.params;
   const sp = await props.searchParams;
   const justSubmitted = sp.just === "1";
+  const isKiosk = sp.kiosk === "1";
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -46,7 +51,9 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader kiosk={isKiosk} />
+      {/* 결재 진행 시 신청자 화면이 자동 갱신되도록 — 새로고침 없이 단계 통과·인쇄 상태 반영 */}
+      <RealtimeRefresh tables={REALTIME_TABLES} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
@@ -55,6 +62,8 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
             주세요.
           </div>
         )}
+
+        {isKiosk && <KioskAutoReturn printStatus={r.print_status} />}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-stone-900">

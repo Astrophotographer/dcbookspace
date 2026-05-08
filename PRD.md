@@ -135,7 +135,7 @@
 - 페이지네이션 10/50/100
 
 ### 6-5. 관리자 (`/admin/*`)
-- BasicAuth + DB-stored 비밀번호 (env 비상 키 영구 유효)
+- 쿠키 세션 로그인 + DB-stored 비밀번호 (env 비상 키 영구 유효)
 - 신청서 관리 (강제 확정·삭제·결재 취소)
 - 결재자 관리 (PIN 발급, 신청 이력 있으면 soft delete + PIN 무효화)
 - 관리자 정보 (다중 마스터 PIN, 최소 1명 보장 — 시드 "홍길동")
@@ -156,8 +156,9 @@
 - 입력값 검증은 거부가 아니라 자동 보정 우선
 
 ### 7-2. 보안 불변식
-- `/admin/*` BasicAuth (server actions POST 포함)
-- `ADMIN_PASSWORD` 빈 값이면 503 (실수로 풀린 채 배포 방지)
+- `/admin/*` 쿠키 세션 인증 (server action POST 포함, `/admin/login` 만 면제)
+- `APPROVAL_SESSION_SECRET` 빈 값이면 503 (실수로 보호 풀린 채 배포 방지)
+- 비상용 `ADMIN_PASSWORD` env 키는 영구 유효 — 운영 비밀번호 분실 시 우회 로그인용
 - `SUPABASE_SERVICE_ROLE_KEY` 서버 전용
 - 마스터 키 `0000` 코드 하드코딩 유지 (비상용)
 - PIN은 bcrypt 해시. 평문 DB 저장 금지
@@ -187,7 +188,7 @@
 [Vercel] (서버 + Edge)
   ├─ Server Components (데이터 fetch)
   ├─ Server Actions (mutation)
-  └─ Proxy 미들웨어 (BasicAuth)
+  └─ Proxy 미들웨어 (쿠키 세션 — /admin/* 보호)
         │
         ▼
 [Supabase Tokyo region]
@@ -232,7 +233,7 @@
 | 본인 단계 결재 | — | ✅ | ✅ | ✅ | — |
 | 어떤 단계든 강제 승인 | — | — | — | ✅ | ✅ |
 | 결재 취소 (모든 단계 reset) | — | — | ✅ | (사무처 권한) | — |
-| `/admin/*` 접근 | — | — | — | ✅ (BasicAuth 통과) | — |
+| `/admin/*` 접근 | — | — | — | ✅ (로그인 통과) | — |
 
 ---
 

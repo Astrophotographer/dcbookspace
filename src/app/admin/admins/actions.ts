@@ -1,10 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
 import { updateAdminPassword } from "@/lib/admin-credentials";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser } from "@/lib/supabase/types";
+
+function revalidateAdminPages() {
+  revalidatePath("/admin/admins");
+  // 충돌 모달의 1차 연락 관리자 (getPrimaryAdminContact) 도 영향받음
+  revalidatePath("/apply");
+}
 
 /**
  * 사이트 로그인 비밀번호 변경 (BasicAuth 대체 — DB-stored hash).
@@ -76,6 +83,7 @@ export async function createAdmin(
     .select("*")
     .single();
   if (error) return { error: error.message };
+  revalidateAdminPages();
   return { user: data as AppUser, pin: tail };
 }
 
@@ -100,6 +108,7 @@ export async function deleteAdmin(id: string): Promise<{ error?: string }> {
 
   const { error } = await supabase.from("users").delete().eq("id", id);
   if (error) return { error: error.message };
+  revalidateAdminPages();
   return {};
 }
 
@@ -139,5 +148,6 @@ export async function issueAdminPin(
     .update({ pin_hash: hash, pin_attempts: 0, pin_locked_until: null })
     .eq("id", userId);
   if (error) return { error: error.message };
+  revalidateAdminPages();
   return { pin: tail };
 }

@@ -9,11 +9,15 @@ import {
   getDepartments,
 } from "@/lib/repo";
 
-export default async function ApplyPage() {
+export default async function ApplyPage(props: PageProps<"/apply">) {
+  // 키오스크 모드 — ?kiosk=1 일 때 헤더·푸터 숨기고 신청 전용 화면.
+  const sp = await props.searchParams;
+  const isKiosk = sp.kiosk === "1";
+
   if (!isSupabaseConfigured()) {
     return (
       <>
-        <SiteHeader />
+        <SiteHeader kiosk={isKiosk} />
         <main className="flex-1">
           <SetupNeeded />
         </main>
@@ -30,9 +34,9 @@ export default async function ApplyPage() {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader kiosk={isKiosk} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
-        <h1 className="mb-6 text-2xl font-bold text-stone-900">
+        <h1 className="mb-6 text-[28px] font-bold tracking-tight text-stone-900 sm:text-[34px]">
           장소사용 신청
         </h1>
         <ApplyForm

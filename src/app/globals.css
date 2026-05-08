@@ -51,3 +51,28 @@ body {
   to   { transform: rotate(360deg); }
 }
 .animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+/* 신청 확인 모달 — 프린터에서 종이가 빠져나오는 모티브.
+   prefers-reduced-motion 환경에선 정지(메인 도큐먼트만 보이고 종이는 멈춤). */
+@keyframes paper-emerge {
+  0%   { transform: translate(-50%, -16px); opacity: 0; }
+  35%  { transform: translate(-50%, -8px);  opacity: 1; }
+  70%  { transform: translate(-50%, 4px);   opacity: 1; }
+  100% { transform: translate(-50%, 4px);   opacity: 1; }
+}
+.animate-paper-emerge { animation: paper-emerge 1.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-paper-emerge { animation: none; transform: translate(-50%, 4px); }
+}
+
+/* 신청 확인 모달 상단의 미세한 종이 결 패턴 */
+.bg-paper-grain {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(146, 64, 14, 0) 0,
+      rgba(146, 64, 14, 0) 5px,
+      rgba(146, 64, 14, 0.06) 5px,
+      rgba(146, 64, 14, 0.06) 6px
+    );
+}

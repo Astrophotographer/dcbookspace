@@ -1,9 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser, UserRole } from "@/lib/supabase/types";
+
+function revalidateUserPages() {
+  // 결재자 목록 + 결재 라인에 사용자가 등장하는 모든 화면.
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/departments"); // 부서장·관리장로 매핑
+  revalidatePath("/apply"); // 신청 폼의 부서/PIN 검증 시 영향
+}
 
 const APPROVER_ROLES: UserRole[] = [
   "dept_head",
@@ -58,6 +66,7 @@ export async function createUser(
     .select("*")
     .single();
   if (error) return { error: error.message };
+  revalidateUserPages();
   return { user: data as AppUser, pin: initialPin ?? undefined };
 }
 
@@ -103,11 +112,13 @@ export async function deleteUser(
       })
       .eq("id", id);
     if (error) return { error: error.message };
+    revalidateUserPages();
     return { result: "deactivated" };
   }
 
   const { error } = await supabase.from("users").delete().eq("id", id);
   if (error) return { error: error.message };
+  revalidateUserPages();
   return { result: "deleted" };
 }
 
@@ -170,5 +181,6 @@ export async function issuePin(
     .update({ pin_hash: hash, pin_attempts: 0, pin_locked_until: null })
     .eq("id", userId);
   if (error) return { error: error.message };
+  revalidateUserPages();
   return { pin: tail };
 }
