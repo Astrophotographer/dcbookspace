@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
@@ -39,7 +40,11 @@ export default function RootLayout({
     <html lang="ko" className={`${notoSansKR.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
         {children}
-        <SiteFooter />
+        {/* SiteFooter 가 useSearchParams 를 쓰므로 prerender 시 Suspense 경계 필요.
+            /_not-found 같은 정적 prerender 페이지가 깨지지 않도록 fallback null. */}
+        <Suspense fallback={null}>
+          <SiteFooter />
+        </Suspense>
       </body>
     </html>
   );
