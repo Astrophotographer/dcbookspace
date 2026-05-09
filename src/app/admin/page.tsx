@@ -15,6 +15,7 @@ import {
   FileText,
   Inbox,
   LogOut,
+  Maximize2,
   Network,
   QrCode,
   ShieldCheck,
@@ -76,6 +77,12 @@ const TILES = [
     label: "신청 QR",
     desc: "휴대폰으로 스캔 시 신청서 바로 열림",
     Icon: QrCode,
+  },
+  {
+    href: "/kiosk-install",
+    label: "키오스크 설치",
+    desc: "사무실 단말에 키오스크 모드 PWA 로 설치 안내",
+    Icon: Maximize2,
   },
 ];
 

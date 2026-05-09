@@ -1,0 +1,29 @@
+{
+  "id": "/kiosk",
+  "name": "등촌교회 장소신청 키오스크",
+  "short_name": "장소신청 키오스크",
+  "description": "사무실 키오스크 단말 — 장소 사용 신청 전용 (풀스크린)",
+  "start_url": "/apply?kiosk=1",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#0b1024",
+  "theme_color": "#1d4ed8",
+  "lang": "ko-KR",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
