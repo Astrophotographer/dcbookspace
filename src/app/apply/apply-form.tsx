@@ -116,6 +116,20 @@ function shiftDayDigit(current: string, digit: string): string | null {
   return `${yyyy}-${mm}-${String(n).padStart(2, "0")}`;
 }
 
+/**
+ * "HH:MM" 에 1시간을 더한 결과 (24:00 이후엔 23:59 로 cap).
+ * 같은날에서 종료 시간이 시작보다 이상해질 때 자동 보정용.
+ */
+function timePlusOneHour(hhmm: string): string {
+  const m = hhmm.match(/^(\d{2}):(\d{2})$/);
+  if (!m) return hhmm;
+  const total = Number(m[1]) * 60 + Number(m[2]) + 60;
+  if (total >= 24 * 60) return "23:59";
+  const h = Math.floor(total / 60);
+  const min = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
 function formatDateInput(raw: string): string {
   const d = raw.replace(/\D/g, "").slice(0, 8);
   if (d.length <= 4) return d;
@@ -820,6 +834,12 @@ export function ApplyForm({
           date={date}
           startTime={timeBlocks[0]?.start}
           endTime={timeBlocks[0]?.end}
+          excludeReservationId={
+            isEdit && editTarget?.kind === "reservation"
+              ? editTarget.id
+              : undefined
+          }
+          excludeSeriesId={isSeriesEdit ? editTarget?.id : undefined}
         />
 
         {/* 시간대 — 정기 모드에서는 [+ 시간대 추가] 버튼 노출 */}
@@ -834,13 +854,27 @@ export function ApplyForm({
                   type="time"
                   required
                   value={block.start}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const next = e.target.value;
                     setTimeBlocks((arr) =>
-                      arr.map((b, i) =>
-                        i === idx ? { ...b, start: e.target.value } : b,
-                      ),
-                    )
-                  }
+                      arr.map((b, i) => {
+                        if (i !== idx) return b;
+                        // 같은날에서 새 시작 ≥ 기존 종료가 되면 종료를 시작+1h 로 자동 보정.
+                        // 다일 신청(date != endDate)은 사용자가 의도한 거라 그대로 둠.
+                        const sameDay = endDate === date;
+                        const needsBump =
+                          sameDay &&
+                          /^\d{2}:\d{2}$/.test(next) &&
+                          /^\d{2}:\d{2}$/.test(b.end) &&
+                          next >= b.end;
+                        return {
+                          ...b,
+                          start: next,
+                          end: needsBump ? timePlusOneHour(next) : b.end,
+                        };
+                      }),
+                    );
+                  }}
                 />
               </Field>
               <Field label={idx === 0 ? "종료 시간" : `종료 시간 #${idx + 1}`}>
@@ -848,13 +882,25 @@ export function ApplyForm({
                   type="time"
                   required
                   value={block.end}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const next = e.target.value;
                     setTimeBlocks((arr) =>
-                      arr.map((b, i) =>
-                        i === idx ? { ...b, end: e.target.value } : b,
-                      ),
-                    )
-                  }
+                      arr.map((b, i) => {
+                        if (i !== idx) return b;
+                        // 같은날에서 종료 ≤ 시작이 되면 시작+1h 로 자동 보정.
+                        const sameDay = endDate === date;
+                        const invalid =
+                          sameDay &&
+                          /^\d{2}:\d{2}$/.test(next) &&
+                          /^\d{2}:\d{2}$/.test(b.start) &&
+                          next <= b.start;
+                        return {
+                          ...b,
+                          end: invalid ? timePlusOneHour(b.start) : next,
+                        };
+                      }),
+                    );
+                  }}
                 />
               </Field>
               {recurring && timeBlocks.length > 1 && (

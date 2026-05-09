@@ -33,6 +33,8 @@ type ReservationRow = {
 export async function fetchRoomAvailability(
   roomId: string,
   date: string,
+  /** 수정 모드 — 자기 자신 신청서/시리즈를 충돌 후보에서 제외 */
+  options?: { excludeReservationId?: string; excludeSeriesId?: string },
 ): Promise<ExistingSlot[]> {
   if (!roomId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
 
@@ -40,7 +42,7 @@ export async function fetchRoomAvailability(
   const dayEnd = `${date}T23:59:59+09:00`;
 
   const supabase = createServiceClient();
-  const reservationsP = supabase
+  let reservationsQuery = supabase
     .from("reservations")
     .select(
       `id, start_at, end_at, status, series_id,
@@ -51,6 +53,20 @@ export async function fetchRoomAvailability(
     .gt("end_at", dayStart)
     .in("status", ["pending", "approved"])
     .order("start_at");
+  if (options?.excludeReservationId) {
+    reservationsQuery = reservationsQuery.neq(
+      "id",
+      options.excludeReservationId,
+    );
+  }
+  if (options?.excludeSeriesId) {
+    // 시리즈 자식들도 자기 자신 — series_id 매칭 row 모두 제외
+    reservationsQuery = reservationsQuery.neq(
+      "series_id",
+      options.excludeSeriesId,
+    );
+  }
+  const reservationsP = reservationsQuery;
   const fixedP = getFixedEvents();
 
   const [{ data: reservations }, fixed] = await Promise.all([

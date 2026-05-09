@@ -1,10 +1,24 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { format, parseISO } from "date-fns";
 import { CalendarCheck, Clock, Pin } from "lucide-react";
 import { fetchRoomAvailability, type ExistingSlot } from "./availability";
 import { formatTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+/**
+ * 슬롯 시간 표시. 시작·종료가 같은 날이면 "HH:mm-HH:mm",
+ * 다른 날이면 "M/d HH:mm – M/d HH:mm" 으로 — 다일 예약이 같은 날처럼
+ * 잘못 보이는 것을 방지.
+ */
+function formatSlotRange(start_at: string, end_at: string): string {
+  const s = parseISO(start_at);
+  const e = parseISO(end_at);
+  const sameDay = format(s, "yyyy-MM-dd") === format(e, "yyyy-MM-dd");
+  if (sameDay) return `${format(s, "HH:mm")}–${format(e, "HH:mm")}`;
+  return `${format(s, "M/d HH:mm")} – ${format(e, "M/d HH:mm")}`;
+}
 
 type Props = {
   roomId: string;
@@ -13,6 +27,9 @@ type Props = {
   startTime?: string;
   /** 사용자가 입력한 종료 시간 (HH:MM) */
   endTime?: string;
+  /** 수정 모드 — 자기 자신을 충돌 후보에서 제외 */
+  excludeReservationId?: string;
+  excludeSeriesId?: string;
 };
 
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -33,6 +50,8 @@ export function AvailabilityPreview({
   date,
   startTime,
   endTime,
+  excludeReservationId,
+  excludeSeriesId,
 }: Props) {
   const isValid = !!roomId && /^\d{4}-\d{2}-\d{2}$/.test(date);
   if (!isValid) return null;
@@ -42,11 +61,20 @@ export function AvailabilityPreview({
       date={date}
       startTime={startTime}
       endTime={endTime}
+      excludeReservationId={excludeReservationId}
+      excludeSeriesId={excludeSeriesId}
     />
   );
 }
 
-function AvailabilityPreviewInner({ roomId, date, startTime, endTime }: Props) {
+function AvailabilityPreviewInner({
+  roomId,
+  date,
+  startTime,
+  endTime,
+  excludeReservationId,
+  excludeSeriesId,
+}: Props) {
   const [slots, setSlots] = useState<ExistingSlot[] | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -54,12 +82,15 @@ function AvailabilityPreviewInner({ roomId, date, startTime, endTime }: Props) {
     // 입력 변경 후 300ms 디바운스 — 빠르게 타이핑할 때 매번 RPC 안 때림
     const t = setTimeout(() => {
       startTransition(async () => {
-        const r = await fetchRoomAvailability(roomId, date);
+        const r = await fetchRoomAvailability(roomId, date, {
+          excludeReservationId,
+          excludeSeriesId,
+        });
         setSlots(r);
       });
     }, 300);
     return () => clearTimeout(t);
-  }, [roomId, date]);
+  }, [roomId, date, excludeReservationId, excludeSeriesId]);
 
   if (slots === null) {
     return (
@@ -97,11 +128,9 @@ function AvailabilityPreviewInner({ roomId, date, startTime, endTime }: Props) {
     return <SlotListCard slots={slots} date={date} mode="info" />;
   }
 
-  // 사용자 시간과 실제 겹침 계산. Date.parse 로 비교 (KST 오프셋 그대로).
-  const userStartIso = `${date}T${startTime}:00+09:00`;
-  const userEndIso = `${date}T${endTime}:00+09:00`;
-  const userStartMs = Date.parse(userStartIso);
-  const userEndMs = Date.parse(userEndIso);
+  // 사용자 시간과 실제 겹침 계산. parseISO 로 ISO 8601 strict parse.
+  const userStartMs = parseISO(`${date}T${startTime}:00+09:00`).getTime();
+  const userEndMs = parseISO(`${date}T${endTime}:00+09:00`).getTime();
 
   // 종료가 시작보다 빠르거나 같음 → 사용자 입력 자체가 잘못됨. 정보 모드로 fallback.
   if (
@@ -114,9 +143,10 @@ function AvailabilityPreviewInner({ roomId, date, startTime, endTime }: Props) {
   }
 
   const overlapping = slots.filter((s) => {
-    const sStart = Date.parse(s.start_at);
-    const sEnd = Date.parse(s.end_at);
+    const sStart = parseISO(s.start_at).getTime();
+    const sEnd = parseISO(s.end_at).getTime();
     if (!Number.isFinite(sStart) || !Number.isFinite(sEnd)) return false;
+    // [start, end) 반열린 구간 — 끝-시작 정확히 같으면 안 겹침
     return sStart < userEndMs && sEnd > userStartMs;
   });
 
@@ -184,7 +214,7 @@ function SlotListCard({
             className="flex items-center gap-2 text-stone-800"
           >
             <span className="font-mono text-xs tabular-nums text-stone-700">
-              {formatTime(s.start_at)}–{formatTime(s.end_at)}
+              {formatSlotRange(s.start_at, s.end_at)}
             </span>
             <span className="text-stone-700">{s.label}</span>
             {s.is_fixed && (
