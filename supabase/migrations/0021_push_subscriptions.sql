@@ -9,7 +9,9 @@
 -- =====================================================
 
 create table push_subscriptions (
-  id uuid primary key default uuid_generate_v4(),
+  -- gen_random_uuid() 는 Postgres 13+ 내장(pgcrypto 별도 활성화 불필요).
+  -- supabase 환경에서 uuid-ossp 가 extensions schema 에 격리돼 search_path 미스 나는 케이스 회피.
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
   endpoint text not null unique,
   p256dh text not null,
