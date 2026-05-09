@@ -121,7 +121,10 @@ export default async function AdminReservationDetail(
           </p>
           <AdminActions
             reservationId={r.id}
-            canForce={r.status === "pending"}
+            canForceApprove={r.status === "pending"}
+            canForceReject={r.status === "pending" || r.status === "approved"}
+            canRevive={r.status === "rejected"}
+            isPostApproval={r.status === "approved"}
           />
         </section>
 

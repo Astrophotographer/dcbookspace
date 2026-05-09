@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/components/site-footer";
+import { MobileApplyFab } from "@/components/mobile-apply-fab";
 
 const notoSansKR = Noto_Sans_KR({
   variable: "--font-sans-kr",
@@ -40,9 +41,9 @@ export default function RootLayout({
     <html lang="ko" className={`${notoSansKR.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
         {children}
-        {/* SiteFooter 가 useSearchParams 를 쓰므로 prerender 시 Suspense 경계 필요.
-            /_not-found 같은 정적 prerender 페이지가 깨지지 않도록 fallback null. */}
+        {/* MobileApplyFab 가 usePathname 을 쓰므로 Suspense 안에 — prerender 안전성 */}
         <Suspense fallback={null}>
+          <MobileApplyFab />
           <SiteFooter />
         </Suspense>
       </body>

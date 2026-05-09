@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, BellOff, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   registerPushSubscription,
   unregisterPushSubscription,
@@ -147,73 +148,89 @@ export function PushPermissionPrompt({ applicantPhone }: Props) {
     }
   };
 
-  if (state === "init") return null;
+  if (state === "init" || state === "unsupported") return null;
 
-  if (state === "unsupported") {
-    // 미지원 환경에서는 안내 자체를 숨김 (어르신용 — 못 쓰는 기능 노출 X)
-    return null;
-  }
-
-  if (state === "denied") {
-    return (
-      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
-        <div className="flex items-center gap-2">
-          <BellOff className="h-4 w-4 text-stone-500" />
-          <span>
-            알림이 차단되어 있어요. 결재 결과 알림을 받으려면 브라우저 주소창
-            왼쪽의 자물쇠 → 알림 → 허용으로 변경해 주세요.
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === "on") {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <div className="flex items-center gap-2 text-sm text-emerald-900">
-          <Bell className="h-4 w-4 text-emerald-600" />
-          <span>
-            <strong>알림 받는 중</strong> — 결재 완료·반려 / 누군가 같은 시간에
-            신청 시 즉시 알림이 갑니다.
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={disable}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
-        >
-          해제
-        </button>
-      </div>
-    );
-  }
+  const isOn = state === "on";
+  const isBusy = state === "subscribing";
+  const isDenied = state === "denied";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4">
-      <div className="flex items-center gap-2 text-sm text-brand-900">
-        <Bell className="h-4 w-4 text-brand-600" />
-        <span>
-          결재가 완료/반려되거나 같은 시간에 다른 신청이 들어오면{" "}
-          <strong>홈 화면에 알림</strong>으로 받을 수 있어요.
-        </span>
-      </div>
-      <button
-        type="button"
-        onClick={enable}
-        disabled={state === "subscribing"}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {state === "subscribing" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Bell className="h-4 w-4" />
-        )}
-        {state === "subscribing" ? "등록 중..." : "알림 켜기"}
-      </button>
-      {error && (
-        <div className="basis-full text-xs text-red-700">{error}</div>
+    <div
+      className={cn(
+        "rounded-xl border p-4",
+        isOn
+          ? "border-emerald-200 bg-emerald-50"
+          : isDenied
+            ? "border-stone-200 bg-stone-50"
+            : "border-brand-200 bg-brand-50",
       )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <label
+          htmlFor="push-toggle"
+          className="flex min-w-0 flex-1 items-center gap-2 text-sm"
+        >
+          {isOn ? (
+            <Bell className="h-4 w-4 flex-none text-emerald-600" />
+          ) : isDenied ? (
+            <BellOff className="h-4 w-4 flex-none text-stone-500" />
+          ) : (
+            <Bell className="h-4 w-4 flex-none text-brand-600" />
+          )}
+          <span
+            className={cn(
+              "leading-relaxed",
+              isOn
+                ? "text-emerald-900"
+                : isDenied
+                  ? "text-stone-700"
+                  : "text-brand-900",
+            )}
+          >
+            {isOn ? (
+              <>
+                <strong>결재 알림 받는 중</strong> — 결재 완료·반려, 같은 시간 강제 신청 시 즉시 알림
+              </>
+            ) : isDenied ? (
+              <>
+                알림이 차단되어 있어요. 주소창 자물쇠 → 알림 → 허용으로 변경해 주세요.
+              </>
+            ) : (
+              <>
+                결재 완료·반려, 누군가 같은 시간에 신청 시 <strong>홈 화면에 알림</strong>으로 받기
+              </>
+            )}
+          </span>
+        </label>
+
+        <button
+          id="push-toggle"
+          type="button"
+          role="switch"
+          aria-checked={isOn}
+          aria-label={isOn ? "알림 끄기" : "알림 켜기"}
+          disabled={isBusy || isDenied}
+          onClick={isOn ? disable : enable}
+          className={cn(
+            "relative inline-flex h-7 w-12 flex-none items-center rounded-full transition-colors",
+            isOn ? "bg-emerald-500" : "bg-stone-300",
+            "disabled:cursor-not-allowed disabled:opacity-60",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
+              isOn ? "translate-x-6" : "translate-x-1",
+            )}
+          />
+          {isBusy && (
+            <Loader2 className="pointer-events-none absolute inset-0 m-auto h-3.5 w-3.5 animate-spin text-white" />
+          )}
+        </button>
+      </div>
+
+      {error && <div className="mt-2 text-xs text-red-700">{error}</div>}
     </div>
   );
 }

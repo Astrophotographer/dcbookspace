@@ -22,7 +22,8 @@ export default async function ApplyQrPage() {
   const isLocal = (s?: string | null) =>
     !!s && /(^|\/\/)(localhost|127\.0\.0\.1)/.test(s);
   const baseUrl = envUrl && !isLocal(envUrl) ? envUrl : PROD_APP_URL;
-  const applyUrl = `${baseUrl}/apply`;
+  // 키오스크 모드 — 게시판/복도에서 스캔한 사용자가 키오스크 UX 로 진입 (자동 reset 등)
+  const applyUrl = `${baseUrl}/apply?kiosk=1`;
   const qr = await qrDataUrl(applyUrl, 480);
 
   return (
@@ -68,9 +69,7 @@ export default async function ApplyQrPage() {
 
         {/* 인쇄·도움말은 화면 전용 */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-          <p className="text-sm text-stone-500">
-            게시판·복도에 붙여 두면 누구나 휴대폰으로 신청 가능
-          </p>
+          <p className="text-sm text-stone-500">외부 게시용 QR 코드</p>
           <PrintButton />
         </div>
       </main>

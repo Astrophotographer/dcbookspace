@@ -5,15 +5,27 @@ import { useRouter } from "next/navigation";
 import { createClient } from "./client";
 
 /**
- * 지정된 테이블에 변경이 일어나면 router.refresh()를 호출한다.
- * 서버 컴포넌트가 다시 실행되어 최신 데이터로 자동 갱신된다.
+ * Realtime 구독 spec — 단순 테이블 이름만 주거나, postgres 필터까지 명시 가능.
+ *   "reservations"
+ *   { table: "reservations", filter: "id=eq.<uuid>" }
  *
- * 200ms 디바운스로 짧은 시간에 몰린 변경(예: 드래그 후 위치 저장)을 1회로 합친다.
+ * filter 가 있으면 해당 행 변경만 broadcast 받음 — 같은 페이지에 동시 활성 신청서가
+ * 많아도 트래픽이 N 으로 폭발하지 않음.
  */
-export function useRealtimeRefresh(tables: readonly string[]) {
+export type RealtimeSpec =
+  | string
+  | { table: string; filter?: string };
+
+/**
+ * 지정된 테이블/행에 변경이 일어나면 router.refresh() 호출.
+ * 200ms 디바운스로 짧은 시간에 몰린 변경을 1회로 합친다.
+ */
+export function useRealtimeRefresh(specs: readonly RealtimeSpec[]) {
   const router = useRouter();
-  // tables는 호출부에서 안정적인 reference로 넘겨야 함 (배열 리터럴은 매 렌더 새 ref → join으로 dep)
-  const key = tables.join(",");
+  // 사양을 안정적인 dep key 로 직렬화. spec 객체가 매 렌더 새 reference 여도 키는 같음.
+  const key = specs
+    .map((s) => (typeof s === "string" ? s : `${s.table}|${s.filter ?? ""}`))
+    .join(",");
 
   useEffect(() => {
     const supabase = createClient();
@@ -24,10 +36,16 @@ export function useRealtimeRefresh(tables: readonly string[]) {
     };
 
     let channel = supabase.channel(`app-${key}`);
-    for (const table of key.split(",").filter(Boolean)) {
+    for (const part of key.split(",").filter(Boolean)) {
+      const [table, filter] = part.split("|");
       channel = channel.on(
         "postgres_changes",
-        { event: "*", schema: "public", table },
+        {
+          event: "*",
+          schema: "public",
+          table,
+          ...(filter ? { filter } : {}),
+        },
         trigger,
       );
     }

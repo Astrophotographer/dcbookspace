@@ -14,8 +14,7 @@ import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { KioskAutoReturn } from "@/components/kiosk-auto-return";
-
-const REALTIME_TABLES = ["reservations", "approvals"] as const;
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
   if (!isSupabaseConfigured()) {
@@ -52,8 +51,14 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
   return (
     <>
       <SiteHeader kiosk={isKiosk} />
-      {/* 결재 진행 시 신청자 화면이 자동 갱신되도록 — 새로고침 없이 단계 통과·인쇄 상태 반영 */}
-      <RealtimeRefresh tables={REALTIME_TABLES} />
+      {/* 결재 진행·인쇄 상태 변화 시 자동 갱신 — 자기 신청서 행만 필터링해서
+          다른 신청서 변경에 대한 불필요한 broadcast/refresh 차단 */}
+      <RealtimeRefresh
+        tables={[
+          { table: "reservations", filter: `id=eq.${id}` },
+          { table: "approvals", filter: `reservation_id=eq.${id}` },
+        ]}
+      />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
@@ -80,6 +85,13 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           applicantPhone={r.applicant.phone ?? ""}
           editable={r.status === "pending" && r.current_step === 1}
         />
+
+        {/* PWA 푸시 알림 — 키오스크 모드(공용 단말)에서는 숨김 */}
+        {!isKiosk && r.applicant.phone && (
+          <div className="mb-4">
+            <PushPermissionPrompt applicantPhone={r.applicant.phone} />
+          </div>
+        )}
 
         <div className="mb-6">
           <PrintProgress

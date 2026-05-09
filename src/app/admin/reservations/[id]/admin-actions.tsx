@@ -2,47 +2,77 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   deleteReservation,
   forceReject,
   forceReserve,
+  reviveReservation,
 } from "../actions";
 
-type ActionKind = "force" | "reject" | "delete";
+type ActionKind = "force" | "reject" | "revive" | "delete";
 
 type Props = {
   reservationId: string;
-  /** 강제 예약·반려 가능 여부 (status === 'pending' 일 때만 의미 있음). */
-  canForce: boolean;
+  /** 강제 예약 가능 여부 — status === 'pending' 일 때만 true */
+  canForceApprove: boolean;
+  /** 강제 반려 가능 여부 — status === 'pending' OR 'approved' */
+  canForceReject: boolean;
+  /** 다시 결재 진행 가능 여부 — status === 'rejected' 일 때만 */
+  canRevive: boolean;
+  /** 사후 강제 반려(이미 예약완료된 건) 인지 — 모달 문구 분기용 */
+  isPostApproval: boolean;
 };
 
-const COPY: Record<
+function buildCopy(
+  isPostApproval: boolean,
+): Record<
   ActionKind,
   { title: string; ask: string; note: string; confirm: string }
-> = {
-  force: {
-    title: "강제 예약",
-    ask: "결재 단계 없이 즉시 예약 완료 처리하시겠습니까?",
-    note: "미처리 결재 단계는 '건너뜀' 으로 기록되고 신청 상태가 예약완료로 바뀝니다.",
-    confirm: "예약 확정",
-  },
-  reject: {
-    title: "강제 반려",
-    ask: "결재 단계 없이 즉시 반려 처리하시겠습니까?",
-    note: "미처리 결재 단계는 '반려' 로 기록되고 신청 상태가 반려로 바뀝니다.",
-    confirm: "반려 확정",
-  },
-  delete: {
-    title: "신청서 삭제",
-    ask: "정말 이 신청서를 삭제하시겠습니까?",
-    note: "삭제 후 복구할 수 없습니다. 결재 이력도 함께 사라집니다.",
-    confirm: "삭제 확정",
-  },
-};
+> {
+  return {
+    force: {
+      title: "강제 예약",
+      ask: "결재 단계 없이 즉시 예약 완료 처리하시겠습니까?",
+      note: "미처리 결재 단계는 '건너뜀' 으로 기록되고 신청 상태가 예약완료로 바뀝니다.",
+      confirm: "예약 확정",
+    },
+    reject: isPostApproval
+      ? {
+          title: "강제 반려 (예약완료 사후)",
+          ask: "이미 예약완료된 신청서를 반려로 되돌리시겠습니까?",
+          note: "기존 결재 이력은 그대로 유지되고, 신청 상태만 반려로 바뀝니다. 신청자에게 알림이 발송됩니다.",
+          confirm: "반려 확정",
+        }
+      : {
+          title: "강제 반려",
+          ask: "결재 단계 없이 즉시 반려 처리하시겠습니까?",
+          note: "미처리 결재 단계는 '반려' 로 기록되고 신청 상태가 반려로 바뀝니다.",
+          confirm: "반려 확정",
+        },
+    revive: {
+      title: "다시 결재 진행",
+      ask: "반려된 신청서를 다시 결재 진행 상태로 되살릴까요?",
+      note: "반려 표시였던 결재 단계는 다시 '대기' 로 돌아가고, 이미 통과된 단계는 그대로 유지됩니다. 신청 상태가 '결재 진행중' 으로 표시됩니다.",
+      confirm: "다시 진행",
+    },
+    delete: {
+      title: "신청서 삭제",
+      ask: "정말 이 신청서를 삭제하시겠습니까?",
+      note: "삭제 후 복구할 수 없습니다. 결재 이력도 함께 사라집니다.",
+      confirm: "삭제 확정",
+    },
+  };
+}
 
-export function AdminActions({ reservationId, canForce }: Props) {
+export function AdminActions({
+  reservationId,
+  canForceApprove,
+  canForceReject,
+  canRevive,
+  isPostApproval,
+}: Props) {
   const router = useRouter();
   const [open, setOpen] = useState<ActionKind | null>(null);
   const [pending, startTransition] = useTransition();
@@ -81,35 +111,55 @@ export function AdminActions({ reservationId, canForce }: Props) {
         }
         router.refresh();
         setOpen(null);
+        return;
+      }
+      if (open === "revive") {
+        const res = await reviveReservation(reservationId);
+        if (res.error) {
+          setError(res.error);
+          return;
+        }
+        router.refresh();
+        setOpen(null);
       }
     });
   }
 
-  const copy = open ? COPY[open] : null;
+  const copy = open ? buildCopy(isPostApproval)[open] : null;
 
   return (
     <>
       <div className="flex flex-wrap justify-end gap-2">
-        {canForce && (
-          <>
-            <Button
-              size="lg"
-              variant="primary"
-              onClick={() => setOpen("force")}
-            >
-              <CheckCircle2 className="h-5 w-5" />
-              강제 예약
-            </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              onClick={() => setOpen("reject")}
-              className="border-red-300 bg-white text-red-700 hover:bg-red-50"
-            >
-              <XCircle className="h-5 w-5" />
-              강제 반려
-            </Button>
-          </>
+        {canForceApprove && (
+          <Button
+            size="lg"
+            variant="primary"
+            onClick={() => setOpen("force")}
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            강제 예약
+          </Button>
+        )}
+        {canForceReject && (
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={() => setOpen("reject")}
+            className="border-red-300 bg-white text-red-700 hover:bg-red-50"
+          >
+            <XCircle className="h-5 w-5" />
+            강제 반려
+          </Button>
+        )}
+        {canRevive && (
+          <Button
+            size="lg"
+            variant="primary"
+            onClick={() => setOpen("revive")}
+          >
+            <RotateCcw className="h-5 w-5" />
+            다시 결재 진행
+          </Button>
         )}
         <Button
           size="lg"
@@ -155,7 +205,9 @@ export function AdminActions({ reservationId, canForce }: Props) {
               </Button>
               <Button
                 size="lg"
-                variant={open === "force" ? "primary" : "danger"}
+                variant={
+                  open === "force" || open === "revive" ? "primary" : "danger"
+                }
                 onClick={confirmAction}
                 disabled={pending}
               >

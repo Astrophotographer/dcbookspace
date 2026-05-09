@@ -20,6 +20,7 @@ import {
   emitSeriesEventAfter,
 } from "@/lib/webhook";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
+import { notifyForcedOverlap } from "@/lib/push";
 
 type SubmitResult = { id?: string; error?: string };
 type Result = { error?: string };
@@ -284,6 +285,20 @@ export async function submitApplication(
   if (resErr || !res) {
     if (resErr?.message?.includes("이미 예약")) return { error: resErr.message };
     return { error: resErr?.message ?? "신청 실패" };
+  }
+
+  // 강제 중복 신청 시 → 기존 신청자 + 관리자에게 푸시 알림 (fire-and-forget)
+  if (options?.forceOverlap) {
+    void notifyForcedOverlap({
+      newReservationId: res.id,
+      roomId,
+      startAt,
+      endAt,
+      newApplicantName: applicantName,
+      newApplicantId: applicantId,
+    }).catch(() => {
+      /* ignore — 신청 자체는 성공한 상태 */
+    });
   }
 
   // 4) approvals 행 생성 (각 단계별)

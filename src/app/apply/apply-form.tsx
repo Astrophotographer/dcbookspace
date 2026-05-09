@@ -2,7 +2,14 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, FileText, Plus, Printer, X } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  Plus,
+  Printer,
+  X,
+} from "lucide-react";
 import type {
   Building,
   Department,
@@ -117,6 +124,75 @@ function shiftDayDigit(current: string, digit: string): string | null {
 }
 
 /**
+ * YYYY-MM-DD → "M월 N째 주 X요일" 한국어 라벨.
+ * 시작 날짜 hint 에 "지금 입력한 날짜가 그 달 몇째 주 무슨 요일인지" 안내.
+ * 형식 안 맞으면 "YYYY-MM-DD" 안내 그대로.
+ */
+function describeDateInMonth(dateStr: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return "YYYY-MM-DD";
+  const d = new Date(`${dateStr}T12:00:00+09:00`);
+  if (Number.isNaN(d.getTime())) return "YYYY-MM-DD";
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const dow = d.getDay(); // 0=일 ... 6=토
+  // 일자 1~7 = 첫째, 8~14 = 둘째, 15~21 = 셋째, 22~28 = 넷째, 29+ = 다섯째
+  const nth = Math.ceil(day / 7);
+  const ordinals = ["첫째", "둘째", "셋째", "넷째", "다섯째"];
+  const ord = ordinals[nth - 1] ?? `${nth}째`;
+  const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+  return `${month}월 ${ord} 주 ${dayLabels[dow]}요일`;
+}
+
+/**
+ * 날짜 입력 우측에 겹쳐 두는 작은 달력 픽커.
+ * - 텍스트 입력 위에 calendar 아이콘을 절대 배치
+ * - 같은 자리에 투명한 `<input type="date">` 를 둬서 클릭하면 네이티브 picker 가 뜸
+ * - 사용자가 picker 에서 날짜 고르면 onPick 으로 부모 텍스트 입력 갱신
+ *
+ * 텍스트 입력의 우측 padding(pr-12) 와 함께 써야 아이콘과 글자가 겹치지 않음.
+ */
+function DatePickerOverlay({
+  value,
+  onPick,
+}: {
+  value: string;
+  onPick: (next: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const validIso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+  return (
+    <div className="pointer-events-none absolute inset-y-0 right-1.5 flex w-9 items-center justify-center text-stone-500">
+      <CalendarDays className="h-5 w-5" aria-hidden />
+      <input
+        ref={inputRef}
+        type="date"
+        value={validIso}
+        onChange={(e) => {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+            onPick(e.target.value);
+          }
+        }}
+        onClick={() => {
+          // 일부 브라우저에서 click 만으로는 picker 가 안 떠서 explicit showPicker 호출.
+          // 미지원 환경(Safari iOS 일부 등)에선 try/catch 로 graceful skip.
+          const inp = inputRef.current;
+          if (inp && typeof inp.showPicker === "function") {
+            try {
+              inp.showPicker();
+            } catch {
+              /* 무시 */
+            }
+          }
+        }}
+        aria-label="달력으로 날짜 선택"
+        className="pointer-events-auto absolute inset-0 cursor-pointer opacity-0"
+        tabIndex={-1}
+      />
+    </div>
+  );
+}
+
+/**
  * "HH:MM" 에 1시간을 더한 결과 (24:00 이후엔 23:59 로 cap).
  * 같은날에서 종료 시간이 시작보다 이상해질 때 자동 보정용.
  */
@@ -227,6 +303,15 @@ export function ApplyForm({
       },
     ];
   });
+  // 사용자가 시간 입력을 한 번이라도 건드렸는지. 폼 진입 직후 기본값(09:00-11:00)
+  // 으로 충돌 알림이 자동으로 뜨는 게 어색해서, 첫 입력 후에만 미리보기 노출.
+  // 수정 모드(defaults?.time_blocks 또는 start_time 가 들어옴)는 이미 의도된 값이라
+  // 처음부터 true.
+  const [timeTouched, setTimeTouched] = useState<boolean>(
+    !!defaults?.time_blocks?.length ||
+      !!defaults?.start_time ||
+      !!defaults?.end_time,
+  );
   // 시작 날짜의 요일 (정기 모드에서 라벨에 노출)
   const startWeekday = useMemo(() => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
@@ -777,27 +862,33 @@ export function ApplyForm({
                 ? `시작 날짜 (${weekdayLabel(startWeekday)}요일)`
                 : "시작 날짜"
             }
-            hint="YYYY-MM-DD"
+            hint={describeDateInMonth(date)}
           >
-            <Input
-              type="text"
-              name="date"
-              required
-              inputMode="numeric"
-              placeholder="YYYY-MM-DD"
-              maxLength={10}
-              pattern="\d{4}-\d{2}-\d{2}"
-              value={date}
-              onKeyDown={(e) => {
-                // 완성된 YYYY-MM-DD + 숫자 한 자 → 일(DD) 시프트
-                const next = shiftDayDigit(date, e.key);
-                if (next) {
-                  e.preventDefault();
-                  onStartDateChange(next);
+            <div className="relative">
+              <Input
+                type="text"
+                name="date"
+                required
+                inputMode="numeric"
+                placeholder="YYYY-MM-DD"
+                maxLength={10}
+                pattern="\d{4}-\d{2}-\d{2}"
+                value={date}
+                className="pr-12"
+                onKeyDown={(e) => {
+                  // 완성된 YYYY-MM-DD + 숫자 한 자 → 일(DD) 시프트
+                  const next = shiftDayDigit(date, e.key);
+                  if (next) {
+                    e.preventDefault();
+                    onStartDateChange(next);
+                  }
+                }}
+                onChange={(e) =>
+                  onStartDateChange(formatDateInput(e.target.value))
                 }
-              }}
-              onChange={(e) => onStartDateChange(formatDateInput(e.target.value))}
-            />
+              />
+              <DatePickerOverlay value={date} onPick={onStartDateChange} />
+            </div>
           </Field>
           <Field
             label={
@@ -813,24 +904,28 @@ export function ApplyForm({
                 : "기본값은 시작 날짜와 같음"
             }
           >
-            <Input
-              type="text"
-              name="end_date"
-              required
-              inputMode="numeric"
-              placeholder="YYYY-MM-DD"
-              maxLength={10}
-              pattern="\d{4}-\d{2}-\d{2}"
-              value={endDate}
-              onKeyDown={(e) => {
-                const next = shiftDayDigit(endDate, e.key);
-                if (next) {
-                  e.preventDefault();
-                  setEndDate(next);
-                }
-              }}
-              onChange={(e) => setEndDate(formatDateInput(e.target.value))}
-            />
+            <div className="relative">
+              <Input
+                type="text"
+                name="end_date"
+                required
+                inputMode="numeric"
+                placeholder="YYYY-MM-DD"
+                maxLength={10}
+                pattern="\d{4}-\d{2}-\d{2}"
+                value={endDate}
+                className="pr-12"
+                onKeyDown={(e) => {
+                  const next = shiftDayDigit(endDate, e.key);
+                  if (next) {
+                    e.preventDefault();
+                    setEndDate(next);
+                  }
+                }}
+                onChange={(e) => setEndDate(formatDateInput(e.target.value))}
+              />
+              <DatePickerOverlay value={endDate} onPick={setEndDate} />
+            </div>
           </Field>
         </div>
 
@@ -848,6 +943,7 @@ export function ApplyForm({
                     required
                     value={block.start}
                     onChange={(e) => {
+                      setTimeTouched(true);
                       const next = e.target.value;
                       setTimeBlocks((arr) =>
                         arr.map((b, i) => {
@@ -875,7 +971,8 @@ export function ApplyForm({
                     type="time"
                     required
                     value={block.end}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setTimeTouched(true);
                       // 종료 시간은 사용자가 입력한 그대로 — 자동 보정 안 함.
                       // 시작 변경 시점에만 시작+1h 로 한 번 보정해 두고, 이후엔
                       // 사용자가 자유롭게 조정. 종료가 시작보다 빠른 경우의 검증은
@@ -884,8 +981,8 @@ export function ApplyForm({
                         arr.map((b, i) =>
                           i === idx ? { ...b, end: e.target.value } : b,
                         ),
-                      )
-                    }
+                      );
+                    }}
                   />
                 </Field>
                 {timeBlocks.length > 1 && (
@@ -907,18 +1004,23 @@ export function ApplyForm({
                   </div>
                 )}
               </div>
-              <AvailabilityPreview
-                roomId={roomId}
-                date={date}
-                startTime={block.start}
-                endTime={block.end}
-                excludeReservationId={
-                  isEdit && editTarget?.kind === "reservation"
-                    ? editTarget.id
-                    : undefined
-                }
-                excludeSeriesId={isSeriesEdit ? editTarget?.id : undefined}
-              />
+              {/* 사용자가 시간 입력을 한 번이라도 만진 후에만 미리보기 노출.
+                  폼 진입 직후 기본값(09:00-11:00) 으로 자동 충돌 알림이 뜨는
+                  어색함 제거. */}
+              {timeTouched && (
+                <AvailabilityPreview
+                  roomId={roomId}
+                  date={date}
+                  startTime={block.start}
+                  endTime={block.end}
+                  excludeReservationId={
+                    isEdit && editTarget?.kind === "reservation"
+                      ? editTarget.id
+                      : undefined
+                  }
+                  excludeSeriesId={isSeriesEdit ? editTarget?.id : undefined}
+                />
+              )}
             </div>
           ))}
           {timeBlocks.length < MAX_TIME_BLOCKS && (

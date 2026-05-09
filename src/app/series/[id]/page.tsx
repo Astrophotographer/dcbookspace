@@ -15,8 +15,6 @@ import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 
-const REALTIME_TABLES = ["reservation_series", "reservations", "approvals"] as const;
-
 export const dynamic = "force-dynamic";
 
 function timeBlocksLabel(blocks: { start: string; end: string }[]): string {
@@ -52,8 +50,15 @@ export default async function SeriesPage(props: PageArgs) {
   return (
     <>
       <SiteHeader />
-      {/* 결재 진행 시 화면 자동 갱신 — 시리즈 본체 + 자식 회차 + 결재 단계 모두 반영 */}
-      <RealtimeRefresh tables={REALTIME_TABLES} />
+      {/* 결재 진행 시 화면 자동 갱신 — 자기 시리즈 행만 필터.
+          자식 reservations 변경(인쇄 상태 등) 은 series_id 컬럼으로 묶어서 같은 트리거. */}
+      <RealtimeRefresh
+        tables={[
+          { table: "reservation_series", filter: `id=eq.${id}` },
+          { table: "reservations", filter: `series_id=eq.${id}` },
+          { table: "approvals", filter: `series_id=eq.${id}` },
+        ]}
+      />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">

@@ -6,6 +6,7 @@ import { adminLogout } from "@/lib/admin-actions";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   AlertTriangle,
+  Bell,
   Building,
   Briefcase,
   CalendarCheck,
@@ -27,6 +28,12 @@ const TILES = [
     label: "관리자정보",
     desc: "관리자 추가·삭제, 마스터 PIN 발급",
     Icon: ShieldCheck,
+  },
+  {
+    href: "/admin/notifications",
+    label: "관리자 알림",
+    desc: "강제 중복 신청 발생 시 이 폰으로 받기 — ON/OFF 토글",
+    Icon: Bell,
   },
   {
     href: "/admin/users",
@@ -67,7 +74,7 @@ const TILES = [
   {
     href: "/admin/apply-qr",
     label: "신청 QR",
-    desc: "외부 게시용 QR 코드 — 휴대폰으로 스캔 시 신청서 바로 열림",
+    desc: "휴대폰으로 스캔 시 신청서 바로 열림",
     Icon: QrCode,
   },
 ];

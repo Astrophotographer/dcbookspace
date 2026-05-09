@@ -17,6 +17,44 @@ import {
   emitReservationEventAfter,
   emitSeriesEventAfter,
 } from "@/lib/webhook";
+import { sendPushToUser, getReservationLite } from "@/lib/push";
+
+/**
+ * 결재 흐름 종료 시 신청자에게 푸시 알림 (fire-and-forget).
+ * 실패는 silently 무시 — 결재 자체 흐름은 알림에 의존하지 않음.
+ */
+function notifyApplicant(
+  ctx: SignContext,
+  kind: "approved" | "cancelled",
+): void {
+  void (async () => {
+    try {
+      const lite = await getReservationLite(ctx.kind, ctx.id);
+      if (!lite) return;
+      const detailUrl =
+        ctx.kind === "series" ? `/series/${ctx.id}` : `/reservations/${ctx.id}`;
+      const refLabel = lite.ref_no ? `#${lite.ref_no}` : "";
+      const purposeLabel = lite.purpose ? ` (${lite.purpose})` : "";
+      if (kind === "approved") {
+        await sendPushToUser(lite.applicant_id, {
+          title: "결재 완료",
+          body: `신청서 ${refLabel}${purposeLabel} — 모든 결재가 완료됐습니다.`,
+          url: detailUrl,
+          tag: `approval-${ctx.id}`,
+        });
+      } else {
+        await sendPushToUser(lite.applicant_id, {
+          title: "결재 취소",
+          body: `신청서 ${refLabel}${purposeLabel} — 당회장이 결재를 취소했습니다.`,
+          url: detailUrl,
+          tag: `approval-${ctx.id}`,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  })();
+}
 
 type Result = {
   error?: string;
@@ -245,6 +283,11 @@ export async function signByPin(args: {
     is_admin_master: isAdminMaster,
   });
 
+  // 마지막 단계 통과 = 결재 완료. 신청자에게 푸시 알림.
+  if (ctx.current_step >= steps.length) {
+    notifyApplicant(ctx, "approved");
+  }
+
   // 결재자가 같이 취소하기로 한 충돌 신청서들 처리
   if (args.cancelConflicts && args.cancelConflicts.length > 0) {
     await cancelConflictTargets(supabase, args.cancelConflicts);
@@ -351,6 +394,11 @@ export async function signBySession(args: {
     via_auto_session: true,
   });
 
+  // 마지막 단계 통과 → 신청자에게 푸시 알림
+  if (ctx.current_step >= steps.length) {
+    notifyApplicant(ctx, "approved");
+  }
+
   if (args.cancelConflicts && args.cancelConflicts.length > 0) {
     await cancelConflictTargets(supabase, args.cancelConflicts);
   }
@@ -438,6 +486,9 @@ export async function cancelByChairman(args: {
           .update({ status: "pending", current_step: 1 })
           .eq("id", ctx.id);
   if (e3) return { error: e3.message };
+
+  // 결재 취소(반려) 알림
+  notifyApplicant(ctx, "cancelled");
 
   revalidatePath("/");
   revalidatePath(`/sign/${token}`);

@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useRealtimeRefresh } from "@/lib/supabase/use-realtime-refresh";
 import { setPrintStatus } from "@/app/print/actions";
 import type { PrintStatus } from "@/lib/supabase/types";
 
@@ -45,10 +44,8 @@ type Props = {
 };
 
 export function PrintProgress({ kind, id, status, statusAt }: Props) {
-  // 같은 행이 다른 곳(워커, 테스트 버튼)에서 갱신되면 페이지 다시 그리기
-  useRealtimeRefresh([
-    kind === "series" ? "reservation_series" : "reservations",
-  ]);
+  // realtime 구독은 부모 페이지(reservations/[id], series/[id])의 <RealtimeRefresh>
+  // 가 행 단위 필터로 이미 처리. 여기서 별도로 켜면 같은 테이블에 채널 중복.
 
   // 30초 타임아웃 — status='requested' 가 30초 넘게 지속되면 자동 'failed' 로 전환
   const triggered = useRef(false);
