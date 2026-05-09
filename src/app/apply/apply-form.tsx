@@ -419,8 +419,10 @@ export function ApplyForm({
         return;
       }
 
-      // === 새 시리즈 신청 ===
-      if (recurring) {
+      // === 새 시리즈 OR 다중 시간대 일회성 ===
+      // recurring 토글이 꺼져 있어도 timeBlocks 가 2개 이상이면 시리즈 path 로 처리
+      // (같은 날 N개 시간대 = 1회 × N 시리즈).
+      if (recurring || timeBlocks.length > 1) {
         const res = await submitSeriesApplication(fd, { forceOverlap });
         if (res.error) {
           await handleSubmitError(res.error, fd, forceOverlap, true);
@@ -491,15 +493,22 @@ export function ApplyForm({
         const fd = new FormData(e.currentTarget);
         const roomId = String(fd.get("room_id") ?? "");
 
-        // ===== 정기 신청 =====
-        if (recurring) {
+        // ===== 정기 OR 다중 시간대 일회성 =====
+        // 다중 시간대(2개 이상) 는 일회성이라도 시리즈 path 로 처리.
+        // - 정기 + 다중 시간대 = 매주 X요일 N개 시간대 점유 (정상 시리즈)
+        // - 일회성 + 다중 시간대 = 같은 날 N개 시간대 (start_date == end_date 시리즈, 1회 × N)
+        const useSeriesPath = recurring || timeBlocks.length > 1;
+        if (useSeriesPath) {
           // 시리즈 폼은 start_date/end_date/time_blocks 만 사용 (단일 시간 필드 제거)
           fd.set("start_date", date);
-          fd.set("end_date", endDate);
+          // 일회성 + 다중 시간대 케이스는 같은 날에 한정해 endDate=date 로 강제.
+          // (다일 + 다중 시간대는 의도가 모호해서 같은날만 지원)
+          const seriesEndDate = recurring ? endDate : date;
+          fd.set("end_date", seriesEndDate);
           fd.set("time_blocks", JSON.stringify(timeBlocks));
           const occurrences = computeWeeklyOccurrences(
             date,
-            endDate,
+            seriesEndDate,
             new Date(`${date}T12:00:00+09:00`).getDay(),
           );
           if (occurrences.length === 0) {
@@ -825,105 +834,94 @@ export function ApplyForm({
           </Field>
         </div>
 
-        {/* 호실 + 시작 날짜 + 시간이 정해지면 실제로 겹치는 일정만 골라 보여줘
-            사용자가 시간을 바꾸면 즉시 갱신되도록 timeBlocks 도 같이 전달.
-            정기 모드의 다중 시간대도 첫 블록 기준으로 빠른 미리보기 — 정확한
-            전체 충돌은 제출 시 findSeriesConflicts 가 검증. */}
-        <AvailabilityPreview
-          roomId={roomId}
-          date={date}
-          startTime={timeBlocks[0]?.start}
-          endTime={timeBlocks[0]?.end}
-          excludeReservationId={
-            isEdit && editTarget?.kind === "reservation"
-              ? editTarget.id
-              : undefined
-          }
-          excludeSeriesId={isSeriesEdit ? editTarget?.id : undefined}
-        />
-
-        {/* 시간대 — 정기 모드에서는 [+ 시간대 추가] 버튼 노출 */}
-        <div className="space-y-2">
+        {/* 시간대 — 정기 모드에서는 [+ 시간대 추가] 버튼 노출.
+            각 시간대 row 아래에 AvailabilityPreview 를 두어 시간대별로 충돌 가시화.
+            정기 모드의 경우 첫 회차 날짜(date) 기준 빠른 미리보기 — 정확한 전체
+            회차 충돌은 제출 시 findSeriesConflicts 가 검증. */}
+        <div className="space-y-3">
           {timeBlocks.map((block, idx) => (
-            <div
-              key={idx}
-              className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:gap-3"
-            >
-              <Field label={idx === 0 ? "시작 시간" : `시작 시간 #${idx + 1}`}>
-                <Input
-                  type="time"
-                  required
-                  value={block.start}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setTimeBlocks((arr) =>
-                      arr.map((b, i) => {
-                        if (i !== idx) return b;
-                        // 같은날에서 새 시작 ≥ 기존 종료가 되면 종료를 시작+1h 로 자동 보정.
-                        // 다일 신청(date != endDate)은 사용자가 의도한 거라 그대로 둠.
-                        const sameDay = endDate === date;
-                        const needsBump =
-                          sameDay &&
-                          /^\d{2}:\d{2}$/.test(next) &&
-                          /^\d{2}:\d{2}$/.test(b.end) &&
-                          next >= b.end;
-                        return {
-                          ...b,
-                          start: next,
-                          end: needsBump ? timePlusOneHour(next) : b.end,
-                        };
-                      }),
-                    );
-                  }}
-                />
-              </Field>
-              <Field label={idx === 0 ? "종료 시간" : `종료 시간 #${idx + 1}`}>
-                <Input
-                  type="time"
-                  required
-                  value={block.end}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setTimeBlocks((arr) =>
-                      arr.map((b, i) => {
-                        if (i !== idx) return b;
-                        // 같은날에서 종료 ≤ 시작이 되면 시작+1h 로 자동 보정.
-                        const sameDay = endDate === date;
-                        const invalid =
-                          sameDay &&
-                          /^\d{2}:\d{2}$/.test(next) &&
-                          /^\d{2}:\d{2}$/.test(b.start) &&
-                          next <= b.start;
-                        return {
-                          ...b,
-                          end: invalid ? timePlusOneHour(b.start) : next,
-                        };
-                      }),
-                    );
-                  }}
-                />
-              </Field>
-              {recurring && timeBlocks.length > 1 && (
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="md"
-                    onClick={() =>
+            <div key={idx} className="space-y-2">
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 sm:gap-3">
+                <Field label={idx === 0 ? "시작 시간" : `시작 시간 #${idx + 1}`}>
+                  <Input
+                    type="time"
+                    required
+                    value={block.start}
+                    onChange={(e) => {
+                      const next = e.target.value;
                       setTimeBlocks((arr) =>
-                        arr.filter((_, i) => i !== idx),
+                        arr.map((b, i) => {
+                          if (i !== idx) return b;
+                          // 같은날에서 새 시작 ≥ 기존 종료가 되면 종료를 시작+1h 로 자동 보정.
+                          // 다일 신청(date != endDate)은 사용자가 의도한 거라 그대로 둠.
+                          const sameDay = endDate === date;
+                          const needsBump =
+                            sameDay &&
+                            /^\d{2}:\d{2}$/.test(next) &&
+                            /^\d{2}:\d{2}$/.test(b.end) &&
+                            next >= b.end;
+                          return {
+                            ...b,
+                            start: next,
+                            end: needsBump ? timePlusOneHour(next) : b.end,
+                          };
+                        }),
+                      );
+                    }}
+                  />
+                </Field>
+                <Field label={idx === 0 ? "종료 시간" : `종료 시간 #${idx + 1}`}>
+                  <Input
+                    type="time"
+                    required
+                    value={block.end}
+                    onChange={(e) =>
+                      // 종료 시간은 사용자가 입력한 그대로 — 자동 보정 안 함.
+                      // 시작 변경 시점에만 시작+1h 로 한 번 보정해 두고, 이후엔
+                      // 사용자가 자유롭게 조정. 종료가 시작보다 빠른 경우의 검증은
+                      // 폼 submit 단계의 validateTimeBlocks 가 담당.
+                      setTimeBlocks((arr) =>
+                        arr.map((b, i) =>
+                          i === idx ? { ...b, end: e.target.value } : b,
+                        ),
                       )
                     }
-                    className="text-stone-500 hover:text-red-600"
-                    aria-label={`시간대 #${idx + 1} 제거`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+                  />
+                </Field>
+                {timeBlocks.length > 1 && (
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="md"
+                      onClick={() =>
+                        setTimeBlocks((arr) =>
+                          arr.filter((_, i) => i !== idx),
+                        )
+                      }
+                      className="text-stone-500 hover:text-red-600"
+                      aria-label={`시간대 #${idx + 1} 제거`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <AvailabilityPreview
+                roomId={roomId}
+                date={date}
+                startTime={block.start}
+                endTime={block.end}
+                excludeReservationId={
+                  isEdit && editTarget?.kind === "reservation"
+                    ? editTarget.id
+                    : undefined
+                }
+                excludeSeriesId={isSeriesEdit ? editTarget?.id : undefined}
+              />
             </div>
           ))}
-          {recurring && timeBlocks.length < MAX_TIME_BLOCKS && (
+          {timeBlocks.length < MAX_TIME_BLOCKS && (
             <div>
               <Button
                 type="button"
