@@ -67,7 +67,9 @@ export function Field({
       <span className="mb-1 block text-sm font-medium text-stone-800">{label}</span>
       {children}
       {hint && !error && (
-        <span className="mt-1 block text-sm text-stone-500">{hint}</span>
+        <span className="mt-1 block text-xs leading-snug text-stone-500 sm:text-sm">
+          {hint}
+        </span>
       )}
       {error && <span className="mt-1 block text-sm text-red-600">{error}</span>}
     </label>

@@ -744,35 +744,40 @@ export function ApplyForm({
         <legend className="mb-3 text-base font-semibold text-stone-900">
           사용 장소
         </legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="건물">
-            <Select
-              value={buildingId}
-              onChange={(e) => {
-                setBuildingId(e.target.value);
-                const f = floors.find((x) => x.building_id === e.target.value);
-                setFloorId(f?.id ?? "");
-              }}
-            >
-              {buildings.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="층">
-            <Select
-              value={floorId}
-              onChange={(e) => setFloorId(e.target.value)}
-            >
-              {visibleFloors.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        <div className="space-y-4">
+          {/* 건물·층은 세트로 묶어 옆으로, 호실은 풀폭 — 호실명이 길어 1열로 노출 */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <Field label="건물">
+              <Select
+                value={buildingId}
+                onChange={(e) => {
+                  setBuildingId(e.target.value);
+                  const f = floors.find(
+                    (x) => x.building_id === e.target.value,
+                  );
+                  setFloorId(f?.id ?? "");
+                }}
+              >
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="층">
+              <Select
+                value={floorId}
+                onChange={(e) => setFloorId(e.target.value)}
+              >
+                {visibleFloors.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
           <Field label="호실">
             <Select
               name="room_id"
@@ -813,21 +818,22 @@ export function ApplyForm({
           />
           <span
             className={cn(
-              "text-base font-medium",
+              "whitespace-nowrap text-sm font-medium sm:text-base",
               recurring ? "text-brand-700" : "text-stone-800",
             )}
           >
             매주 정기로 사용
           </span>
-          <span className="ml-1 text-sm text-stone-500">
+          {/* 부가 설명 — 모바일에선 가로 폭 부족해서 숨김, sm 이상에서만 노출 */}
+          <span className="ml-1 hidden text-sm text-stone-500 sm:inline">
             (매주 같은 요일·시간 반복인 경우)
           </span>
         </label>
 
-        <p className="text-sm text-stone-500">
+        <p className="text-xs text-stone-500 sm:text-sm">
           {recurring
             ? "시작 날짜의 요일이 곧 반복 요일이 됩니다."
-            : "하루 안에 끝나면 종료 날짜를 시작 날짜와 같게 두면 됩니다."}
+            : "주 단위로 반복 시 선택"}
         </p>
 
         {/* 정기 미체크인데 시작·종료 날짜가 7일 이상 벌어져 있으면 안내 */}
@@ -855,7 +861,7 @@ export function ApplyForm({
             );
           })()}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           <Field
             label={
               recurring && startWeekday !== null
