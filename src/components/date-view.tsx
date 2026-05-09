@@ -210,6 +210,15 @@ export function DateView({
                   isEvenMonth ? "bg-orange-50" : "bg-white",
                 )}
               >
+                {/* 모바일 전용 — 셀 어디 탭해도 모달이 뜨게. 칩 글씨가 작아서
+                    개별 링크 누르기 어려운 모바일 UX 보강. 데스크톱(sm+)에선
+                    오버레이 숨김 → 기존대로 칩 클릭이 신청 상세로 동작. */}
+                <button
+                  type="button"
+                  onClick={() => setModalDate(day)}
+                  aria-label={`${format(day, "yyyy년 M월 d일")} 예약 목록 열기`}
+                  className="absolute inset-0 z-10 sm:hidden"
+                />
                 <div className="flex items-center justify-between gap-1">
                   <button
                     onClick={() => setModalDate(day)}

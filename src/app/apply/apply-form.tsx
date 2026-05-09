@@ -811,9 +811,16 @@ export function ApplyForm({
           </Field>
         </div>
 
-        {/* 호실 + 시작 날짜가 정해지면 그 날 이미 잡힌 일정을 미리 보여줘
-            사용자가 충돌 시간대를 피해 입력하도록 안내 */}
-        <AvailabilityPreview roomId={roomId} date={date} />
+        {/* 호실 + 시작 날짜 + 시간이 정해지면 실제로 겹치는 일정만 골라 보여줘
+            사용자가 시간을 바꾸면 즉시 갱신되도록 timeBlocks 도 같이 전달.
+            정기 모드의 다중 시간대도 첫 블록 기준으로 빠른 미리보기 — 정확한
+            전체 충돌은 제출 시 findSeriesConflicts 가 검증. */}
+        <AvailabilityPreview
+          roomId={roomId}
+          date={date}
+          startTime={timeBlocks[0]?.start}
+          endTime={timeBlocks[0]?.end}
+        />
 
         {/* 시간대 — 정기 모드에서는 [+ 시간대 추가] 버튼 노출 */}
         <div className="space-y-2">
