@@ -53,7 +53,7 @@ export default async function PrintPage(
 
   const apprByOrder = new Map(r.approvals.map((a) => [a.step_order, a]));
   const steps = r.route.steps as ApprovalStep[];
-  const createdLabel = formatDate(r.created_at, "yyyy년 M월 d일");
+  const createdLabel = formatDate(r.created_at, "yyyy/MM/dd");
 
   return (
     <>

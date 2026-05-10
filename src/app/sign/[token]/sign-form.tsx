@@ -333,12 +333,12 @@ function ConflictResolveModal({
                   {c.purpose}
                 </div>
                 <div className="mt-0.5 text-sm text-stone-700">
-                  {format(start, "M월 d일 (E)", { locale: ko })}{" "}
+                  {format(start, "yyyy/MM/dd (E)", { locale: ko })}{" "}
                   <span className="font-mono">
                     {format(start, "HH:mm")}
                     {sameDay
                       ? `–${format(end, "HH:mm")}`
-                      : ` ~ ${format(end, "M/d HH:mm", { locale: ko })}`}
+                      : ` ~ ${format(end, "yyyy/MM/dd HH:mm", { locale: ko })}`}
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-stone-600">

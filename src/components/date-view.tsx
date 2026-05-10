@@ -132,7 +132,7 @@ export function DateView({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-stone-900">
-          {format(headerAnchor, "yyyy년 M월")}
+          {format(headerAnchor, "yyyy/MM")}
         </h2>
         <div
           className={cn(
@@ -216,13 +216,13 @@ export function DateView({
                 <button
                   type="button"
                   onClick={() => setModalDate(day)}
-                  aria-label={`${format(day, "yyyy년 M월 d일")} 예약 목록 열기`}
+                  aria-label={`${format(day, "yyyy/MM/dd")} 예약 목록 열기`}
                   className="absolute inset-0 z-10 sm:hidden"
                 />
                 <div className="flex items-center justify-between gap-1">
                   <button
                     onClick={() => setModalDate(day)}
-                    aria-label={`${format(day, "yyyy년 M월 d일")} 예약 ${list.length}건 보기`}
+                    aria-label={`${format(day, "yyyy/MM/dd")} 예약 ${list.length}건 보기`}
                     className={cn(
                       "inline-flex h-6 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 sm:h-7",
                       isToday
@@ -336,7 +336,7 @@ function DayReservationsModal({
     };
   }, [onClose]);
 
-  const heading = format(date, "yyyy년 M월 d일 (E)", { locale: ko });
+  const heading = format(date, "yyyy/MM/dd (E)", { locale: ko });
 
   return (
     <div

@@ -39,6 +39,10 @@ import {
   type RoomConflictResult,
   type SeriesConflictResult,
 } from "./actions";
+import {
+  submitAdminReservation,
+  submitAdminSeriesReservation,
+} from "@/app/admin/reservations/actions";
 import { AvailabilityPreview } from "./availability-preview";
 
 export type ApplyFormDefaults = {
@@ -77,6 +81,14 @@ type Props = {
   departments: Department[];
   defaults?: ApplyFormDefaults;
   editTarget?: EditTarget;
+  /**
+   * 관리자 직접 등록 모드. true 면:
+   *  - 결재 단계 생략 → 곧장 'approved' 로 들어가도록 admin 액션으로 라우팅
+   *  - 출력 안내 모달 / 키오스크 자동 복귀 / 사용자 me 저장 흐름 모두 우회
+   *  - 성공 redirect → /admin/reservations/{id} (시리즈는 공개 /series/{id})
+   * 폼 UI 자체는 사용자 신청과 동일.
+   */
+  adminMode?: boolean;
 };
 
 /** 충돌 모달이 들고 있는 데이터 — 일회성/시리즈 케이스 분기 */
@@ -126,12 +138,12 @@ function shiftDayDigit(current: string, digit: string): string | null {
 /**
  * YYYY-MM-DD → "M월 N째 주 X요일" 한국어 라벨.
  * 시작 날짜 hint 에 "지금 입력한 날짜가 그 달 몇째 주 무슨 요일인지" 안내.
- * 형식 안 맞으면 "YYYY-MM-DD" 안내 그대로.
+ * 형식 안 맞으면 "YYYY/MM/DD" 안내 그대로.
  */
 function describeDateInMonth(dateStr: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return "YYYY-MM-DD";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return "YYYY/MM/DD";
   const d = new Date(`${dateStr}T12:00:00+09:00`);
-  if (Number.isNaN(d.getTime())) return "YYYY-MM-DD";
+  if (Number.isNaN(d.getTime())) return "YYYY/MM/DD";
   const day = d.getDate();
   const month = d.getMonth() + 1;
   const dow = d.getDay(); // 0=일 ... 6=토
@@ -241,6 +253,7 @@ export function ApplyForm({
   departments,
   defaults,
   editTarget,
+  adminMode = false,
 }: Props) {
   const router = useRouter();
   // 키오스크 모드 진입 여부 — 신청 성공 redirect URL 에 ?kiosk=1 자동 보존
@@ -508,13 +521,20 @@ export function ApplyForm({
       // recurring 토글이 꺼져 있어도 timeBlocks 가 2개 이상이면 시리즈 path 로 처리
       // (같은 날 N개 시간대 = 1회 × N 시리즈).
       if (recurring || timeBlocks.length > 1) {
-        const res = await submitSeriesApplication(fd, { forceOverlap });
+        const res = adminMode
+          ? await submitAdminSeriesReservation(fd, { forceOverlap })
+          : await submitSeriesApplication(fd, { forceOverlap });
         if (res.error) {
           await handleSubmitError(res.error, fd, forceOverlap, true);
           return;
         }
         if (res.id) {
           setConflictModal(null);
+          if (adminMode) {
+            // 관리자 모드 — me 저장·키오스크 자동복귀 흐름 모두 우회
+            router.push(`/series/${res.id}`);
+            return;
+          }
           const submittedName = String(fd.get("applicant_name") ?? "").trim();
           const submittedPhone = String(fd.get("applicant_phone") ?? "").trim();
           if (submittedName && submittedPhone) {
@@ -526,13 +546,19 @@ export function ApplyForm({
       }
 
       // === 새 일회성 신청 ===
-      const res = await submitApplication(fd, { forceOverlap });
+      const res = adminMode
+        ? await submitAdminReservation(fd, { forceOverlap })
+        : await submitApplication(fd, { forceOverlap });
       if (res.error) {
         await handleSubmitError(res.error, fd, forceOverlap, false);
         return;
       }
       if (res.id) {
         setConflictModal(null);
+        if (adminMode) {
+          router.push(`/admin/reservations/${res.id}`);
+          return;
+        }
         const submittedName = String(fd.get("applicant_name") ?? "").trim();
         const submittedPhone = String(fd.get("applicant_phone") ?? "").trim();
         if (submittedName && submittedPhone) {
@@ -558,7 +584,8 @@ export function ApplyForm({
           setError("시간 입력이 잘못되었습니다.");
           return;
         }
-        if (date < todayKey) {
+        // 관리자 직접 등록은 종이 신청서 사후 입력 케이스가 있어 과거 날짜 허용
+        if (!adminMode && date < todayKey) {
           setError(
             "시작 날짜가 지난 날짜입니다. 오늘 이후 날짜로 다시 입력해 주세요.",
           );
@@ -576,6 +603,10 @@ export function ApplyForm({
         }
 
         const fd = new FormData(e.currentTarget);
+        // 표시용 날짜 입력은 슬래시(YYYY/MM/DD) 로 보여주지만 서버·내부 계산은
+        // 대시(YYYY-MM-DD) 기준이므로 React 상태(`date`/`endDate`) 값으로 덮어쓴다.
+        fd.set("date", date);
+        fd.set("end_date", endDate);
         const roomId = String(fd.get("room_id") ?? "");
 
         // ===== 정기 OR 다중 시간대 일회성 =====
@@ -614,8 +645,8 @@ export function ApplyForm({
               setConflictModal({ kind: "series", result, fd });
               return;
             }
-            // 충돌 없음 — 수정 모드는 바로 진행, 신규는 출력 안내 모달 거침
-            if (isEdit) {
+            // 충돌 없음 — 수정·관리자 모드는 바로 진행, 일반 신규는 출력 안내 모달 거침
+            if (isEdit || adminMode) {
               doSubmit(fd, false);
             } else {
               setSubmitConfirmFd(fd);
@@ -647,8 +678,8 @@ export function ApplyForm({
             setConflictModal({ kind: "single", result, fd });
             return;
           }
-          // 충돌 없음 — 수정 모드는 바로 진행, 신규는 출력 안내 모달 거침
-          if (isEdit) {
+          // 충돌 없음 — 수정·관리자 모드는 바로 진행, 일반 신규는 출력 안내 모달 거침
+          if (isEdit || adminMode) {
             doSubmit(fd, false);
           } else {
             setSubmitConfirmFd(fd);
@@ -874,10 +905,10 @@ export function ApplyForm({
                 name="date"
                 required
                 inputMode="numeric"
-                placeholder="YYYY-MM-DD"
+                placeholder="YYYY/MM/DD"
                 maxLength={10}
-                pattern="\d{4}-\d{2}-\d{2}"
-                value={date}
+                pattern="\d{4}/\d{2}/\d{2}"
+                value={date.replace(/-/g, "/")}
                 className="pr-12"
                 onKeyDown={(e) => {
                   // 완성된 YYYY-MM-DD + 숫자 한 자 → 일(DD) 시프트
@@ -914,10 +945,10 @@ export function ApplyForm({
                 name="end_date"
                 required
                 inputMode="numeric"
-                placeholder="YYYY-MM-DD"
+                placeholder="YYYY/MM/DD"
                 maxLength={10}
-                pattern="\d{4}-\d{2}-\d{2}"
-                value={endDate}
+                pattern="\d{4}/\d{2}/\d{2}"
+                value={endDate.replace(/-/g, "/")}
                 className="pr-12"
                 onKeyDown={(e) => {
                   const next = shiftDayDigit(endDate, e.key);

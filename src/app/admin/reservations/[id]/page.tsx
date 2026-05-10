@@ -10,7 +10,7 @@ import { ApprovalProgress } from "@/components/approval-progress";
 import { ReservationBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, resolveBaseUrl } from "@/lib/utils";
-import { Printer } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import type { ReservationDetail } from "@/lib/repo";
 import { AdminActions } from "./admin-actions";
 
@@ -58,9 +58,19 @@ export default async function AdminReservationDetail(
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-        <div className="mb-3 text-sm text-stone-500">
-          <Link href="/admin/reservations" className="hover:underline">
+        <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+          <Link
+            href="/admin/reservations"
+            className="text-stone-500 hover:underline"
+          >
             ← 신청서 관리
+          </Link>
+          <Link
+            href="/admin/reservations/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            새 신청서 직접 등록
           </Link>
         </div>
 

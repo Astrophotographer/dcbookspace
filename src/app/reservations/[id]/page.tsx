@@ -8,6 +8,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
 import { formatDateTime } from "@/lib/utils";
+import { isAdmin } from "@/lib/admin-server";
+import { maskName, maskPhone } from "@/lib/privacy";
 import type { ReservationDetail } from "@/lib/repo";
 import { Printer, FileText } from "lucide-react";
 import { OwnerActions } from "./owner-actions";
@@ -31,6 +33,8 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
   const sp = await props.searchParams;
   const justSubmitted = sp.just === "1";
   const isKiosk = sp.kiosk === "1";
+  // 관리자가 아니면 신청자 이름·전화 마스킹 (홍**, 010-1234-****)
+  const viewerIsAdmin = await isAdmin();
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -105,7 +109,9 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
             <Row k="신청자">
-              {r.applicant.name} ({r.applicant.phone})
+              {viewerIsAdmin
+                ? `${r.applicant.name} (${r.applicant.phone})`
+                : `${maskName(r.applicant.name)} (${maskPhone(r.applicant.phone ?? "")})`}
             </Row>
             <Row k="부서">{r.dept?.name ?? "-"}</Row>
             <Row k="장소">

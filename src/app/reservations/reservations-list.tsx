@@ -15,6 +15,7 @@ export function ReservationsList({ entries, isAdmin }: Props) {
   return (
     <ReservationsTable
       entries={entries}
+      isAdmin={isAdmin}
       rowLink={(e) => ({
         href:
           e.kind === "series"

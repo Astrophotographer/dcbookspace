@@ -170,9 +170,8 @@ export function describeSeries(input: {
 }
 
 function formatShortDate(d: string): string {
-  // "2026-06-06" → "6/6"
-  const [, m, day] = d.split("-");
-  return `${parseInt(m, 10)}/${parseInt(day, 10)}`;
+  // "2026-06-06" → "2026/06/06" (사용자 노출용 통일된 슬래시 포맷)
+  return d.replace(/-/g, "/");
 }
 
 /** 두 시간대가 [start, end) 기준으로 겹치는지. */

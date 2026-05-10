@@ -14,6 +14,7 @@ import {
 import { ApprovalTracker } from "@/components/approval-tracker";
 import { ReservationBadge } from "@/components/ui/badge";
 import { cn, formatDateTime } from "@/lib/utils";
+import { maskName } from "@/lib/privacy";
 import type {
   ApprovalRoute,
   AppUser,
@@ -101,6 +102,8 @@ type Props = {
     render: (entry: TableEntry) => ReactNode;
   };
   emptyMessage?: string;
+  /** 관리자가 아닌 사용자에겐 신청자 이름을 "홍**" 형태로 마스킹 */
+  isAdmin?: boolean;
 };
 
 type SortField =
@@ -214,6 +217,7 @@ export function ReservationsTable({
   rowLink,
   extraColumn,
   emptyMessage = "아직 작성된 신청서가 없습니다.",
+  isAdmin,
 }: Props) {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -419,7 +423,9 @@ export function ReservationsTable({
                         {data.dept?.name ?? "-"}
                       </div>
                       <div className="text-stone-500">
-                        {data.applicant.name}
+                        {isAdmin
+                          ? data.applicant.name
+                          : maskName(data.applicant.name)}
                       </div>
                     </Link>
                   </Td>

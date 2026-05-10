@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * 슬롯 시간 표시. 시작·종료가 같은 날이면 "HH:mm-HH:mm",
- * 다른 날이면 "M/d HH:mm – M/d HH:mm" 으로 — 다일 예약이 같은 날처럼
+ * 다른 날이면 "YYYY/MM/DD HH:mm – YYYY/MM/DD HH:mm" 으로 — 다일 예약이 같은 날처럼
  * 잘못 보이는 것을 방지.
  */
 function formatSlotRange(start_at: string, end_at: string): string {
@@ -17,7 +17,7 @@ function formatSlotRange(start_at: string, end_at: string): string {
   const e = parseISO(end_at);
   const sameDay = format(s, "yyyy-MM-dd") === format(e, "yyyy-MM-dd");
   if (sameDay) return `${format(s, "HH:mm")}–${format(e, "HH:mm")}`;
-  return `${format(s, "M/d HH:mm")} – ${format(e, "M/d HH:mm")}`;
+  return `${format(s, "yyyy/MM/dd HH:mm")} – ${format(e, "yyyy/MM/dd HH:mm")}`;
 }
 
 type Props = {

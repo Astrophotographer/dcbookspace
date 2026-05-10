@@ -22,10 +22,10 @@ function formatConflictWindow(startIso: string, endIso: string) {
   const sameDay =
     format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd");
   return {
-    date: format(start, "M월 d일 (E)", { locale: ko }),
+    date: format(start, "yyyy/MM/dd (E)", { locale: ko }),
     range: sameDay
       ? `${format(start, "HH:mm")} – ${format(end, "HH:mm")}`
-      : `${format(start, "HH:mm")} – ${format(end, "M월 d일 HH:mm", { locale: ko })}`,
+      : `${format(start, "HH:mm")} – ${format(end, "yyyy/MM/dd HH:mm", { locale: ko })}`,
   };
 }
 
@@ -140,7 +140,7 @@ export function ConflictModal({ data, pending, onCancel, onConfirm }: Props) {
                 >
                   <div className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm">
                     <span className="font-semibold text-stone-900">
-                      {format(parseISO(occ.date), "M월 d일 (E)", {
+                      {format(parseISO(occ.date), "yyyy/MM/dd (E)", {
                         locale: ko,
                       })}
                     </span>

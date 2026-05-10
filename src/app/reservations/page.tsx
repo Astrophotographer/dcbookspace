@@ -1,4 +1,5 @@
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Download, Plus } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -113,12 +114,24 @@ export default async function ReservationsListPage() {
               총 {entries.length}건
             </span>
             {admin && (
+              // 종이 신청서를 직접 입력하는 admin 셀프-등록 진입.
+              // /admin/reservations 와 동일하게 모든 신청내역 페이지에서도 노출.
+              <Link
+                href="/admin/reservations/new"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                title="종이 신청서를 받아 관리자가 직접 등록"
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+                신청서 직접 등록
+              </Link>
+            )}
+            {admin && (
               // CSV 라우트로 직접 a href 다운로드 — server 가 Content-Disposition
               // 헤더로 파일명·attachment 지정해 클릭 한 번에 저장됨.
               <a
                 href="/api/admin/reservations/csv"
                 download
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
                 title="모든 신청내역을 CSV(엑셀) 파일로 다운로드"
               >
                 <Download className="h-4 w-4" aria-hidden />

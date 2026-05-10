@@ -121,7 +121,7 @@ export function BuildingView({
     goToDate(addDays(parseISO(currentDate), days));
 
   const dateObj = parseISO(currentDate);
-  const dateLabel = format(dateObj, "yyyy년 M월 d일 (E)", { locale: ko });
+  const dateLabel = format(dateObj, "yyyy/MM/dd (E)", { locale: ko });
 
   return (
     <div className="space-y-4">

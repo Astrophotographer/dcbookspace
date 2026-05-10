@@ -49,7 +49,7 @@ export default async function SeriesPrintPage(props: PageArgs) {
 
   const apprByOrder = new Map(series.approvals.map((a) => [a.step_order, a]));
   const steps = series.route.steps as ApprovalStep[];
-  const createdLabel = formatDate(series.created_at, "yyyy년 M월 d일");
+  const createdLabel = formatDate(series.created_at, "yyyy/MM/dd");
 
   const blockLabel = series.time_blocks
     .map((b) => `${b.start}-${b.end}`)
