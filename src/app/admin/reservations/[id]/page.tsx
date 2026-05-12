@@ -14,6 +14,8 @@ import { Plus, Printer } from "lucide-react";
 import type { ReservationDetail } from "@/lib/repo";
 import { AdminActions } from "./admin-actions";
 import { getPrintEnabled } from "@/lib/site-settings";
+import { PrintProgress } from "@/components/print-progress";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 export default async function AdminReservationDetail(
   props: PageProps<"/admin/reservations/[id]">,
@@ -59,6 +61,13 @@ export default async function AdminReservationDetail(
   return (
     <>
       <SiteHeader />
+      {/* 결재·인쇄 상태 실시간 갱신 — /reservations/[id] 와 동일 패턴 */}
+      <RealtimeRefresh
+        tables={[
+          { table: "reservations", filter: `id=eq.${id}` },
+          { table: "approvals", filter: `reservation_id=eq.${id}` },
+        ]}
+      />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         <div className="mb-3 flex items-center justify-between gap-3 text-sm">
           <Link
@@ -121,6 +130,18 @@ export default async function AdminReservationDetail(
             )}
           </dl>
         </section>
+
+        {/* 프린트 진행 상황 — /reservations/[id] 와 동일하게 인쇄 ON 일 때만 노출 */}
+        {printEnabled && (
+          <div className="mb-6">
+            <PrintProgress
+              kind="reservation"
+              id={r.id}
+              status={r.print_status}
+              statusAt={r.print_status_at}
+            />
+          </div>
+        )}
 
         {/* 관리자 작업 — 결재 진행 위에 노출해서 강제 처리 액션을 가장 먼저 눈에 띄게 */}
         <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
