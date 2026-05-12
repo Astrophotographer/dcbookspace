@@ -83,7 +83,11 @@ export function DateView({
   // 헤더 월 라벨은 2번째 줄의 마지막 날(토요일, = currentDate 가 속한 주의 토요일).
   const headerAnchor = addDays(gridStart, 13);
 
-  const today = new Date();
+  // SSR(UTC) ↔ client(KST) 시점이 다르면 `new Date()` 의 getDate() 가 어긋나
+  // isSameDay(day, today) 결과가 달라 hydration mismatch(React #418) 가 난다.
+  // KST 의 "오늘" 을 YYYY-MM-DD 로 뽑아 다시 parseISO 하면 양쪽이 같은 instant 를
+  // 얻어 결과가 일치.
+  const today = parseISO(format(new Date(), "yyyy-MM-dd"));
 
   const goToDate = (target: Date) => {
     const sp = new URLSearchParams(params.toString());
