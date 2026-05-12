@@ -32,8 +32,8 @@ export async function setPrintStatus(args: {
   if (error) return { error: error.message };
 
   // print_status_at 은 DB 트리거가 자동 갱신.
-  revalidatePath("/");
-  revalidatePath("/reservations");
+  // print_status 는 상세 페이지에서만 표시되므로 해당 페이지만 재검증.
+  // 홈 캘린더·신청 목록은 print_status 노출 안 하므로 무관 (불필요한 invalidation 제거).
   revalidatePath(
     args.kind === "series"
       ? `/series/${args.id}`

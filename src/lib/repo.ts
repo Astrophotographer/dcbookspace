@@ -6,6 +6,11 @@
 // 메모화한다. 여러 server component 가 같은 마스터 데이터를 fetch 해도 DB 왕복은 1회.
 import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  APPROVAL_WITH_RESERVATION_SELECT,
+  RESERVATION_FULL_SELECT,
+  SERIES_FULL_SELECT,
+} from "@/lib/supabase/selects";
 import type {
   Building,
   Floor,
@@ -137,14 +142,7 @@ export const getReservationsBetween = cache(async (
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("reservations")
-    .select(
-      `*,
-       room:rooms (*, floor:floors (*, building:buildings(*))),
-       applicant:users!applicant_id (*),
-       dept:departments (*),
-       approvals (*, approver:users!approver_id (*)),
-       route:approval_routes (*)`,
-    )
+    .select(RESERVATION_FULL_SELECT)
     .lt("start_at", endISO)
     .gt("end_at", startISO)
     .in("status", ["pending", "approved"])
@@ -153,42 +151,30 @@ export const getReservationsBetween = cache(async (
   return (data ?? []) as unknown as ReservationDetail[];
 });
 
-export async function getReservationByQrToken(qrToken: string) {
+// QR 토큰 lookup — 같은 토큰을 같은 요청 안에서 여러 컴포넌트가 호출할 때 dedupe.
+export const getReservationByQrToken = cache(async (qrToken: string) => {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("reservations")
-    .select(
-      `*,
-       room:rooms (*, floor:floors (*, building:buildings(*))),
-       applicant:users!applicant_id (*),
-       dept:departments (*),
-       approvals (*, approver:users!approver_id (*)),
-       route:approval_routes (*)`,
-    )
+    .select(RESERVATION_FULL_SELECT)
     .eq("qr_token", qrToken)
     .single();
   if (error || !data) return null;
   return data as unknown as ReservationDetail;
-}
+});
 
-export async function getSeries(id: string): Promise<SeriesDetail | null> {
+export const getSeries = cache(async (
+  id: string,
+): Promise<SeriesDetail | null> => {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("reservation_series")
-    .select(
-      `*,
-       room:rooms (*, floor:floors (*, building:buildings(*))),
-       applicant:users!applicant_id (*),
-       dept:departments (*),
-       approvals (*, approver:users!approver_id (*)),
-       route:approval_routes (*),
-       reservations (id, start_at, end_at, status, ref_no)`,
-    )
+    .select(SERIES_FULL_SELECT)
     .eq("id", id)
     .single();
   if (error || !data) return null;
   return data as unknown as SeriesDetail;
-}
+});
 
 /**
  * QR 토큰으로 결재 대상 조회. 시리즈 토큰을 먼저 시도하고 없으면 일회성 reservation.
@@ -198,21 +184,13 @@ export type SignTarget =
   | { kind: "reservation"; reservation: ReservationDetail }
   | null;
 
-export async function getSignTargetByQrToken(
+export const getSignTargetByQrToken = cache(async (
   token: string,
-): Promise<SignTarget> {
+): Promise<SignTarget> => {
   const supabase = createServiceClient();
   const { data: series } = await supabase
     .from("reservation_series")
-    .select(
-      `*,
-       room:rooms (*, floor:floors (*, building:buildings(*))),
-       applicant:users!applicant_id (*),
-       dept:departments (*),
-       approvals (*, approver:users!approver_id (*)),
-       route:approval_routes (*),
-       reservations (id, start_at, end_at, status, ref_no)`,
-    )
+    .select(SERIES_FULL_SELECT)
     .eq("qr_token", token)
     .maybeSingle();
   if (series) {
@@ -221,22 +199,13 @@ export async function getSignTargetByQrToken(
   const r = await getReservationByQrToken(token);
   if (r) return { kind: "reservation", reservation: r };
   return null;
-}
+});
 
 export async function getReservationByToken(token: string) {
   const supabase = createServiceClient();
   const { data: appr, error } = await supabase
     .from("approvals")
-    .select(
-      `*,
-       reservation:reservations (
-         *,
-         room:rooms (*, floor:floors (*, building:buildings(*))),
-         applicant:users!applicant_id (*),
-         dept:departments (*),
-         route:approval_routes (*)
-       )`,
-    )
+    .select(APPROVAL_WITH_RESERVATION_SELECT)
     .eq("signature_token", token)
     .single();
   if (error || !appr) return null;
