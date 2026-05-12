@@ -9,14 +9,16 @@ type Props = {
 };
 
 /**
- * Vercel 빌드 환경에 따라 staging 임을 한눈에 보여주는 배지.
+ * Vercel 빌드 환경에 따라 staging 임을 한눈에 보여주는 글자 라벨.
  * - 'production' → 안 보임 (dcbook.vercel.app)
  * - 'preview' / 'development' / undefined → 노출 (dcbookspace.vercel.app, localhost 등)
+ *
+ * flex item 으로 자리잡혀 로고와 nav 사이에 고정. 화면 폭 따라 위치 안 흔들림.
  */
-function StagingBadge() {
+function StagingLabel() {
   if (process.env.VERCEL_ENV === "production") return null;
   return (
-    <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-md sm:px-5 sm:py-1.5 sm:text-base">
+    <span className="hidden flex-none text-sm font-bold text-amber-600 sm:inline md:text-base">
       🧪 테스트용 페이지
     </span>
   );
@@ -28,8 +30,7 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
   if (kiosk) {
     return (
       <header className="border-b border-stone-200 bg-white">
-        <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
-          <StagingBadge />
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
           <div
             className="flex min-w-0 items-center gap-2 sm:gap-4"
             aria-label="등촌교회"
@@ -43,6 +44,7 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
               className="h-10 w-auto object-contain sm:h-14"
             />
           </div>
+          <StagingLabel />
           <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 sm:text-sm">
             <Tablet className="h-3.5 w-3.5" aria-hidden />
             신청 전용
@@ -55,8 +57,7 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
   const admin = await isAdmin();
   return (
     <header className="border-b border-stone-200 bg-white">
-      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
-        <StagingBadge />
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
         <Link
           href="/"
           className="flex min-w-0 items-center gap-2 sm:gap-4"
@@ -71,6 +72,7 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
             className="h-10 w-auto object-contain sm:h-14"
           />
         </Link>
+        <StagingLabel />
         <nav className="flex flex-none items-center gap-1 text-sm sm:gap-1.5 sm:text-base">
           <Link
             href="/"
