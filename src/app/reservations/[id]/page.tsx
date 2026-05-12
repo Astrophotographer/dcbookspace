@@ -56,14 +56,19 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
   const r = data as unknown as ReservationDetail;
   const printEnabled = await getPrintEnabled();
 
-  const h = await headers();
-  const baseUrl = resolveBaseUrl({
-    envUrl: process.env.NEXT_PUBLIC_APP_URL,
-    host: h.get("host"),
-    proto: h.get("x-forwarded-proto"),
-  });
-  const qrUrl = `${baseUrl}/sign/${r.qr_token}`;
-  const qr = await qrDataUrl(qrUrl, 220);
+  // QR 코드는 관리자에게만 노출 — 일반 신청자 화면엔 의미 없고, 외부 노출 위험 있음
+  let qr: string | null = null;
+  let qrUrl: string | null = null;
+  if (viewerIsAdmin) {
+    const h = await headers();
+    const baseUrl = resolveBaseUrl({
+      envUrl: process.env.NEXT_PUBLIC_APP_URL,
+      host: h.get("host"),
+      proto: h.get("x-forwarded-proto"),
+    });
+    qrUrl = `${baseUrl}/sign/${r.qr_token}`;
+    qr = await qrDataUrl(qrUrl, 220);
+  }
 
   return (
     <>
@@ -131,16 +136,24 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           </div>
         )}
 
-        {/* QR + 신청 정보 — /admin/reservations/[id] 와 동일 레이아웃 */}
-        <section className="mb-6 grid gap-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:grid-cols-[220px_1fr]">
-          <div className="flex flex-col items-center text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- QR은 base64 data URL. next/image 최적화 의미 없음 */}
-            <img src={qr} alt="결재 QR" width={200} height={200} />
-            <p className="mt-2 text-xs text-stone-500">QR 스캔 → PIN 결재</p>
-            <p className="mt-1 break-all text-[10px] text-stone-400">
-              {qrUrl}
-            </p>
-          </div>
+        {/* 관리자 = QR + 신청 정보 2-col, 일반 신청자 = 신청 정보만 */}
+        <section
+          className={
+            viewerIsAdmin
+              ? "mb-6 grid gap-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:grid-cols-[220px_1fr]"
+              : "mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
+          }
+        >
+          {viewerIsAdmin && qr && (
+            <div className="flex flex-col items-center text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- QR은 base64 data URL. next/image 최적화 의미 없음 */}
+              <img src={qr} alt="결재 QR" width={200} height={200} />
+              <p className="mt-2 text-xs text-stone-500">QR 스캔 → PIN 결재</p>
+              <p className="mt-1 break-all text-[10px] text-stone-400">
+                {qrUrl}
+              </p>
+            </div>
+          )}
           <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
             <Row k="신청자">
               {viewerIsAdmin
