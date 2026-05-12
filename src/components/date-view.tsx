@@ -19,6 +19,7 @@ import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { fixedEventsByDate } from "@/lib/recurrence";
 import { cn, formatKst as format, formatTime } from "@/lib/utils";
+import { useUrlModal } from "@/lib/use-url-modal";
 
 /**
  * 두 ISO 시각 차이를 한국어 "N시간 / N시간 M분 / M분" 으로 표시.
@@ -65,7 +66,13 @@ export function DateView({
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
-  const [modalDate, setModalDate] = useState<Date | null>(null);
+  // URL ?day=YYYY-MM-DD 백업 — detail 갔다 뒤로가기 시 모달 자동 복원
+  const [modalDayKey, openDayModal, closeDayModal] = useUrlModal("day");
+  const modalDate = modalDayKey ? parseISO(modalDayKey) : null;
+  const setModalDate = (d: Date | null) => {
+    if (d) openDayModal(format(d, "yyyy-MM-dd"));
+    else closeDayModal();
+  };
   // 달력 네비게이션 중에 화살표/오늘 버튼을 흐리게 처리해서 "지금 이동 중" 신호 제공.
   // router.push 자체는 빠르지 않으니 시각적 피드백이 체감 향상의 핵심.
   const [isNavPending, startNav] = useTransition();

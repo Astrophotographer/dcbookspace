@@ -22,6 +22,7 @@ import { AdminActions } from "./admin-actions";
 import { getPrintEnabled } from "@/lib/site-settings";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { BackLink } from "@/components/back-link";
 
 export default async function AdminReservationDetail(
   props: PageProps<"/admin/reservations/[id]">,
@@ -69,12 +70,8 @@ export default async function AdminReservationDetail(
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         <div className="mb-3 flex items-center justify-between gap-3 text-sm">
-          <Link
-            href="/admin/reservations"
-            className="text-stone-500 hover:underline"
-          >
-            ← 신청서 관리
-          </Link>
+          {/* 뒤로가기 — 직전 entry 가 홈(?room=...) 이면 모달 복원, 아니면 /admin/reservations 로 */}
+          <BackLink label="뒤로" fallbackHref="/admin/reservations" />
           <Link
             href="/admin/reservations/new"
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white shadow-sm transition-colors hover:bg-brand-700"

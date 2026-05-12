@@ -19,6 +19,7 @@ import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { KioskAutoReturn } from "@/components/kiosk-auto-return";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { BackLink } from "@/components/back-link";
 import { getPrintEnabled } from "@/lib/site-settings";
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
@@ -82,6 +83,12 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
         ]}
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+        {/* 키오스크 모드에선 뒤로가기 숨김 — 어르신용 태블릿에서 의도치 않은 흐름 방지 */}
+        {!isKiosk && (
+          <div className="mb-3">
+            <BackLink />
+          </div>
+        )}
         {justSubmitted && (
           printEnabled ? (
             <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
