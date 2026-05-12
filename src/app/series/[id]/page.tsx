@@ -63,12 +63,17 @@ export default async function SeriesPage(props: PageArgs) {
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
-          <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
-            <strong>정기 신청이 잘 접수되었습니다.</strong> 결재 1회로 모든
-            회차가 함께 확정됩니다.
-            {printEnabled &&
-              " 사무실 프린터로 결재 서류 인쇄 요청이 전송됐습니다."}
-          </div>
+          printEnabled ? (
+            <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
+              <strong>정기 신청서를 프린트하는 중입니다.</strong> 결재 1회로 모든
+              회차가 함께 확정됩니다. 아래에서 진행 상황을 확인해 주세요.
+            </div>
+          ) : (
+            <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
+              <strong>정기 신청이 잘 접수되었습니다.</strong> 결재 1회로 모든
+              회차가 함께 확정됩니다.
+            </div>
+          )
         )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
