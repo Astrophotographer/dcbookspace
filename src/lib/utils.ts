@@ -28,17 +28,19 @@ export function formatDateSlash(d: Date | string) {
   return formatDate(d, "yyyy/MM/dd HH:mm");
 }
 
-// 사용일시 표시: 같은 날짜면 'YYYY/MM/DD (요일) HH:MM ~ HH:MM',
-// 다른 날짜면 시작/종료를 모두 풀로 출력.
+// 사용일시 표시: 같은 날짜면 'MM월 DD일(요일) HH:MM ~ HH:MM',
+// 다른 날짜면 'MM월 DD일(요일) HH:MM ~ MM월 DD일(요일) HH:MM'.
+// 종이 신청서 본문에 그대로 들어가는 표기.
 export function formatUsageRange(startISO: string, endISO: string): string {
   const start = parseISO(startISO);
   const end = parseISO(endISO);
   const sameDay = format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd");
+  const head = format(start, "MM월 dd일(E)", { locale: ko });
   if (sameDay) {
-    const head = format(start, "yyyy/MM/dd (E)", { locale: ko });
     return `${head} ${format(start, "HH:mm")} ~ ${format(end, "HH:mm")}`;
   }
-  return `${formatDateTime(startISO)} ~ ${formatDateTime(endISO)}`;
+  const tail = format(end, "MM월 dd일(E)", { locale: ko });
+  return `${head} ${format(start, "HH:mm")} ~ ${tail} ${format(end, "HH:mm")}`;
 }
 
 /**

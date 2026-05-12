@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   CheckCircle2,
-  FileText,
   Plus,
   Printer,
   X,
@@ -138,6 +137,54 @@ function shiftDayDigit(current: string, digit: string): string | null {
   const max = maxDayOfMonth(y, mo);
   if (n > max) n = max;
   return `${yyyy}-${mm}-${String(n).padStart(2, "0")}`;
+}
+
+/** 신청 확인 모달용 — 부서를 "대분류 > 소분류" 라벨로. */
+function summarizeDept(
+  fd: FormData,
+  departments: Department[],
+): string {
+  const deptId = String(fd.get("dept_id") ?? "");
+  if (!deptId) return "";
+  const leaf = departments.find((d) => d.id === deptId);
+  if (!leaf) return "";
+  if (!leaf.parent_id) return leaf.name;
+  const group = departments.find((d) => d.id === leaf.parent_id);
+  return group ? `${group.name} > ${leaf.name}` : leaf.name;
+}
+
+/** 신청 확인 모달용 — 장소를 "건물 층 호실" 라벨로. */
+function summarizeRoom(
+  fd: FormData,
+  buildings: Building[],
+  floors: Floor[],
+  rooms: Room[],
+): string {
+  const roomId = String(fd.get("room_id") ?? "");
+  if (!roomId) return "";
+  const room = rooms.find((r) => r.id === roomId);
+  if (!room) return "";
+  const floor = floors.find((f) => f.id === room.floor_id);
+  const building = floor
+    ? buildings.find((b) => b.id === floor.building_id)
+    : undefined;
+  return [building?.name, floor?.label, room.name].filter(Boolean).join(" ");
+}
+
+/** 신청 확인 모달용 — 일자를 "YYYY/M/D (요일)" 로. 정기 신청은 "~ 종료일" 도. */
+function summarizeDate(fd: FormData, isSeries: boolean): string {
+  const start = String(fd.get("date") ?? "");
+  const end = String(fd.get("end_date") ?? "");
+  const fmt = (s: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(`${s}T12:00:00+09:00`);
+    if (Number.isNaN(d.getTime())) return s;
+    const dow = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} (${dow})`;
+  };
+  if (!start) return "-";
+  if (isSeries && end && end !== start) return `${fmt(start)} ~ ${fmt(end)}`;
+  return fmt(start);
 }
 
 /** KST 기준 내일 날짜 "YYYY-MM-DD". 당일 예약은 결재 시간이 없어 기본값에서 제외. */
@@ -1213,9 +1260,7 @@ export function ApplyForm({
     />
 
     {/* 출력 안내 모달 — 충돌 없이 진짜 신청 직전에 한 번 더 확인. 수정 모드는 우회.
-        디자인: 종이가 프린터에서 막 빠져나오는 모티브로 "지금 종이가 출력될 거예요"
-        를 시각적으로 전달. 어르신 가독성을 위해 본문 큼직한 활자 + 핵심 정보는
-        chip 형태로 강조. */}
+        신청 요약을 함께 보여줘서 마지막 점검. 어르신 가독성 유지하면서 컴팩트. */}
     {submitConfirmFd && (
       <div
         role="dialog"
@@ -1226,68 +1271,66 @@ export function ApplyForm({
           if (e.target === e.currentTarget && !pending) setSubmitConfirmFd(null);
         }}
       >
-        <div className="animate-modal-panel relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.25)] ring-1 ring-stone-900/5">
-          {/* 상단 — 프린터에서 종이가 빠져나오는 시각적 모티브 */}
-          <div className="bg-paper-grain relative bg-gradient-to-b from-amber-50 via-amber-50/50 to-white px-8 pt-9 pb-7">
-            <div className="relative mx-auto h-20 w-20">
-              {/* 프린터 아이콘 — 진한 amber 배경의 둥근 사각 */}
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 to-amber-200/80 shadow-inner ring-1 ring-amber-300/60">
-                <Printer
-                  className="h-9 w-9 text-amber-700"
-                  strokeWidth={2.2}
-                  aria-hidden
-                />
-              </div>
-              {/* 빠져나오는 종이 — animate-paper-emerge 로 1.6s 동안 슬쩍 내려옴 */}
-              <div
-                className="animate-paper-emerge absolute left-1/2 top-full flex h-9 w-12 items-center justify-center rounded-md border border-amber-300 bg-white shadow-md"
-                aria-hidden
-              >
-                {/* 종이 위에 작은 가로선들 — 본문 텍스트 흉내 */}
-                <div className="space-y-1">
-                  <div className="h-0.5 w-7 rounded-full bg-amber-300/80" />
-                  <div className="h-0.5 w-5 rounded-full bg-amber-300/60" />
-                  <div className="h-0.5 w-6 rounded-full bg-amber-300/70" />
-                </div>
-              </div>
+        <div className="animate-modal-panel relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_-12px_rgba(0,0,0,0.25)] ring-1 ring-stone-900/5">
+          {/* 상단 — 프린터 아이콘 인라인 + 제목 */}
+          <div className="flex items-center gap-3 border-b border-stone-200/70 bg-gradient-to-b from-amber-50/70 to-white px-5 py-4">
+            <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-200/80 ring-1 ring-amber-300/60">
+              <Printer className="h-5 w-5 text-amber-700" strokeWidth={2.2} aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold tracking-tight text-stone-900">
+                정말 신청하시겠습니까?
+              </h2>
+              <p className="text-xs text-stone-600">
+                신청하기를 누르면 사무실 프린터로 자동 출력됩니다.
+              </p>
             </div>
           </div>
 
-          {/* 본문 */}
-          <div className="px-8 pt-12 pb-7 text-center">
-            <h2 className="mb-3 text-2xl font-bold tracking-tight text-stone-900 sm:text-[26px]">
-              정말 신청하시겠습니까?
-            </h2>
-            <p className="mb-5 text-base leading-relaxed text-stone-600">
-              <strong className="font-semibold text-stone-900">신청하기</strong>{" "}
-              를 누르는 순간
-            </p>
-            {/* 핵심 정보 — chip 으로 강조해 한눈에 들어오게 */}
-            <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-base font-semibold text-amber-900 ring-1 ring-amber-300/70 shadow-sm">
-              <Printer className="h-4 w-4 flex-none" aria-hidden />
-              사무실 프린터로 자동 출력됩니다
-            </div>
-            <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-stone-500">
-              <FileText className="h-3.5 w-3.5" aria-hidden />
-              대면 결재용 종이 서류
-            </p>
-          </div>
+          {/* 신청 요약 — 마지막 점검 */}
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 px-5 py-3.5 text-sm">
+            <dt className="text-stone-500">부서</dt>
+            <dd className="font-medium text-stone-900">
+              {summarizeDept(submitConfirmFd, departments) || "-"}
+            </dd>
+            <dt className="text-stone-500">신청자</dt>
+            <dd className="font-medium text-stone-900">
+              {String(submitConfirmFd.get("applicant_name") ?? "") || "-"}
+              {submitConfirmFd.get("applicant_phone") && (
+                <span className="ml-1 font-mono text-stone-600">
+                  ({String(submitConfirmFd.get("applicant_phone"))})
+                </span>
+              )}
+            </dd>
+            <dt className="text-stone-500">장소</dt>
+            <dd className="font-medium text-stone-900">
+              {summarizeRoom(submitConfirmFd, buildings, floors, rooms) || "-"}
+            </dd>
+            <dt className="text-stone-500">일자</dt>
+            <dd className="font-medium text-stone-900">
+              {summarizeDate(submitConfirmFd, recurring)}
+            </dd>
+            <dt className="text-stone-500">목적</dt>
+            <dd className="line-clamp-2 font-medium text-stone-900">
+              {String(submitConfirmFd.get("purpose") ?? "") || "-"}
+            </dd>
+          </dl>
 
           {/* 푸터 — 두 버튼 동등 폭, 1차 액션은 우측 + 아이콘 */}
-          <div className="flex gap-3 border-t border-stone-200/70 bg-stone-50/70 px-6 py-4">
+          <div className="flex gap-2 border-t border-stone-200/70 bg-stone-50/70 px-4 py-3">
             <Button
               type="button"
               variant="secondary"
               onClick={() => setSubmitConfirmFd(null)}
               disabled={pending}
-              size="lg"
+              size="md"
               className="flex-1"
             >
               취소
             </Button>
             <Button
               type="button"
-              size="lg"
+              size="md"
               disabled={pending}
               className="flex-1"
               onClick={() => {
@@ -1300,7 +1343,7 @@ export function ApplyForm({
                 "신청 중..."
               ) : (
                 <>
-                  <CheckCircle2 className="h-5 w-5" aria-hidden />
+                  <CheckCircle2 className="h-4 w-4" aria-hidden />
                   신청하기
                 </>
               )}
