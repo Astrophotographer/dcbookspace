@@ -1281,7 +1281,7 @@ export function ApplyForm({
               <h2 className="text-lg font-bold tracking-tight text-stone-900">
                 정말 신청하시겠습니까?
               </h2>
-              <p className="text-xs text-stone-600">
+              <p className="text-xs font-semibold text-yellow-700">
                 신청하기를 누르면 사무실 프린터로 자동 출력됩니다.
               </p>
             </div>
