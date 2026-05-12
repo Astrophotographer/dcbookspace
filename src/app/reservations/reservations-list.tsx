@@ -9,13 +9,15 @@ type Props = {
   entries: TableEntry[];
   /** 관리자면 일회성 신청 클릭 시 /admin/reservations/[id] 로 직행. */
   isAdmin?: boolean;
+  printEnabled?: boolean;
 };
 
-export function ReservationsList({ entries, isAdmin }: Props) {
+export function ReservationsList({ entries, isAdmin, printEnabled }: Props) {
   return (
     <ReservationsTable
       entries={entries}
       isAdmin={isAdmin}
+      printEnabled={printEnabled}
       rowLink={(e) => ({
         href:
           e.kind === "series"

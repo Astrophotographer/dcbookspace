@@ -3,6 +3,12 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Building, Floor } from "@/lib/supabase/types";
+import {
+  checkRequiredHeaders,
+  makeRowAccessor,
+  parseCsv,
+  type BulkRowError,
+} from "@/lib/bulk-csv";
 
 type Result<T = unknown> = T & { error?: string };
 
@@ -252,6 +258,65 @@ export async function renameFloor(id: string, label: string): Promise<Result> {
 
   revalidateRoomsAndPublic();
   return {};
+}
+
+/**
+ * CSV 텍스트로 건물·층·호실을 일괄 등록.
+ * - 컬럼: 건물, 층, 호실
+ * - 건물·층이 없으면 자동 생성. 호실 (floor_id, name) 유니크 → 중복 시 트랜잭션 전체 ROLLBACK.
+ */
+export async function bulkImportRooms(text: string): Promise<{
+  ok: boolean;
+  count: number;
+  errors?: BulkRowError[];
+}> {
+  let parsed;
+  try {
+    parsed = parseCsv(text);
+  } catch (e) {
+    return {
+      ok: false,
+      count: 0,
+      errors: [{ row: 1, message: e instanceof Error ? e.message : "CSV 파싱 실패" }],
+    };
+  }
+
+  const missing = checkRequiredHeaders(parsed.headers, [
+    { keys: ["건물"], label: "건물" },
+    { keys: ["층"], label: "층" },
+    { keys: ["호실"], label: "호실" },
+  ]);
+  if (missing) return { ok: false, count: 0, errors: [{ row: 1, message: missing }] };
+  if (parsed.rows.length === 0) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: "데이터 줄이 없습니다." }] };
+  }
+
+  const get = makeRowAccessor(parsed.headers);
+  const errors: BulkRowError[] = [];
+  const items: { building: string; floor: string; room: string }[] = [];
+
+  for (const r of parsed.rows) {
+    const lineNo = parsed.sourceLine[r.row];
+    const building = get(r.cells, "건물").trim();
+    const floor = get(r.cells, "층").trim();
+    const room = get(r.cells, "호실").trim();
+    if (!building || !floor || !room) {
+      errors.push({ row: lineNo, message: "건물·층·호실은 모두 필수입니다." });
+      continue;
+    }
+    items.push({ building, floor, room });
+  }
+
+  if (errors.length > 0) return { ok: false, count: 0, errors };
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("bulk_insert_rooms", { items });
+  if (error) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: error.message }] };
+  }
+
+  revalidateRoomsAndPublic();
+  return { ok: true, count: typeof data === "number" ? data : items.length };
 }
 
 export async function deleteFloor(id: string): Promise<Result> {

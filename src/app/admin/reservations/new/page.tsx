@@ -8,6 +8,7 @@ import {
   getRooms,
   getDepartments,
 } from "@/lib/repo";
+import { getPrintEnabled } from "@/lib/site-settings";
 import { ApplyForm } from "@/app/apply/apply-form";
 
 /**
@@ -27,12 +28,14 @@ export default async function AdminNewReservationPage() {
     );
   }
 
-  const [buildings, floors, rooms, departments] = await Promise.all([
-    getBuildings(),
-    getFloors(),
-    getRooms(),
-    getDepartments(),
-  ]);
+  const [buildings, floors, rooms, departments, printEnabled] =
+    await Promise.all([
+      getBuildings(),
+      getFloors(),
+      getRooms(),
+      getDepartments(),
+      getPrintEnabled(),
+    ]);
 
   return (
     <>
@@ -56,6 +59,7 @@ export default async function AdminNewReservationPage() {
           rooms={rooms}
           departments={departments}
           adminMode
+          printEnabled={printEnabled}
         />
       </main>
     </>
