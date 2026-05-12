@@ -8,6 +8,7 @@ import { ReservationsAdmin } from "./reservations-admin";
 import type { ReservationDetail, SeriesDetail } from "@/lib/repo";
 import type { TableEntry } from "@/components/reservations-table";
 import { computeConflictGroups, type ConflictRow } from "@/lib/conflicts";
+import { getPrintEnabled } from "@/lib/site-settings";
 
 export default async function AdminReservationsListPage() {
   if (!isSupabaseConfigured()) {
@@ -56,8 +57,8 @@ export default async function AdminReservationsListPage() {
     .select("id, room_id, start_at, end_at, series_id")
     .in("status", ["pending", "approved"]);
 
-  const [{ data: rData }, { data: sData }, { data: cData }] =
-    await Promise.all([reservationsP, seriesP, conflictRowsP]);
+  const [{ data: rData }, { data: sData }, { data: cData }, printEnabled] =
+    await Promise.all([reservationsP, seriesP, conflictRowsP, getPrintEnabled()]);
 
   const reservations = (rData ?? []) as unknown as ReservationDetail[];
   const seriesList = (sData ?? []) as unknown as SeriesDetail[];
@@ -117,7 +118,7 @@ export default async function AdminReservationsListPage() {
           </Link>
         </div>
 
-        <ReservationsAdmin entries={entries} />
+        <ReservationsAdmin entries={entries} printEnabled={printEnabled} />
       </main>
     </>
   );

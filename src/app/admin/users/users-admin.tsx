@@ -1,17 +1,40 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { AppUser, Department, UserRole } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { formatPhone } from "@/lib/phone";
+import { BulkImportModal } from "@/components/admin/bulk-import-modal";
 import {
+  bulkImportUsers,
   createUser,
   deleteUser,
   issuePin,
   setTelegramChatId,
 } from "./actions";
-import { Send } from "lucide-react";
+import { Send, Upload } from "lucide-react";
+
+const BULK_EXAMPLE_USERS = `이름,휴대폰,역할,부서
+김철수,01012345678,부서장,유치부
+이영희,01098765432,장로,교육부
+박관리,01055554444,관리자,`;
+
+const BULK_COLUMNS_USERS = [
+  { name: "이름", required: true, help: "사용자 이름" },
+  { name: "휴대폰", required: true, help: "010 + 8자리 (숫자만 또는 010-1234-5678)" },
+  {
+    name: "역할",
+    required: true,
+    help: "신청자 / 부서장 / 장로 / 관리장로 / 당회장 / 관리자",
+  },
+  {
+    name: "부서",
+    required: false,
+    help: "leaf 부서 이름 (동명이인이면 \"대분류>소분류\" 형식)",
+  },
+];
 
 const APPROVER_ROLES: UserRole[] = ["dept_head", "elder", "manager", "senior_pastor"];
 // 관리자(admin) 는 /admin/admins 별도 페이지에서 관리한다.
@@ -34,11 +57,13 @@ export function UsersAdmin({
   departments,
   roleLabels,
 }: Props) {
+  const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
   const [pending, startTransition] = useTransition();
   const [issuedPin, setIssuedPin] = useState<{ userId: string; pin: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   // 부서 cascading. 신청 폼과 동일 정책 — leaf 만 dept_id 로.
   const deptGroups = useMemo(
@@ -72,6 +97,29 @@ export function UsersAdmin({
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={() => setBulkOpen(true)}
+        >
+          <Upload className="h-4 w-4" />
+          CSV 일괄 추가
+        </Button>
+      </div>
+
+      <BulkImportModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title="사용자 일괄 추가"
+        description="결재자 포함 여러 사용자를 한 번에 등록합니다. 결재자는 휴대폰 뒷 4자리가 초기 PIN 으로 발급됩니다."
+        example={BULK_EXAMPLE_USERS}
+        columns={BULK_COLUMNS_USERS}
+        onSubmit={bulkImportUsers}
+        onSaved={() => router.refresh()}
+      />
+
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-lg font-semibold">새 사용자 추가</h2>
         <form

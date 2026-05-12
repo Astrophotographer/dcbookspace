@@ -9,6 +9,7 @@ import {
   getRooms,
   getDepartments,
 } from "@/lib/repo";
+import { getPrintEnabled } from "@/lib/site-settings";
 
 /**
  * 키오스크 모드(?kiosk=1) 진입 시점에 manifest 를 키오스크 전용으로 오버라이드.
@@ -49,12 +50,14 @@ export default async function ApplyPage(props: PageProps<"/apply">) {
     );
   }
 
-  const [buildings, floors, rooms, departments] = await Promise.all([
-    getBuildings(),
-    getFloors(),
-    getRooms(),
-    getDepartments(),
-  ]);
+  const [buildings, floors, rooms, departments, printEnabled] =
+    await Promise.all([
+      getBuildings(),
+      getFloors(),
+      getRooms(),
+      getDepartments(),
+      getPrintEnabled(),
+    ]);
 
   return (
     <>
@@ -68,6 +71,7 @@ export default async function ApplyPage(props: PageProps<"/apply">) {
           floors={floors}
           rooms={rooms}
           departments={departments}
+          printEnabled={printEnabled}
         />
       </main>
     </>

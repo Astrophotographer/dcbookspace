@@ -14,6 +14,7 @@ import { weekdayLabel } from "@/lib/recurrence";
 import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { getPrintEnabled } from "@/lib/site-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function SeriesPage(props: PageArgs) {
 
   const totalRows = series.reservations.length;
   const occurrenceCount = totalRows / Math.max(1, series.time_blocks.length);
+  const printEnabled = await getPrintEnabled();
 
   return (
     <>
@@ -63,8 +65,9 @@ export default async function SeriesPage(props: PageArgs) {
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
             <strong>정기 신청이 잘 접수되었습니다.</strong> 결재 1회로 모든
-            회차가 함께 확정됩니다. 사무실 프린터로 결재 서류 인쇄 요청이
-            전송됐습니다.
+            회차가 함께 확정됩니다.
+            {printEnabled &&
+              " 사무실 프린터로 결재 서류 인쇄 요청이 전송됐습니다."}
           </div>
         )}
 
@@ -90,14 +93,16 @@ export default async function SeriesPage(props: PageArgs) {
           totalRows={totalRows}
         />
 
-        <div className="mb-6">
-          <PrintProgress
-            kind="series"
-            id={series.id}
-            status={series.print_status}
-            statusAt={series.print_status_at}
-          />
-        </div>
+        {printEnabled && (
+          <div className="mb-6">
+            <PrintProgress
+              kind="series"
+              id={series.id}
+              status={series.print_status}
+              statusAt={series.print_status_at}
+            />
+          </div>
+        )}
 
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -170,18 +175,22 @@ export default async function SeriesPage(props: PageArgs) {
         <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">결재 진행 방법</h2>
           <p className="mb-4 text-stone-700">
-            결재 1회로 모든 회차가 함께 확정됩니다. 인쇄해서 회람하시거나
-            디지털 링크로 전달하세요.
+            결재 1회로 모든 회차가 함께 확정됩니다.{" "}
+            {printEnabled
+              ? "인쇄해서 회람하시거나 디지털 링크로 전달하세요."
+              : "결재자에게 아래 디지털 링크를 전달하세요."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Link href={`/series/${series.id}/print`} target="_blank">
-              <Button size="lg" variant="primary">
-                <Printer className="h-5 w-5" />
-                결재 서류 인쇄
-              </Button>
-            </Link>
+            {printEnabled && (
+              <Link href={`/series/${series.id}/print`} target="_blank">
+                <Button size="lg" variant="primary">
+                  <Printer className="h-5 w-5" />
+                  결재 서류 인쇄
+                </Button>
+              </Link>
+            )}
             <Link href={`/sign/${series.qr_token}`}>
-              <Button size="lg" variant="secondary">
+              <Button size="lg" variant={printEnabled ? "secondary" : "primary"}>
                 <FileText className="h-5 w-5" />
                 디지털 링크 보기
               </Button>

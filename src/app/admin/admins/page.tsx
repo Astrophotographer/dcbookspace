@@ -31,7 +31,7 @@ export default async function AdminAdminsPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-4 py-6">
-        <h1 className="text-2xl font-bold">관리자 정보</h1>
+        <h1 className="text-2xl font-bold">관리자정보</h1>
 
         {/* 사이트 로그인 비밀번호 (BasicAuth 대체 — 쿠키 세션) */}
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">

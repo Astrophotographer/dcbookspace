@@ -7,11 +7,15 @@ import {
   useTransition,
   type CSSProperties,
 } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import type { Building, Floor, Room } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { useRealtimeRefresh } from "@/lib/supabase/use-realtime-refresh";
+import { Button } from "@/components/ui/button";
+import { BulkImportModal } from "@/components/admin/bulk-import-modal";
 import {
+  bulkImportRooms,
   createBuilding,
   createFloor,
   createRoom,
@@ -23,6 +27,17 @@ import {
   updateRoomLayout,
   updateRoomMeta,
 } from "./actions";
+
+const BULK_EXAMPLE_ROOMS = `건물,층,호실
+교육관,5층,유치부 예배실
+교육관,5층,영아부 예배실
+본당,1층,예배실`;
+
+const BULK_COLUMNS_ROOMS = [
+  { name: "건물", required: true, help: "기존 건물이 없으면 자동 생성" },
+  { name: "층", required: true, help: "예: 1층 / B1 / 5층. 없으면 자동 생성" },
+  { name: "호실", required: true, help: "같은 층에 같은 이름 호실 있으면 거부됨" },
+];
 
 const REALTIME_TABLES = ["rooms"] as const;
 
@@ -59,6 +74,8 @@ function clamp(v: number, min: number, max: number) {
 
 export function RoomsAdmin({ buildings, floors, rooms }: Props) {
   useRealtimeRefresh(REALTIME_TABLES);
+  const router = useRouter();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [buildingId, setBuildingId] = useState(buildings[0]?.id ?? "");
   const buildingFloors = useMemo(
     () => floors.filter((f) => f.building_id === buildingId),
@@ -276,6 +293,30 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
   }
 
   return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={() => setBulkOpen(true)}
+        >
+          <Upload className="h-4 w-4" />
+          CSV 일괄 추가
+        </Button>
+      </div>
+
+      <BulkImportModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title="건물·호실 일괄 추가"
+        description="건물·층이 없으면 자동으로 만들고, 그 아래에 호실을 추가합니다. 같은 층에 같은 이름의 호실이 이미 있으면 거부됩니다."
+        example={BULK_EXAMPLE_ROOMS}
+        columns={BULK_COLUMNS_ROOMS}
+        onSubmit={bulkImportRooms}
+        onSaved={() => router.refresh()}
+      />
+
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
       {/* 좌측: 건물/층 트리 */}
       <aside className="space-y-3">
@@ -473,6 +514,7 @@ export function RoomsAdmin({ buildings, floors, rooms }: Props) {
           })}
         </div>
       </section>
+    </div>
     </div>
   );
 }

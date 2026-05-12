@@ -5,6 +5,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser, Department, UserRole } from "@/lib/supabase/types";
+import {
+  checkRequiredHeaders,
+  makeRowAccessor,
+  parseCsv,
+  type BulkRowError,
+} from "@/lib/bulk-csv";
 
 type Result<T = unknown> = T & { error?: string };
 
@@ -77,6 +83,140 @@ export async function createDepartment(
 
   revalidateAll();
   return { dept: data as Department };
+}
+
+/**
+ * CSV 텍스트로 부서를 일괄 등록 (부서장·담당장로 포함).
+ * - 컬럼: 대분류 / 소분류 / 부서장이름 / 부서장전화번호 / 장로이름 / 장로전화번호
+ * - 소분류 비우면 그룹만 생성 (부서장·장로 컬럼 무시)
+ * - 부서장·장로는 이름+전화번호 둘 다 채워야 등록됨. PIN 은 휴대폰 뒷 4자리.
+ * - bulk_insert_departments RPC 호출 (PL/pgSQL 트랜잭션 → 중간 실패 시 자동 ROLLBACK).
+ */
+export async function bulkImportDepartments(text: string): Promise<{
+  ok: boolean;
+  count: number;
+  errors?: BulkRowError[];
+}> {
+  let parsed;
+  try {
+    parsed = parseCsv(text);
+  } catch (e) {
+    return {
+      ok: false,
+      count: 0,
+      errors: [{ row: 1, message: e instanceof Error ? e.message : "CSV 파싱 실패" }],
+    };
+  }
+
+  const missing = checkRequiredHeaders(parsed.headers, [
+    { keys: ["대분류"], label: "대분류" },
+  ]);
+  if (missing) return { ok: false, count: 0, errors: [{ row: 1, message: missing }] };
+  if (parsed.rows.length === 0) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: "데이터 줄이 없습니다." }] };
+  }
+
+  const get = makeRowAccessor(parsed.headers);
+  const errors: BulkRowError[] = [];
+
+  type Item = {
+    group: string;
+    leaf?: string;
+    head_name?: string;
+    head_phone?: string;
+    head_pin_hash?: string;
+    elder_name?: string;
+    elder_phone?: string;
+    elder_pin_hash?: string;
+  };
+  const items: Item[] = [];
+
+  // 부서장·장로 둘 중 하나라도 phone 검증 실패하면 그 행 자체를 에러로 보내고
+  // 나머지 처리 중단 (한 줄이라도 오류 시 전체 중단 정책).
+  for (const r of parsed.rows) {
+    const lineNo = parsed.sourceLine[r.row];
+    const group = get(r.cells, "대분류").trim();
+    const leaf = get(r.cells, "소분류").trim();
+    const headName = get(r.cells, "부서장이름", "부서장").trim();
+    const headPhoneRaw = get(r.cells, "부서장전화번호", "부서장휴대폰").trim();
+    const elderName = get(r.cells, "장로이름", "담당장로").trim();
+    const elderPhoneRaw = get(r.cells, "장로전화번호", "장로휴대폰").trim();
+
+    if (!group) {
+      errors.push({ row: lineNo, message: "대분류 이름이 비어있습니다." });
+      continue;
+    }
+
+    const item: Item = { group };
+    if (leaf) item.leaf = leaf;
+
+    // 부서장·장로는 leaf 가 있을 때만 의미 있음
+    if (leaf) {
+      // 부서장
+      const hasHeadName = !!headName;
+      const hasHeadPhone = !!headPhoneRaw;
+      if (hasHeadName !== hasHeadPhone) {
+        errors.push({
+          row: lineNo,
+          message: "부서장은 이름·전화번호 둘 다 채우거나 둘 다 비워주세요.",
+        });
+        continue;
+      }
+      if (hasHeadName) {
+        const phone = headPhoneRaw.replace(/\D/g, "");
+        if (!isValidPhone(phone)) {
+          errors.push({ row: lineNo, message: `부서장 ${PHONE_INVALID_MESSAGE}` });
+          continue;
+        }
+        item.head_name = headName;
+        item.head_phone = phone;
+        item.head_pin_hash = await hashPin(phoneTail(phone));
+      }
+
+      // 담당장로
+      const hasElderName = !!elderName;
+      const hasElderPhone = !!elderPhoneRaw;
+      if (hasElderName !== hasElderPhone) {
+        errors.push({
+          row: lineNo,
+          message: "담당장로는 이름·전화번호 둘 다 채우거나 둘 다 비워주세요.",
+        });
+        continue;
+      }
+      if (hasElderName) {
+        const phone = elderPhoneRaw.replace(/\D/g, "");
+        if (!isValidPhone(phone)) {
+          errors.push({ row: lineNo, message: `담당장로 ${PHONE_INVALID_MESSAGE}` });
+          continue;
+        }
+        item.elder_name = elderName;
+        item.elder_phone = phone;
+        item.elder_pin_hash = await hashPin(phoneTail(phone));
+      }
+    } else if (headName || headPhoneRaw || elderName || elderPhoneRaw) {
+      // leaf 비어있는데 부서장/장로 채워진 경우 — 명확히 알려줌
+      errors.push({
+        row: lineNo,
+        message: "부서장·담당장로는 소분류(부서명) 가 있는 줄에만 입력할 수 있습니다.",
+      });
+      continue;
+    }
+
+    items.push(item);
+  }
+
+  if (errors.length > 0) return { ok: false, count: 0, errors };
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("bulk_insert_departments", {
+    items,
+  });
+  if (error) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: error.message }] };
+  }
+
+  revalidateAll();
+  return { ok: true, count: typeof data === "number" ? data : items.length };
 }
 
 export async function renameDepartment(

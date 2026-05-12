@@ -8,6 +8,7 @@ import type { ReservationDetail, SeriesDetail } from "@/lib/repo";
 import type { TableEntry } from "@/components/reservations-table";
 import { computeConflictGroups, type ConflictRow } from "@/lib/conflicts";
 import { isAdmin } from "@/lib/admin-server";
+import { getPrintEnabled } from "@/lib/site-settings";
 import { ReservationsList } from "./reservations-list";
 
 export default async function ReservationsListPage() {
@@ -60,8 +61,14 @@ export default async function ReservationsListPage() {
     .select("id, room_id, start_at, end_at, series_id")
     .in("status", ["pending", "approved"]);
 
-  const [{ data: rData }, { data: sData }, { data: cData }, admin] =
-    await Promise.all([reservationsP, seriesP, conflictRowsP, isAdmin()]);
+  const [{ data: rData }, { data: sData }, { data: cData }, admin, printEnabled] =
+    await Promise.all([
+      reservationsP,
+      seriesP,
+      conflictRowsP,
+      isAdmin(),
+      getPrintEnabled(),
+    ]);
 
   const reservations = (rData ?? []) as unknown as ReservationDetail[];
   const seriesList = (sData ?? []) as unknown as SeriesDetail[];
@@ -140,7 +147,11 @@ export default async function ReservationsListPage() {
             )}
           </div>
         </div>
-        <ReservationsList entries={entries} isAdmin={admin} />
+        <ReservationsList
+          entries={entries}
+          isAdmin={admin}
+          printEnabled={printEnabled}
+        />
       </main>
     </>
   );

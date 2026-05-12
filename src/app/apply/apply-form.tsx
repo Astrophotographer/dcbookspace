@@ -89,6 +89,11 @@ type Props = {
    * 폼 UI 자체는 사용자 신청과 동일.
    */
   adminMode?: boolean;
+  /**
+   * 사이트-와이드 프린트 토글. false 면 출력 안내 모달을 우회해 곧장 제출
+   * (어차피 종이가 안 뽑힐 거니 "지금 종이가 출력될 거예요" 모달이 무의미).
+   */
+  printEnabled?: boolean;
 };
 
 /** 충돌 모달이 들고 있는 데이터 — 일회성/시리즈 케이스 분기 */
@@ -133,6 +138,13 @@ function shiftDayDigit(current: string, digit: string): string | null {
   const max = maxDayOfMonth(y, mo);
   if (n > max) n = max;
   return `${yyyy}-${mm}-${String(n).padStart(2, "0")}`;
+}
+
+/** KST 기준 내일 날짜 "YYYY-MM-DD". 당일 예약은 결재 시간이 없어 기본값에서 제외. */
+function computeTomorrowKst(): string {
+  const t = new Date();
+  t.setUTCDate(t.getUTCDate() + 1);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(t);
 }
 
 /**
@@ -254,6 +266,7 @@ export function ApplyForm({
   defaults,
   editTarget,
   adminMode = false,
+  printEnabled = true,
 }: Props) {
   const router = useRouter();
   // 키오스크 모드 진입 여부 — 신청 성공 redirect URL 에 ?kiosk=1 자동 보존
@@ -293,9 +306,12 @@ export function ApplyForm({
     });
   };
 
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(defaults?.date ?? today);
-  const [endDate, setEndDate] = useState(defaults?.end_date ?? today);
+  // 기본값은 KST 기준 "내일" — 당일 예약은 결재 시간이 없어 운영상 의미 없음.
+  // useState lazy initializer 로 render 마다 재계산되지 않게.
+  const [date, setDate] = useState(() => defaults?.date ?? computeTomorrowKst());
+  const [endDate, setEndDate] = useState(
+    () => defaults?.end_date ?? computeTomorrowKst(),
+  );
   const [buildingId, setBuildingId] = useState(
     defaults?.building_id ?? buildings[0]?.id ?? "",
   );
@@ -645,8 +661,8 @@ export function ApplyForm({
               setConflictModal({ kind: "series", result, fd });
               return;
             }
-            // 충돌 없음 — 수정·관리자 모드는 바로 진행, 일반 신규는 출력 안내 모달 거침
-            if (isEdit || adminMode) {
+            // 충돌 없음 — 수정·관리자·프린트 OFF 면 바로 진행, 그 외는 출력 안내 모달 거침
+            if (isEdit || adminMode || !printEnabled) {
               doSubmit(fd, false);
             } else {
               setSubmitConfirmFd(fd);
@@ -678,8 +694,8 @@ export function ApplyForm({
             setConflictModal({ kind: "single", result, fd });
             return;
           }
-          // 충돌 없음 — 수정·관리자 모드는 바로 진행, 일반 신규는 출력 안내 모달 거침
-          if (isEdit || adminMode) {
+          // 충돌 없음 — 수정·관리자·프린트 OFF 면 바로 진행, 그 외는 출력 안내 모달 거침
+          if (isEdit || adminMode || !printEnabled) {
             doSubmit(fd, false);
           } else {
             setSubmitConfirmFd(fd);

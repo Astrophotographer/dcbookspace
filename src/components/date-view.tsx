@@ -20,6 +20,20 @@ import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { fixedEventsByDate } from "@/lib/recurrence";
 import { cn, formatTime } from "@/lib/utils";
+
+/**
+ * 두 ISO 시각 차이를 한국어 "N시간 / N시간 M분 / M분" 으로 표시.
+ * 모달에서 "09:00 – 11:00 (2시간)" 처럼 보조 정보로 노출.
+ */
+function durationLabel(startIso: string, endIso: string): string {
+  const ms = parseISO(endIso).getTime() - parseISO(startIso).getTime();
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}분`;
+  if (m === 0) return `${h}시간`;
+  return `${h}시간 ${m}분`;
+}
 import { ko } from "date-fns/locale";
 import {
   displayStatus,
@@ -383,6 +397,9 @@ function DayReservationsModal({
                       <span className="font-mono text-sm text-stone-700">
                         {formatTime(ev.start_at)} – {formatTime(ev.end_at)}
                       </span>
+                      <span className="text-xs text-stone-500">
+                        ({durationLabel(ev.start_at, ev.end_at)})
+                      </span>
                       <span className="inline-flex items-center rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-800">
                         고정
                       </span>
@@ -413,6 +430,9 @@ function DayReservationsModal({
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm text-stone-600">
                           {formatTime(r.start_at)} – {formatTime(r.end_at)}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          ({durationLabel(r.start_at, r.end_at)})
                         </span>
                         <span
                           className={cn(

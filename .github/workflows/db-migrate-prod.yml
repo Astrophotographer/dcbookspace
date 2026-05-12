@@ -1,0 +1,43 @@
+name: DB migrate (prod)
+
+# prod DB 마이그레이션 적용은 항상 수동 트리거.
+# GitHub Actions 페이지 → "DB migrate (prod)" → Run workflow 버튼 클릭.
+# (이렇게 한 번의 의도적 액션을 거치게 해서 사고 방지)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '"PROD" 라고 입력해야 진행됩니다 (오타 방지)'
+        required: true
+        type: string
+
+jobs:
+  apply:
+    name: supabase db push → prod
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Verify confirmation
+        if: ${{ inputs.confirm != 'PROD' }}
+        run: |
+          echo "::error::Input 'confirm' 가 'PROD' 가 아닙니다. 안전을 위해 중단합니다."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to prod
+        run: supabase link --project-ref lcndkzfvrkwlzkyppdzh
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
+
+      - name: Apply migrations
+        run: supabase db push --include-all
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}

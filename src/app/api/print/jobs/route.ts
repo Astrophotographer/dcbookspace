@@ -21,6 +21,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { resolveBaseUrl } from "@/lib/utils";
+import { getPrintEnabled } from "@/lib/site-settings";
 import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,12 @@ export async function GET(request: Request) {
   const auth = request.headers.get("authorization") ?? "";
   if (auth !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // 사이트-와이드 프린트 토글 OFF — agent 가 폴링해도 빈 목록 반환.
+  // 어드민이 다시 ON 으로 돌리면 그때부터 다시 작업이 노출됨.
+  if (!(await getPrintEnabled())) {
+    return NextResponse.json({ jobs: [] });
   }
 
   const h = await headers();

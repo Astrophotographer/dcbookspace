@@ -18,10 +18,12 @@ import {
   Maximize2,
   Network,
   QrCode,
+  Settings as SettingsIcon,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getPrintEnabled } from "@/lib/site-settings";
 
 const TILES = [
   {
@@ -68,7 +70,7 @@ const TILES = [
   },
   {
     href: "/admin/fixed-events",
-    label: "고정 행사",
+    label: "고정행사·예배",
     desc: "주일 예배 등 매주 정기 일정 관리",
     Icon: CalendarClock,
   },
@@ -83,6 +85,12 @@ const TILES = [
     label: "키오스크 설치",
     desc: "사무실 단말에 키오스크 모드 PWA 로 설치 안내",
     Icon: Maximize2,
+  },
+  {
+    href: "/admin/settings",
+    label: "프린트ON/OFF",
+    desc: "프린트 자동 출력·진행상태·재출력 버튼 일괄 ON/OFF",
+    Icon: SettingsIcon,
   },
 ];
 
@@ -163,7 +171,10 @@ export default async function AdminHome() {
     );
   }
 
-  const stats = await fetchStats();
+  const [stats, printEnabled] = await Promise.all([
+    fetchStats(),
+    getPrintEnabled(),
+  ]);
 
   return (
     <>
@@ -211,15 +222,17 @@ export default async function AdminHome() {
             Icon={CalendarCheck}
             tone="emerald"
           />
-          <StatCard
-            label="인쇄 실패"
-            value={stats.printFail}
-            unit="건"
-            href="/admin/reservations"
-            Icon={AlertTriangle}
-            tone={stats.printFail > 0 ? "red" : "stone"}
-            emphasized={stats.printFail > 0}
-          />
+          {printEnabled && (
+            <StatCard
+              label="인쇄 실패"
+              value={stats.printFail}
+              unit="건"
+              href="/admin/reservations"
+              Icon={AlertTriangle}
+              tone={stats.printFail > 0 ? "red" : "stone"}
+              emphasized={stats.printFail > 0}
+            />
+          )}
         </section>
 
         <div className="grid gap-3 sm:grid-cols-2">

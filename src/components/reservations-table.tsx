@@ -104,6 +104,8 @@ type Props = {
   emptyMessage?: string;
   /** 관리자가 아닌 사용자에겐 신청자 이름을 "홍**" 형태로 마스킹 */
   isAdmin?: boolean;
+  /** 사이트-와이드 프린트 토글. false 면 "프린트 문제" 배지 숨김 */
+  printEnabled?: boolean;
 };
 
 type SortField =
@@ -218,6 +220,7 @@ export function ReservationsTable({
   extraColumn,
   emptyMessage = "아직 작성된 신청서가 없습니다.",
   isAdmin,
+  printEnabled = true,
 }: Props) {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -471,7 +474,7 @@ export function ReservationsTable({
                   <Td>
                     <div className="flex flex-col items-start gap-1">
                       <ReservationBadge reservation={statusInputFor(entry)} />
-                      {data.print_status === "failed" && (
+                      {printEnabled && data.print_status === "failed" && (
                         <span
                           className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-red-200"
                           title="사무실 프린터 연결에 문제가 있어 인쇄가 실패했어요. 신청서 상세에서 다시 요청 가능합니다."

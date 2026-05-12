@@ -5,6 +5,28 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin } from "@/lib/auth";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser, UserRole } from "@/lib/supabase/types";
+import {
+  checkRequiredHeaders,
+  makeRowAccessor,
+  parseCsv,
+  type BulkRowError,
+} from "@/lib/bulk-csv";
+
+const ROLE_MAP: Record<string, UserRole> = {
+  "신청자": "applicant",
+  "부서장": "dept_head",
+  "장로": "elder",
+  "관리장로": "manager",
+  "당회장": "senior_pastor",
+  "관리자": "admin",
+  // 영어도 허용 (개발자가 직접 붙여 넣을 때)
+  applicant: "applicant",
+  dept_head: "dept_head",
+  elder: "elder",
+  manager: "manager",
+  senior_pastor: "senior_pastor",
+  admin: "admin",
+};
 
 function revalidateUserPages() {
   // 결재자 목록 + 결재 라인에 사용자가 등장하는 모든 화면.
@@ -150,6 +172,154 @@ export async function setTelegramChatId(
     .eq("id", userId);
   if (error) return { error: error.message };
   return { ok: true };
+}
+
+/**
+ * CSV 텍스트로 사용자(결재자 포함) 를 일괄 등록.
+ * - 한 줄이라도 검증 실패 시 전체 중단.
+ * - 컬럼: 이름, 휴대폰, 역할 / 옵션: 부서
+ * - 부서명은 leaf 우선. 동명 leaf 가 여럿이면 "대분류>소분류" 형식 요구.
+ * - 결재자(부서장/장로/관리장로/당회장)면 휴대폰 뒷 4자리 PIN 자동 발급.
+ */
+export async function bulkImportUsers(text: string): Promise<{
+  ok: boolean;
+  count: number;
+  errors?: BulkRowError[];
+}> {
+  let parsed;
+  try {
+    parsed = parseCsv(text);
+  } catch (e) {
+    return {
+      ok: false,
+      count: 0,
+      errors: [{ row: 1, message: e instanceof Error ? e.message : "CSV 파싱 실패" }],
+    };
+  }
+
+  const missing = checkRequiredHeaders(parsed.headers, [
+    { keys: ["이름"], label: "이름" },
+    { keys: ["휴대폰", "전화번호"], label: "휴대폰" },
+    { keys: ["역할"], label: "역할" },
+  ]);
+  if (missing) return { ok: false, count: 0, errors: [{ row: 1, message: missing }] };
+  if (parsed.rows.length === 0) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: "데이터 줄이 없습니다." }] };
+  }
+
+  const get = makeRowAccessor(parsed.headers);
+  const supabase = createServiceClient();
+
+  // 부서 매핑용 — 한 번 로드
+  const { data: depts } = await supabase
+    .from("departments")
+    .select("id, name, parent_id");
+  const deptsArr = depts ?? [];
+  const groupById = new Map(
+    deptsArr.filter((d) => d.parent_id === null).map((d) => [d.id, d.name]),
+  );
+
+  function resolveDept(input: string, lineNo: number): { id: string | null; err?: BulkRowError } {
+    if (!input) return { id: null };
+    // "대분류>소분류" 형식이면 정확 매칭
+    const m = input.match(/^([^>]+)>(.+)$/);
+    if (m) {
+      const group = m[1].trim();
+      const leaf = m[2].trim();
+      const cand = deptsArr.find(
+        (d) =>
+          d.parent_id !== null &&
+          d.name === leaf &&
+          groupById.get(d.parent_id) === group,
+      );
+      if (!cand) {
+        return {
+          id: null,
+          err: { row: lineNo, message: `부서를 찾을 수 없습니다: "${input}"` },
+        };
+      }
+      return { id: cand.id };
+    }
+    // leaf 이름으로만 — 동명이인 leaf 있으면 거부
+    const matches = deptsArr.filter(
+      (d) => d.parent_id !== null && d.name === input,
+    );
+    if (matches.length === 1) return { id: matches[0].id };
+    if (matches.length === 0) {
+      // 그룹 자체로 시도 (관리자 등 그룹 직속도 허용)
+      const grp = deptsArr.find((d) => d.parent_id === null && d.name === input);
+      if (grp) return { id: grp.id };
+      return {
+        id: null,
+        err: { row: lineNo, message: `부서를 찾을 수 없습니다: "${input}"` },
+      };
+    }
+    return {
+      id: null,
+      err: {
+        row: lineNo,
+        message: `"${input}" 이름의 부서가 ${matches.length}개 있습니다. "대분류>소분류" 형식으로 지정해 주세요.`,
+      },
+    };
+  }
+
+  type ToInsert = {
+    name: string;
+    phone: string;
+    role: UserRole;
+    dept_id: string | null;
+    pin_hash: string | null;
+  };
+
+  const errors: BulkRowError[] = [];
+  const records: ToInsert[] = [];
+
+  for (const r of parsed.rows) {
+    const lineNo = parsed.sourceLine[r.row];
+    const name = get(r.cells, "이름").trim();
+    const phoneRaw = get(r.cells, "휴대폰", "전화번호").trim();
+    const roleRaw = get(r.cells, "역할").trim();
+    const deptInput = get(r.cells, "부서").trim();
+
+    if (!name || !phoneRaw || !roleRaw) {
+      errors.push({ row: lineNo, message: "이름·휴대폰·역할은 필수입니다." });
+      continue;
+    }
+    // 휴대폰 — 숫자만 남기고 검증 (010-1234-5678 같은 형식 허용)
+    const phone = phoneRaw.replace(/\D/g, "");
+    if (!isValidPhone(phone)) {
+      errors.push({ row: lineNo, message: PHONE_INVALID_MESSAGE });
+      continue;
+    }
+    const role = ROLE_MAP[roleRaw];
+    if (!role) {
+      errors.push({ row: lineNo, message: `역할을 알 수 없습니다: "${roleRaw}"` });
+      continue;
+    }
+    const { id: deptId, err: deptErr } = resolveDept(deptInput, lineNo);
+    if (deptErr) {
+      errors.push(deptErr);
+      continue;
+    }
+
+    let pinHash: string | null = null;
+    if (isApprover(role)) {
+      const tail = phoneTail(phone);
+      pinHash = await hashPin(tail);
+    }
+
+    records.push({ name, phone, role, dept_id: deptId, pin_hash: pinHash });
+  }
+
+  if (errors.length > 0) return { ok: false, count: 0, errors };
+
+  const { error } = await supabase.from("users").insert(records);
+  if (error) {
+    return { ok: false, count: 0, errors: [{ row: 1, message: error.message }] };
+  }
+
+  revalidateUserPages();
+  return { ok: true, count: records.length };
 }
 
 /**

@@ -17,6 +17,7 @@ import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { KioskAutoReturn } from "@/components/kiosk-auto-return";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { getPrintEnabled } from "@/lib/site-settings";
 
 export default async function Page(props: PageProps<"/reservations/[id]">) {
   if (!isSupabaseConfigured()) {
@@ -51,6 +52,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
     .single();
   if (error || !data) notFound();
   const r = data as unknown as ReservationDetail;
+  const printEnabled = await getPrintEnabled();
 
   return (
     <>
@@ -66,13 +68,18 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
           <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
-            <strong>신청서가 잘 접수되었습니다.</strong> 사무실 프린터로
-            결재 서류 인쇄 요청이 전송됐습니다. 아래에서 진행 상황을 확인해
-            주세요.
+            <strong>신청서가 잘 접수되었습니다.</strong>{" "}
+            {printEnabled
+              ? "사무실 프린터로 결재 서류 인쇄 요청이 전송됐습니다. 아래에서 진행 상황을 확인해 주세요."
+              : "결재가 진행되면 아래 결재 진행 카드에서 상태를 확인할 수 있습니다."}
           </div>
         )}
 
-        {isKiosk && <KioskAutoReturn printStatus={r.print_status} />}
+        {/* 키오스크 자동 복귀 — 인쇄 상태 기반이라 print 비활성 시엔 의미 없음.
+            (인쇄 OFF 면 키오스크 흐름 자체도 함께 비활성으로 가정) */}
+        {isKiosk && printEnabled && (
+          <KioskAutoReturn printStatus={r.print_status} />
+        )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-stone-900">
@@ -97,14 +104,16 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           </div>
         )}
 
-        <div className="mb-6">
-          <PrintProgress
-            kind="reservation"
-            id={r.id}
-            status={r.print_status}
-            statusAt={r.print_status_at}
-          />
-        </div>
+        {printEnabled && (
+          <div className="mb-6">
+            <PrintProgress
+              kind="reservation"
+              id={r.id}
+              status={r.print_status}
+              statusAt={r.print_status_at}
+            />
+          </div>
+        )}
 
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -145,18 +154,21 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
         <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">결재 진행 방법</h2>
           <p className="mb-4 text-stone-700">
-            결재 서류를 인쇄하여 결재자에게 회람하거나, 디지털 링크를 직접
-            전달하세요.
+            {printEnabled
+              ? "결재 서류를 인쇄하여 결재자에게 회람하거나, 디지털 링크를 직접 전달하세요."
+              : "결재자에게 아래 디지털 링크를 전달하세요."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Link href={`/reservations/${r.id}/print`} target="_blank">
-              <Button size="lg" variant="primary">
-                <Printer className="h-5 w-5" />
-                결재 서류 인쇄
-              </Button>
-            </Link>
+            {printEnabled && (
+              <Link href={`/reservations/${r.id}/print`} target="_blank">
+                <Button size="lg" variant="primary">
+                  <Printer className="h-5 w-5" />
+                  결재 서류 인쇄
+                </Button>
+              </Link>
+            )}
             <Link href={`/reservations/${r.id}/digital`}>
-              <Button size="lg" variant="secondary">
+              <Button size="lg" variant={printEnabled ? "secondary" : "primary"}>
                 <FileText className="h-5 w-5" />
                 디지털 링크 보기
               </Button>

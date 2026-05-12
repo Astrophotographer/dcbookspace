@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { GripVertical, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { GripVertical, Pencil, Plus, Trash2, Upload, UserPlus, X } from "lucide-react";
 import type { AppUser, Department } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
+import { BulkImportModal } from "@/components/admin/bulk-import-modal";
 import {
+  bulkImportDepartments,
   clearDeptElder,
   clearDeptHead,
   createDepartment,
@@ -17,6 +20,26 @@ import {
   setDeptElder,
   setDeptHead,
 } from "./actions";
+
+const BULK_EXAMPLE_DEPT = `대분류,소분류,부서장이름,부서장전화번호,장로이름,장로전화번호
+교육부,유치부,홍길동,01012345678,김철수,01098765432
+교육부,초등부,이영희,01023456789,,
+교육부,중등부,,,박지훈,01076543210
+선교부,해외선교,,,,
+청년부,,,,,`;
+
+const BULK_COLUMNS_DEPT = [
+  { name: "대분류", required: true, help: "그룹 이름. 이미 있으면 재사용" },
+  { name: "소분류", required: false, help: "비우면 그룹만 생성 / 채우면 그 그룹 아래 부서(leaf)" },
+  { name: "부서장이름", required: false, help: "소분류 줄에서만 의미 있음" },
+  {
+    name: "부서장전화번호",
+    required: false,
+    help: "010 + 8자리. 뒷 4자리가 초기 PIN 으로 자동 발급",
+  },
+  { name: "장로이름", required: false, help: "담당장로 이름" },
+  { name: "장로전화번호", required: false, help: "010 + 8자리. PIN 자동 발급" },
+];
 
 type Props = {
   initialDepartments: Department[];
@@ -29,10 +52,12 @@ export function DepartmentsAdmin({
   initialDepartments,
   initialContacts,
 }: Props) {
+  const router = useRouter();
   const [depts, setDepts] = useState(initialDepartments);
   const [contacts, setContacts] = useState(initialContacts);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [openSlot, setOpenSlot] = useState<{
     deptId: string;
     slot: ContactSlot;
@@ -129,6 +154,29 @@ export function DepartmentsAdmin({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={() => setBulkOpen(true)}
+        >
+          <Upload className="h-4 w-4" />
+          CSV 일괄 추가
+        </Button>
+      </div>
+
+      <BulkImportModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title="부서 일괄 추가"
+        description="여러 부서를 한 번에 등록합니다. 한 줄이라도 오류가 있으면 전부 저장되지 않습니다."
+        example={BULK_EXAMPLE_DEPT}
+        columns={BULK_COLUMNS_DEPT}
+        onSubmit={bulkImportDepartments}
+        onSaved={() => router.refresh()}
+      />
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}

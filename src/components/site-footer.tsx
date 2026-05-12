@@ -7,8 +7,8 @@
 //   - 프로덕션 시작 선언 시: v1.0 부터 (정식 릴리스, `*` 제거)
 //   - 프로덕션 후 마이너 배포: v1.0 → v1.1 → v1.2 ...
 //   - 큰 변경: v2.0, v3.0 같이 메이저 점프
-const VERSION = "v1.2*";
-const RELEASE_DATE = "05.11";
+const VERSION = "v1.3*";
+const RELEASE_DATE = "05.12";
 
 export function SiteFooter() {
   return (
