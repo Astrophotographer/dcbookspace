@@ -1,5 +1,5 @@
 import { AlertTriangle, Ban } from "lucide-react";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, formatTime } from "@/lib/utils";
 import type { ActiveConflictItem } from "@/lib/conflicts";
 
 /**
@@ -47,38 +47,43 @@ export function ConflictBanner({ conflicts, level }: Props) {
               : "같은 시간·장소에 다른 신청서가 있어요"}
           </h3>
           <ul className="mt-2 space-y-1.5 text-sm">
-            {conflicts.map((c) => (
-              <li
-                key={`${c.kind}-${c.id}`}
-                className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
-              >
-                <span className="font-medium">
-                  #{c.ref_no ?? c.id.slice(0, 8)}
-                </span>
-                <span className="text-stone-700">·</span>
-                <span>{c.dept?.name ?? "-"}</span>
-                <span className="text-stone-500">({c.applicant?.name ?? "-"})</span>
-                <span className="text-stone-700">·</span>
-                <span className="font-mono text-xs">
-                  {formatDateTime(c.start_at)} ~ {formatDateTime(c.end_at)}
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    c.status === "approved"
-                      ? "bg-red-200 text-red-900"
-                      : "bg-amber-200 text-amber-900",
-                  )}
+            {conflicts.map((c) => {
+              const sameDay = c.start_at.slice(0, 10) === c.end_at.slice(0, 10);
+              return (
+                <li
+                  key={`${c.kind}-${c.id}`}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-0.5"
                 >
-                  {c.status === "approved" ? "확정" : "결재중"}
-                </span>
-              </li>
-            ))}
+                  <span className="font-medium">
+                    #{c.ref_no ?? c.id.slice(0, 8)}
+                  </span>
+                  <span className="text-stone-700">·</span>
+                  <span>{c.dept?.name ?? "-"}</span>
+                  <span className="text-stone-500">
+                    ({c.applicant?.name ?? "-"})
+                  </span>
+                  <span className="text-stone-700">·</span>
+                  <span className="font-mono text-xs">
+                    {formatDateTime(c.start_at)} ~{" "}
+                    {sameDay ? formatTime(c.end_at) : formatDateTime(c.end_at)}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                      c.status === "approved"
+                        ? "bg-red-200 text-red-900"
+                        : "bg-amber-200 text-amber-900",
+                    )}
+                  >
+                    {c.status === "approved" ? "확정" : "결재중"}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
           {isCritical && (
             <p className="mt-3 text-sm">
-              결재를 진행해도 같은 시간에 두 예약이 공존하게 됩니다. 진행
-              여부는 결재자 판단입니다.
+              결재를 진행해도 같은 시간에 두 예약이 공존하게 됩니다.
             </p>
           )}
         </div>
