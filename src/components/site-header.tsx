@@ -8,13 +8,28 @@ type Props = {
   kiosk?: boolean;
 };
 
+/**
+ * Vercel 빌드 환경에 따라 staging 임을 한눈에 보여주는 배지.
+ * - 'production' → 안 보임 (dcbook.vercel.app)
+ * - 'preview' / 'development' / undefined → 노출 (dcbookspace.vercel.app, localhost 등)
+ */
+function StagingBadge() {
+  if (process.env.VERCEL_ENV === "production") return null;
+  return (
+    <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-md sm:px-5 sm:py-1.5 sm:text-base">
+      🧪 테스트용 페이지
+    </span>
+  );
+}
+
 export async function SiteHeader({ kiosk = false }: Props = {}) {
   // 키오스크 모드: 로고 + "신청 전용" 배지만. 다른 페이지로 갈 수 있는 GUI 0
   // — 어르신이 의도 외 영역으로 빠지는 사고 방지. Link 도 일반 div 로 (홈 이동 X).
   if (kiosk) {
     return (
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+        <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+          <StagingBadge />
           <div
             className="flex min-w-0 items-center gap-2 sm:gap-4"
             aria-label="등촌교회"
@@ -40,7 +55,8 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
   const admin = await isAdmin();
   return (
     <header className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+        <StagingBadge />
         <Link
           href="/"
           className="flex min-w-0 items-center gap-2 sm:gap-4"
