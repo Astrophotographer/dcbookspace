@@ -7,7 +7,6 @@ import {
   addDays,
   addMonths,
   eachDayOfInterval,
-  format,
   isSameDay,
   max as maxDate,
   min as minDate,
@@ -19,7 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { fixedEventsByDate } from "@/lib/recurrence";
-import { cn, formatTime } from "@/lib/utils";
+import { cn, formatKst as format, formatTime } from "@/lib/utils";
 
 /**
  * 두 ISO 시각 차이를 한국어 "N시간 / N시간 M분 / M분" 으로 표시.

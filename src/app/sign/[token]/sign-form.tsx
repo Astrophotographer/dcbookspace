@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Check, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatKst as format } from "@/lib/utils";
 import type { ActiveConflictItem } from "@/lib/conflicts";
 import {
   cancelByChairman,

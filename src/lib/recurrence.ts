@@ -1,4 +1,5 @@
-import { addDays, eachDayOfInterval, format, parseISO } from "date-fns";
+import { addDays, eachDayOfInterval, parseISO } from "date-fns";
+import { formatKst as format } from "@/lib/utils";
 import type { FixedEvent, TimeBlock } from "@/lib/supabase/types";
 
 const KOR_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;

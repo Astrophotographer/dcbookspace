@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
   CalendarDays,
@@ -20,7 +20,7 @@ import {
 import type { Building, Floor, Room } from "@/lib/supabase/types";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
-import { cn, formatTime } from "@/lib/utils";
+import { cn, formatKst as format, formatTime } from "@/lib/utils";
 import { displayStatus, STATUS_LABEL } from "@/lib/reservation-status";
 import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";

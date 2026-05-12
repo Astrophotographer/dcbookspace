@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
 import { qrDataUrl } from "@/lib/qr";
-import { formatDate, resolveBaseUrl } from "@/lib/utils";
+import { formatDate, formatKst as format, resolveBaseUrl } from "@/lib/utils";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getSeries } from "@/lib/repo";
 import { weekdayLabel } from "@/lib/recurrence";

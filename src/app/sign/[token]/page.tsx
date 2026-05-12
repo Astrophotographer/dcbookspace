@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
 import { ApprovalProgress } from "@/components/approval-progress";
 import { ConflictBanner } from "@/components/conflict-banner";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatKst as format } from "@/lib/utils";
 import { getSignTargetByQrToken } from "@/lib/repo";
 import { findActiveConflictsFor } from "@/lib/conflicts";
 import { createServiceClient } from "@/lib/supabase/server";

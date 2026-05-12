@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { CalendarCheck, Clock, Pin } from "lucide-react";
 import { fetchRoomAvailability, type ExistingSlot } from "./availability";
-import { formatTime } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatKst as format } from "@/lib/utils";
 
 /**
  * 슬롯 시간 표시. 시작·종료가 같은 날이면 "HH:mm-HH:mm",

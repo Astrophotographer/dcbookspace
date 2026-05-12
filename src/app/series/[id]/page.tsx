@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Printer, FileText } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
 import { getSeries } from "@/lib/repo";
+import { formatKst as format } from "@/lib/utils";
 import { weekdayLabel } from "@/lib/recurrence";
 import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
