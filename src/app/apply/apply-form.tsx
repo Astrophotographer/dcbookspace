@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -18,7 +19,15 @@ import type {
 } from "@/lib/supabase/types";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ConflictModal } from "@/components/ui/conflict-modal";
+// ConflictModal 은 충돌 발생 시에만 노출 — 정상 경로에선 다운로드/평가 안 됨.
+// date-fns 를 사용하는 무거운 컴포넌트라 dynamic split 효과 큼.
+const ConflictModal = dynamic(
+  () =>
+    import("@/components/ui/conflict-modal").then((m) => ({
+      default: m.ConflictModal,
+    })),
+  { ssr: false },
+);
 import { setMe } from "@/lib/me";
 import { formatPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
