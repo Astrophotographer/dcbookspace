@@ -49,7 +49,7 @@ export default async function SeriesPrintPage(props: PageArgs) {
 
   const apprByOrder = new Map(series.approvals.map((a) => [a.step_order, a]));
   const steps = series.route.steps as ApprovalStep[];
-  const createdLabel = formatDate(series.created_at, "yyyy/MM/dd");
+  const createdLabel = formatDate(series.created_at, "yyyy 년   MM 월   dd 일");
 
   const blockLabel = series.time_blocks
     .map((b) => `${b.start}-${b.end}`)
@@ -80,7 +80,9 @@ export default async function SeriesPrintPage(props: PageArgs) {
               <img src={qr} alt="전자결재용 QR" width={92} height={92} />
               <div className="qr-caption">전자결재용 QR</div>
             </div>
-            <table className="approval-table">
+            <div className="approval-right">
+              <div className="ref-no-top">신청번호 {series.ref_no ?? "—"}</div>
+              <table className="approval-table">
               <tbody>
                 <tr>
                   <th rowSpan={2} className="approval-stamp">
@@ -115,6 +117,7 @@ export default async function SeriesPrintPage(props: PageArgs) {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="content-body">
@@ -169,8 +172,6 @@ export default async function SeriesPrintPage(props: PageArgs) {
           </div>
 
           <div className="date-section">신 청 일 : {createdLabel}</div>
-
-          <div className="ref-no">신청번호 {series.ref_no}</div>
         </div>
 
         <style>{`
@@ -227,6 +228,18 @@ export default async function SeriesPrintPage(props: PageArgs) {
             margin-left: 14mm;
           }
           .qr-caption { font-size: 9pt; font-weight: 600; }
+          .approval-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+          }
+          .ref-no-top {
+            font-size: 10pt;
+            color: #000;
+            font-weight: 600;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          }
           .approval-table {
             border-collapse: collapse;
             width: 300px;
@@ -339,15 +352,8 @@ export default async function SeriesPrintPage(props: PageArgs) {
             font-weight: bold;
             margin-top: auto;
             padding-top: 18px;
-            padding-bottom: 16mm;
-          }
-          .ref-no {
-            position: absolute;
-            right: 8mm;
-            bottom: 4mm;
-            font-size: 9pt;
-            color: #555;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            padding-bottom: 6mm;
+            white-space: pre;
           }
           @media print {
             html, body {

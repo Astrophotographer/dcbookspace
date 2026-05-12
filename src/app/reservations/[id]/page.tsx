@@ -67,12 +67,17 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
       />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {justSubmitted && (
-          <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
-            <strong>신청서가 잘 접수되었습니다.</strong>{" "}
-            {printEnabled
-              ? "사무실 프린터로 결재 서류 인쇄 요청이 전송됐습니다. 아래에서 진행 상황을 확인해 주세요."
-              : "결재가 진행되면 아래 결재 진행 카드에서 상태를 확인할 수 있습니다."}
-          </div>
+          printEnabled ? (
+            <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-900">
+              <strong>신청서를 프린트하는 중입니다.</strong> 아래에서 진행
+              상황을 확인해 주세요.
+            </div>
+          ) : (
+            <div className="mb-4 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-emerald-900">
+              <strong>신청서가 잘 접수되었습니다.</strong> 결재가 진행되면 아래
+              결재 진행 카드에서 상태를 확인할 수 있습니다.
+            </div>
+          )
         )}
 
         {/* 키오스크 자동 복귀 — 인쇄 상태 기반이라 print 비활성 시엔 의미 없음.
