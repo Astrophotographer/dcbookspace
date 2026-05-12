@@ -59,12 +59,7 @@ export default async function AdminAdminsPage() {
           </h2>
           <p className="mt-1 mb-4 text-sm leading-relaxed text-stone-600">
             관리자는 <strong>휴대폰 뒷 4자리</strong>가 마스터 PIN 으로
-            발급되며, 어떤 결재 단계든 강제 승인할 수 있습니다. 비상용 마스터
-            키
-            <span className="mx-1 rounded bg-stone-100 px-1.5 py-0.5 font-mono">
-              0000
-            </span>
-            은 코드에 별도로 유지됩니다.
+            발급되며, 어떤 결재 단계든 강제 승인할 수 있습니다.
           </p>
           <AdminsAdmin initialAdmins={(admins ?? []) as AppUser[]} />
         </section>

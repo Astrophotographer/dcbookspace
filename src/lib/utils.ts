@@ -23,6 +23,22 @@ export function formatTime(d: Date | string) {
   return formatDate(d, "HH:mm");
 }
 
+/**
+ * 시작~종료 시각의 차이를 한국어 'X 시간 Y 분' 형식으로.
+ * - 30분 단위로 반올림하지 않고, 분 단위 그대로
+ * - 정시(0분) 이면 '1 시간', 시간 0 이면 '30 분' 식으로 단위 생략
+ */
+export function formatDuration(startISO: string, endISO: string): string {
+  const diffMs = Date.parse(endISO) - Date.parse(startISO);
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return "";
+  const totalMin = Math.round(diffMs / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours === 0) return `${mins} 분`;
+  if (mins === 0) return `${hours} 시간`;
+  return `${hours} 시간 ${mins} 분`;
+}
+
 // 슬래시 형식 (YYYY/MM/DD HH:mm) — 서류 출력용
 export function formatDateSlash(d: Date | string) {
   return formatDate(d, "yyyy/MM/dd HH:mm");

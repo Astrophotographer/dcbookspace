@@ -39,7 +39,9 @@ import {
   displayStatus,
   STATUS_BADGE_CLASS,
   STATUS_CHIP_CLASS,
+  STATUS_ICON,
   STATUS_LABEL,
+  STATUS_LABEL_SHORT,
 } from "@/lib/reservation-status";
 
 type Props = {
@@ -434,14 +436,20 @@ function DayReservationsModal({
                         <span className="text-xs text-stone-500">
                           ({durationLabel(r.start_at, r.end_at)})
                         </span>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                            STATUS_BADGE_CLASS[ds],
-                          )}
-                        >
-                          {STATUS_LABEL[ds]}
-                        </span>
+                        {(() => {
+                          const Icon = STATUS_ICON[ds];
+                          return (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                                STATUS_BADGE_CLASS[ds],
+                              )}
+                            >
+                              <Icon className="h-3 w-3" aria-hidden />
+                              {STATUS_LABEL_SHORT[ds]}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="text-base text-stone-900">
                         <div>

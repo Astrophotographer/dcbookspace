@@ -2,11 +2,35 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { CalendarDays, Building2 } from "lucide-react";
+import { CalendarDays, Building2, Clock, ArrowRight, CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Building, Floor, Room } from "@/lib/supabase/types";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
+
+// 달력 태그 색·아이콘 — 자연 + 파스텔 톤 (저채도).
+// 대기=마른 풀(yellow), 진행=잎사귀(emerald, →), 확정=파스텔 하늘(sky).
+// building-view STATE_COLOR 와 동일 체계.
+const LEGEND_ITEMS = [
+  {
+    key: "pending",
+    label: "결재 대기중",
+    color: "bg-yellow-100 border-yellow-500 text-yellow-900",
+    Icon: Clock,
+  },
+  {
+    key: "mixed",
+    label: "결재 진행중",
+    color: "bg-emerald-100 border-emerald-500 text-emerald-900",
+    Icon: ArrowRight,
+  },
+  {
+    key: "approved",
+    label: "장소사용확정",
+    color: "bg-sky-100 border-sky-500 text-sky-900",
+    Icon: CircleCheck,
+  },
+] as const;
 
 // BuildingView 는 사용자가 "장소별" 탭을 한 번이라도 열기 전까지 다운로드/평가되지 않음.
 // 첫 페이지 진입 시 ~30~40KB 의 client JS 가 절약됨.
@@ -138,8 +162,9 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
 
   return (
     <div>
-      {/* 토글(segmented control) — 모바일은 가로 꽉, 데스크톱은 좌측 끝 정렬. */}
-      <div role="tablist" className="mb-4 flex">
+      {/* 토글(segmented control) — 모바일은 가로 꽉, 데스크톱은 좌측 끝 정렬.
+          오른쪽엔 달력 태그 범례 (데스크탑에서만; 모바일은 공간 부족) */}
+      <div role="tablist" className="mb-4 flex items-center justify-between gap-3">
         <div
           className="inline-flex w-full touch-pan-y rounded-full bg-stone-100 p-1 sm:w-auto"
           onTouchStart={onToggleTouchStart}
@@ -175,6 +200,23 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
             <Building2 className="h-5 w-5" />
             장소별
           </button>
+        </div>
+
+        {/* 달력 태그 범례 — 데스크탑에서만 노출 (모바일은 가로 공간 부족) */}
+        <div className="hidden flex-wrap items-center gap-3 text-xs sm:flex">
+          {LEGEND_ITEMS.map(({ key, label, color, Icon }) => (
+            <span key={key} className="inline-flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded border",
+                  color,
+                )}
+              >
+                <Icon aria-hidden className="h-3.5 w-3.5" />
+              </span>
+              {label}
+            </span>
+          ))}
         </div>
       </div>
 

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { ApprovalTracker } from "@/components/approval-tracker";
 import { ReservationBadge } from "@/components/ui/badge";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, formatDuration, formatTime } from "@/lib/utils";
 import { maskName } from "@/lib/privacy";
 import type {
   ApprovalRoute,
@@ -451,7 +451,19 @@ export function ReservationsTable({
                             {formatDateTime(entry.data.start_at)}
                           </div>
                           <div className="text-xs text-stone-500">
-                            ~ {formatDateTime(entry.data.end_at)}
+                            {entry.data.start_at.slice(0, 10) ===
+                            entry.data.end_at.slice(0, 10) ? (
+                              <>
+                                ~ {formatTime(entry.data.end_at)} (
+                                {formatDuration(
+                                  entry.data.start_at,
+                                  entry.data.end_at,
+                                )}
+                                )
+                              </>
+                            ) : (
+                              <>~ {formatDateTime(entry.data.end_at)}</>
+                            )}
                           </div>
                         </>
                       ) : (

@@ -7,13 +7,13 @@ import { ko } from "date-fns/locale";
 import {
   CalendarDays,
   ChevronLeft,
+  ArrowRight,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   CircleCheck,
   CircleSlash,
   Clock,
-  Loader2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -57,9 +57,9 @@ function statusFor(reservations: ReservationDetail[], roomId: string): RoomState
 
 const STATE_COLOR: Record<RoomState, string> = {
   empty:    "bg-stone-50    border-stone-300   text-stone-700   hover:bg-stone-100",
-  pending:  "bg-amber-50    border-amber-400   text-amber-900   hover:bg-amber-100",
-  approved: "bg-emerald-50  border-emerald-400 text-emerald-900 hover:bg-emerald-100",
-  mixed:    "bg-orange-50   border-orange-400  text-orange-900  hover:bg-orange-100",
+  pending:  "bg-yellow-100   border-yellow-500  text-yellow-900  hover:bg-yellow-200",
+  mixed:    "bg-emerald-100  border-emerald-500 text-emerald-900 hover:bg-emerald-200",
+  approved: "bg-sky-100      border-sky-500     text-sky-900     font-semibold hover:bg-sky-200",
 };
 
 const STATE_LABEL: Record<RoomState, string> = {
@@ -73,7 +73,7 @@ const STATE_LABEL: Record<RoomState, string> = {
 const STATE_ICON: Record<RoomState, LucideIcon> = {
   empty:    CircleSlash,
   pending:  Clock,
-  mixed:    Loader2,
+  mixed:    ArrowRight,
   approved: CircleCheck,
 };
 
@@ -545,7 +545,6 @@ function RoomMap({
                         aria-hidden
                         className={cn(
                           "h-3.5 w-3.5 self-center",
-                          state === "mixed" && "animate-spin-slow",
                         )}
                       />
                     );
@@ -802,10 +801,7 @@ function RoomGrid({
                 return (
                   <Icon
                     aria-hidden
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      state === "mixed" && "animate-spin-slow",
-                    )}
+                    className="h-3.5 w-3.5"
                   />
                 );
               })()}
