@@ -164,16 +164,14 @@ export async function findRoomConflicts(
   };
 }
 
-function pickRoute(routes: ApprovalRoute[], attendees: number, external: boolean) {
-  // 특수 조건: 50명 이상 OR 외부행사 → 4단계
-  if (attendees >= 50 || external) {
-    const special = routes.find(
-      (r) =>
-        Array.isArray(r.steps) &&
-        (r.steps as ApprovalStep[]).some((s) => s.role === "senior_pastor"),
-    );
-    if (special) return special;
-  }
+// 인원·외부행사와 무관하게 모든 신청은 동일한 default 결재선을 사용 (2026-05-12 정책).
+// 이전엔 50명 이상/외부행사면 당회장 단계가 추가되는 특수 route 를 골랐으나,
+// 운영 단순화를 위해 단일 결재선으로 통일.
+function pickRoute(
+  routes: ApprovalRoute[],
+  _attendees: number,
+  _external: boolean,
+) {
   return routes.find((r) => r.is_default) ?? routes[0];
 }
 
