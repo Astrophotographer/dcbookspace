@@ -772,68 +772,74 @@ function RoomGrid({
   fixedEvents: FixedEventInstance[];
   isAdmin?: boolean;
 }) {
+  // RoomMap 과 동일한 모달 패턴 — 호실 카드 어디든 클릭하면 모달.
+  // (이전엔 카드 안 inline Link 로 바로 detail 이동 → 어르신 손가락에 작은 표적)
+  const [modalRoomId, setModalRoomId] = useState<string | null>(null);
+  const modalRoom = modalRoomId
+    ? rooms.find((r) => r.id === modalRoomId) ?? null
+    : null;
+  const modalList = modalRoomId
+    ? reservations.filter((res) => res.room_id === modalRoomId)
+    : [];
+  const modalFixedList = modalRoomId
+    ? fixedEvents.filter((e) => e.room_id === modalRoomId)
+    : [];
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      {rooms.map((r) => {
-        const state = statusFor(reservations, r.id);
-        const list = reservations.filter((res) => res.room_id === r.id);
-        const fixedList = fixedEvents.filter((e) => e.room_id === r.id);
-        return (
-          <div
-            key={r.id}
-            id={`room-${r.id}`}
-            className={cn(
-              "flex min-h-32 flex-col rounded-lg border p-3",
-              STATE_COLOR[state],
-            )}
-          >
-            <div className="flex items-center gap-1">
-              <span className="font-bold">{r.name}</span>
-              {fixedList.length > 0 && (
-                <span className="rounded bg-stone-200/80 px-1 text-[10px] font-medium text-stone-700">
-                  고정
-                </span>
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {rooms.map((r) => {
+          const state = statusFor(reservations, r.id);
+          const list = reservations.filter((res) => res.room_id === r.id);
+          const fixedList = fixedEvents.filter((e) => e.room_id === r.id);
+          return (
+            <button
+              key={r.id}
+              id={`room-${r.id}`}
+              type="button"
+              onClick={() => setModalRoomId(r.id)}
+              className={cn(
+                "flex min-h-32 flex-col rounded-lg border p-3 text-left transition-colors",
+                STATE_COLOR[state],
               )}
-            </div>
-            <div className="flex items-center gap-1 text-sm opacity-80">
-              {(() => {
-                const Icon = STATE_ICON[state];
-                return (
-                  <Icon
-                    aria-hidden
-                    className="h-3.5 w-3.5"
-                  />
-                );
-              })()}
-              {STATE_LABEL[state]}
-            </div>
-            {(fixedList.length > 0 || list.length > 0) && (
-              <ul className="mt-2 space-y-2 text-xs">
-                {fixedList.slice(0, 2).map((ev) => (
-                  <li
-                    key={ev.id}
-                    className="rounded bg-stone-200/70 px-1.5 py-1 leading-snug text-stone-800"
-                  >
-                    <div className="font-semibold">[고정] {ev.name}</div>
-                    <div className="font-mono opacity-80">
-                      {formatTime(ev.start_at)}–{formatTime(ev.end_at)}
-                    </div>
-                  </li>
-                ))}
-                {list.slice(0, 3).map((res) => {
-                  const ds = displayStatus(res);
-                  return (
-                    <li key={res.id}>
-                      <Link
-                        href={reservationHref(res.id, isAdmin)}
-                        className="block leading-snug hover:underline"
-                      >
+            >
+              <div className="flex items-center gap-1">
+                <span className="font-bold">{r.name}</span>
+                {fixedList.length > 0 && (
+                  <span className="rounded bg-stone-200/80 px-1 text-[10px] font-medium text-stone-700">
+                    고정
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-sm opacity-80">
+                {(() => {
+                  const Icon = STATE_ICON[state];
+                  return <Icon aria-hidden className="h-3.5 w-3.5" />;
+                })()}
+                {STATE_LABEL[state]}
+              </div>
+              {(fixedList.length > 0 || list.length > 0) && (
+                <ul className="mt-2 space-y-2 text-xs">
+                  {fixedList.slice(0, 2).map((ev) => (
+                    <li
+                      key={ev.id}
+                      className="rounded bg-stone-200/70 px-1.5 py-1 leading-snug text-stone-800"
+                    >
+                      <div className="font-semibold">[고정] {ev.name}</div>
+                      <div className="font-mono opacity-80">
+                        {formatTime(ev.start_at)}–{formatTime(ev.end_at)}
+                      </div>
+                    </li>
+                  ))}
+                  {list.slice(0, 3).map((res) => {
+                    const ds = displayStatus(res);
+                    return (
+                      <li key={res.id} className="leading-snug">
                         <div>
                           <span className="font-semibold">
                             [{STATUS_LABEL[ds]}]
                           </span>{" "}
-                          {formatTime(res.start_at)}–
-                          {formatTime(res.end_at)}
+                          {formatTime(res.start_at)}–{formatTime(res.end_at)}
                         </div>
                         <div className="opacity-90">{res.dept?.name ?? "?"}</div>
                         <div className="opacity-90">{res.applicant.name}</div>
@@ -842,20 +848,29 @@ function RoomGrid({
                             {res.applicant.phone}
                           </div>
                         )}
-                      </Link>
+                      </li>
+                    );
+                  })}
+                  {list.length + fixedList.length > 5 && (
+                    <li className="text-stone-500">
+                      +{list.length + fixedList.length - 5}건
                     </li>
-                  );
-                })}
-                {list.length + fixedList.length > 5 && (
-                  <li className="text-stone-500">
-                    +{list.length + fixedList.length - 5}건
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
-        );
-      })}
-    </div>
+                  )}
+                </ul>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {modalRoom && (
+        <RoomDetailModal
+          room={modalRoom}
+          list={modalList}
+          fixedList={modalFixedList}
+          onClose={() => setModalRoomId(null)}
+          isAdmin={isAdmin}
+        />
+      )}
+    </>
   );
 }

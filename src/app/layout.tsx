@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { SiteFooter } from "@/components/site-footer";
 import { MobileApplyFab } from "@/components/mobile-apply-fab";
@@ -46,6 +48,10 @@ export default function RootLayout({
           <MobileApplyFab />
           <SiteFooter />
         </Suspense>
+        {/* Vercel 측정 — Analytics: 페이지뷰·이벤트, SpeedInsights: Core Web Vitals.
+            production 빌드에서만 실제 비콘 전송, dev 모드에선 no-op. */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
