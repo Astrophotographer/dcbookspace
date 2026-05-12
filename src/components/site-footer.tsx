@@ -8,7 +8,7 @@
 //   - Patch (1.0.0 → 1.0.1): 버그 수정·UX 다듬기
 //   - develop 빌드: 끝에 '-dev' 붙임 → staging 임을 한눈에 (예: v1.1.1-dev)
 //   - main 릴리스: '-dev' 제거 (예: v1.1.1)
-const VERSION = "v1.1.1-dev";
+const VERSION = "v1.2.0-dev";
 const RELEASE_DATE = "05.12";
 
 export function SiteFooter() {

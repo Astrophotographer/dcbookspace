@@ -4,8 +4,11 @@ import { ko } from "date-fns/locale";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
 import { ApprovalProgress } from "@/components/approval-progress";
+import { ConflictBanner } from "@/components/conflict-banner";
 import { formatDateTime } from "@/lib/utils";
 import { getSignTargetByQrToken } from "@/lib/repo";
+import { findActiveConflictsFor } from "@/lib/conflicts";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
   displayStatus,
   STATUS_BADGE_CLASS,
@@ -44,6 +47,17 @@ async function ReservationSign({
   token: string;
 }) {
   const ds = displayStatus(r);
+  // 결재 진행 중일 때만 충돌 안내 — 이미 결정된 신청은 정보 의미 없음
+  const conflicts =
+    r.status === "pending"
+      ? await findActiveConflictsFor(createServiceClient(), {
+          kind: "reservation",
+          id: r.id,
+        })
+      : [];
+  const conflictLevel = conflicts.some((c) => c.status === "approved")
+    ? "critical"
+    : "warn";
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
       <header className="mb-5 text-center">
@@ -79,6 +93,8 @@ async function ReservationSign({
           </span>
         </div>
       </section>
+
+      <ConflictBanner conflicts={conflicts} level={conflictLevel} />
 
       {r.status === "pending" && (
         <SignByPinForm
@@ -127,6 +143,16 @@ async function SeriesSign({
   const occurrences = [...s.reservations].sort((a, b) =>
     a.start_at.localeCompare(b.start_at),
   );
+  const conflicts =
+    s.status === "pending"
+      ? await findActiveConflictsFor(createServiceClient(), {
+          kind: "series",
+          id: s.id,
+        })
+      : [];
+  const conflictLevel = conflicts.some((c) => c.status === "approved")
+    ? "critical"
+    : "warn";
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
@@ -170,6 +196,8 @@ async function SeriesSign({
           </span>
         </div>
       </section>
+
+      <ConflictBanner conflicts={conflicts} level={conflictLevel} />
 
       {s.status === "pending" && (
         <SignByPinForm
