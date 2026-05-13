@@ -161,12 +161,12 @@ export default async function ReservationsListPage(
     ? selectedView === "active"
       ? activeEntries
       : completedEntries
-    : entries;
+    : activeEntries;
   const emptyMessage = admin
     ? selectedView === "active"
-      ? "오늘 이후 진행 중인 신청서가 없습니다."
-      : "과거 완료 신청서가 없습니다."
-    : undefined;
+      ? "현재 신청서가 없습니다."
+      : "지난 신청서가 없습니다."
+    : "현재 신청서가 없습니다.";
 
   return (
     <>
@@ -188,7 +188,7 @@ export default async function ReservationsListPage(
                   className={viewClass(selectedView === "active")}
                 >
                   <Clock className="h-5 w-5" aria-hidden />
-                  진행건
+                  현재건
                   <span className="ml-1 text-xs opacity-80">
                     {activeEntries.length}
                   </span>
@@ -200,7 +200,7 @@ export default async function ReservationsListPage(
                   className={viewClass(selectedView === "completed")}
                 >
                   <CircleCheck className="h-5 w-5" aria-hidden />
-                  완료건
+                  지난건
                   <span className="ml-1 text-xs opacity-80">
                     {completedEntries.length}
                   </span>
