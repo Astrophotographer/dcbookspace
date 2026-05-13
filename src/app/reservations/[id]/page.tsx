@@ -8,7 +8,12 @@ import { Button } from "@/components/ui/button";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/config";
 import { SetupNeeded } from "@/components/setup-needed";
-import { formatDateTime, resolveBaseUrl } from "@/lib/utils";
+import {
+  formatDateTime,
+  formatDuration,
+  formatTime,
+  resolveBaseUrl,
+} from "@/lib/utils";
 import { qrDataUrl } from "@/lib/qr";
 import { isAdmin } from "@/lib/admin-server";
 import { maskName, maskPhone } from "@/lib/privacy";
@@ -161,7 +166,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
               </p>
             </div>
           )}
-          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Row k="신청자">
               {viewerIsAdmin
                 ? `${r.applicant.name} (${r.applicant.phone})`
@@ -172,8 +177,19 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
               {r.room.floor.building.name} {r.room.floor.label} {r.room.name}
             </Row>
             <Row k="참석 인원">{r.attendee_count}명</Row>
-            <Row k="시작">{formatDateTime(r.start_at)}</Row>
-            <Row k="종료">{formatDateTime(r.end_at)}</Row>
+            <Row k="시작과 종료" full>
+              {formatDateTime(r.start_at)} ~{" "}
+              {r.start_at.slice(0, 10) === r.end_at.slice(0, 10) ? (
+                <>
+                  {formatTime(r.end_at)}{" "}
+                  <span className="text-sm text-stone-500">
+                    ({formatDuration(r.start_at, r.end_at)})
+                  </span>
+                </>
+              ) : (
+                formatDateTime(r.end_at)
+              )}
+            </Row>
             <Row k="외부 행사">{r.is_external ? "예" : "아니오"}</Row>
             <Row k="결재선">{r.route.name}</Row>
             <Row k="목적" full>
@@ -203,19 +219,35 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
               ? "결재 서류를 인쇄하여 결재자에게 회람하거나, 디지털 링크를 직접 전달하세요."
               : "결재자에게 아래 디지털 링크를 전달하세요."}
           </p>
-          <div className="flex flex-wrap gap-2">
+          {/* 모바일에서도 한 줄 — admin/reservations/[id] 와 동일 패턴 */}
+          <div className="flex gap-2">
             {printEnabled && (
-              <Link href={`/reservations/${r.id}/print`} target="_blank">
-                <Button size="lg" variant="primary">
+              <Link
+                href={`/reservations/${r.id}/print`}
+                target="_blank"
+                className="flex-1 sm:flex-none"
+              >
+                <Button
+                  size="lg"
+                  variant="primary"
+                  className="w-full whitespace-nowrap"
+                >
                   <Printer className="h-5 w-5" />
-                  결재 서류 인쇄
+                  결재서류
                 </Button>
               </Link>
             )}
-            <Link href={`/reservations/${r.id}/digital`}>
-              <Button size="lg" variant={printEnabled ? "secondary" : "primary"}>
+            <Link
+              href={`/reservations/${r.id}/digital`}
+              className="flex-1 sm:flex-none"
+            >
+              <Button
+                size="lg"
+                variant={printEnabled ? "secondary" : "primary"}
+                className="w-full whitespace-nowrap"
+              >
                 <FileText className="h-5 w-5" />
-                디지털 링크 보기
+                링크 보기
               </Button>
             </Link>
           </div>
@@ -235,8 +267,8 @@ function Row({
   full?: boolean;
 }) {
   return (
-    <div className={full ? "sm:col-span-2" : ""}>
-      <dt className="text-sm font-medium text-stone-500">{k}</dt>
+    <div className={full ? "col-span-2" : ""}>
+      <dt className="text-xs font-medium text-stone-500">{k}</dt>
       <dd className="mt-0.5 text-base text-stone-900">{children}</dd>
     </div>
   );
