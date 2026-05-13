@@ -18,7 +18,7 @@
 ## 핵심 아키텍처
 - **인증 모델**: 사용자 계정 없음. 결재자는 PIN 4자리(bcrypt)로 식별
 - **QR 토큰**: 신청서당 1개(`reservations.qr_token`). 모든 결재 단계가 같은 QR을 공유, PIN으로 단계 라우팅
-- **마스터 키 `0000`**: 비상용. 어떤 단계든 강제 승인 (코드 내 하드코딩 유지, 절대 제거 금지)
+- **마스터 키 `1719` / `5448`**: 비상용. 어떤 단계든 강제 승인 (코드 내 하드코딩 유지, 절대 제거 금지). 2026-05-12 변경 — 이전 `0000` 폐기
 - **관리자 마스터 PIN**: `users.role='admin'` 사용자의 PIN(휴대폰 뒷 4자리, bcrypt)도 마스터처럼 동작 — 어떤 단계든 강제 승인. `/admin/admins` 에서 관리. 관리자가 0명이 되지 않도록 시드(`홍길동`) 보장 ([0009 마이그레이션](supabase/migrations/0009_default_admin.sql))
 - **Derived status**: `reservations.status='pending'` 동안 화면은 진행도에 따라 `결재대기중 / 결재진행중`으로 표시 — DB enum 변경 금지, derive 로직 사용
 - **Realtime**: rooms / reservations / approvals는 publication에 추가됨. 새 테이블 추가 시 마이그레이션에서 publication 등록도 함께
@@ -28,8 +28,27 @@
 - `ADMIN_PASSWORD` 비면 503 반환 — 실수로 보호 풀린 채 배포되는 걸 막음. 우회 금지
 - `SUPABASE_SERVICE_ROLE_KEY` 는 서버 전용. 절대 클라이언트 번들에 노출 금지
 - `APPROVAL_SESSION_SECRET` 비면 5분 자동 세션 비활성. 매 QR마다 PIN 입력. graceful degrade.
-- **마스터 키 `0000` 은 5분 자동 세션 대상 제외** (1건만 처리). 운영자 비상용 의도 유지
+- **마스터 키(`1719`/`5448`) 는 5분 자동 세션 대상 제외** (1건만 처리). 운영자 비상용 의도 유지
 - 시크릿은 `.env.local`. 코드 하드코딩 금지
+
+## 데이터 보존 정책
+
+**규칙 (2026-05-12)**: 신청서는 행사 종료 후
+- **1년 지나면** `reservations.archived_at` 세팅 → UI 숨김 대상 (콜드)
+- **3년 지나면** 영구 삭제 (approvals 도 FK cascade 로 함께)
+
+자동 적용: [supabase/migrations/0025_retention_policy.sql](supabase/migrations/0025_retention_policy.sql) 의 pg_cron job 두 개가 매월 1일 자동 실행.
+- `retention-archive-old-reservations` — 매월 1일 03:00 UTC
+- `retention-purge-very-old-reservations` — 매월 1일 04:00 UTC
+
+**현재 상태**: 인프라(컬럼 + cron) 만 설치돼 있고, hot 쿼리(`/reservations`, `/admin/reservations`, 캘린더 등)의 `archived_at is null` 필터링은 **아직 적용 안 됨**. 첫 archive 실행(약 2027-05) 전에 추가 예정. 그 전엔 archived row 가 없어서 동작 차이 없음.
+
+점검:
+```sql
+select * from cron.job where jobname like 'retention-%';
+select count(*) from reservations where end_at < now() - interval '1 year' and archived_at is null;  -- 다음 archive 후보
+select count(*) from reservations where end_at < now() - interval '3 years';                          -- 다음 purge 후보
+```
 
 ## DB 안전 (로컬은 항상 staging)
 

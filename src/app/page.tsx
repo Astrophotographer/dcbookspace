@@ -13,7 +13,8 @@ import {
 import { expandFixedEvents } from "@/lib/recurrence";
 import { isSupabaseConfigured } from "@/lib/config";
 import { isAdmin } from "@/lib/admin-server";
-import { addDays, format, parseISO, startOfWeek } from "date-fns";
+import { addDays, parseISO, startOfWeek } from "date-fns";
+import { formatKst as format } from "@/lib/utils";
 
 export default async function Home(props: PageProps<"/">) {
   if (!isSupabaseConfigured()) {

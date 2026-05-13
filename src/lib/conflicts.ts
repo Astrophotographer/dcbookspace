@@ -116,6 +116,8 @@ export type ActiveConflictItem = {
   purpose: string;
   applicant: { name: string; phone: string | null } | null;
   dept: { name: string } | null;
+  /** 'approved' 면 결재 완료 (확정), 'pending' 이면 결재 진행 중 */
+  status: "pending" | "approved";
   /** 대표 시각 (시리즈는 충돌하는 첫 회차) */
   start_at: string;
   end_at: string;
@@ -127,6 +129,7 @@ type RawReservation = {
   purpose: string;
   start_at: string;
   end_at: string;
+  status: "pending" | "approved";
   series_id: string | null;
   applicant: { name: string; phone: string | null } | null;
   dept: { name: string } | null;
@@ -136,12 +139,13 @@ type RawSeries = {
   id: string;
   ref_no: string | null;
   purpose: string;
+  status: "pending" | "approved";
   applicant: { name: string; phone: string | null } | null;
   dept: { name: string } | null;
 };
 
 const RESERVATION_SELECT =
-  "id, ref_no, purpose, start_at, end_at, series_id, applicant:users!applicant_id(name, phone), dept:departments(name)";
+  "id, ref_no, purpose, start_at, end_at, status, series_id, applicant:users!applicant_id(name, phone), dept:departments(name)";
 
 /**
  * 결재 마지막 단계에서, 이 대상(reservation 또는 series)과 충돌하는
@@ -234,7 +238,7 @@ export async function findActiveConflictsFor(
     const { data: sData } = await supabase
       .from("reservation_series")
       .select(
-        "id, ref_no, purpose, applicant:users!applicant_id(name, phone), dept:departments(name)",
+        "id, ref_no, purpose, status, applicant:users!applicant_id(name, phone), dept:departments(name)",
       )
       .in("id", conflictingSeriesIds);
     const arr = (sData ?? []) as unknown as RawSeries[];
@@ -254,6 +258,7 @@ export async function findActiveConflictsFor(
         purpose: s.purpose,
         applicant: s.applicant,
         dept: s.dept,
+        status: s.status,
         start_at: r.start_at,
         end_at: r.end_at,
       });
@@ -265,6 +270,7 @@ export async function findActiveConflictsFor(
         purpose: r.purpose,
         applicant: r.applicant,
         dept: r.dept,
+        status: r.status,
         start_at: r.start_at,
         end_at: r.end_at,
       });

@@ -2,26 +2,33 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
   CalendarDays,
   ChevronLeft,
+  ArrowRight,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   CircleCheck,
   CircleSlash,
   Clock,
-  Loader2,
   X,
   type LucideIcon,
 } from "lucide-react";
 import type { Building, Floor, Room } from "@/lib/supabase/types";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
-import { cn, formatTime } from "@/lib/utils";
-import { displayStatus, STATUS_LABEL } from "@/lib/reservation-status";
+import { cn, formatKst as format, formatDuration, formatTime } from "@/lib/utils";
+import {
+  displayStatus,
+  STATUS_BADGE_CLASS,
+  STATUS_ICON,
+  STATUS_LABEL,
+  STATUS_LABEL_SHORT,
+} from "@/lib/reservation-status";
+import { useUrlModal } from "@/lib/use-url-modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 
@@ -57,9 +64,9 @@ function statusFor(reservations: ReservationDetail[], roomId: string): RoomState
 
 const STATE_COLOR: Record<RoomState, string> = {
   empty:    "bg-stone-50    border-stone-300   text-stone-700   hover:bg-stone-100",
-  pending:  "bg-amber-50    border-amber-400   text-amber-900   hover:bg-amber-100",
-  approved: "bg-emerald-50  border-emerald-400 text-emerald-900 hover:bg-emerald-100",
-  mixed:    "bg-orange-50   border-orange-400  text-orange-900  hover:bg-orange-100",
+  pending:  "bg-yellow-100   border-yellow-500  text-yellow-900  hover:bg-yellow-200",
+  mixed:    "bg-emerald-100  border-emerald-500 text-emerald-900 hover:bg-emerald-200",
+  approved: "bg-sky-100      border-sky-500     text-sky-900     font-semibold hover:bg-sky-200",
 };
 
 const STATE_LABEL: Record<RoomState, string> = {
@@ -73,7 +80,7 @@ const STATE_LABEL: Record<RoomState, string> = {
 const STATE_ICON: Record<RoomState, LucideIcon> = {
   empty:    CircleSlash,
   pending:  Clock,
-  mixed:    Loader2,
+  mixed:    ArrowRight,
   approved: CircleCheck,
 };
 
@@ -208,6 +215,26 @@ export function BuildingView({
         ))}
       </div>
 
+      {/* 상태 범례 — 건물 탭과 건물 카드 사이 별도 row */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-stone-600">
+        {(["pending", "mixed", "approved"] as RoomState[]).map((s) => {
+          const Icon = STATE_ICON[s];
+          return (
+            <span key={s} className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded border",
+                  STATE_COLOR[s],
+                )}
+              >
+                <Icon aria-hidden className="h-3.5 w-3.5" />
+              </span>
+              {STATE_LABEL[s]}
+            </span>
+          );
+        })}
+      </div>
+
       {/* 층 탭 — 특정 건물 선택 시에만 노출. 맨 앞에 [전체] */}
       {viewMode !== "all-buildings" && (
         <div className="flex flex-wrap gap-2">
@@ -324,26 +351,6 @@ export function BuildingView({
           })}
         </div>
       )}
-
-      {/* 범례 */}
-      <div className="flex flex-wrap gap-3 text-sm">
-        {(["empty", "pending", "mixed", "approved"] as RoomState[]).map((s) => {
-          const Icon = STATE_ICON[s];
-          return (
-            <span key={s} className="flex items-center gap-1.5">
-              <span
-                className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded border",
-                  STATE_COLOR[s],
-                )}
-              >
-                <Icon aria-hidden className="h-3.5 w-3.5" />
-              </span>
-              {STATE_LABEL[s]}
-            </span>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -496,7 +503,8 @@ function RoomMap({
   fixedEvents: FixedEventInstance[];
   isAdmin?: boolean;
 }) {
-  const [modalRoomId, setModalRoomId] = useState<string | null>(null);
+  // URL ?room=<id> 기반 — detail 페이지에서 뒤로가기 시 모달 자동 복원
+  const [modalRoomId, openRoomModal, closeRoomModal] = useUrlModal("room");
   const modalRoom = modalRoomId
     ? rooms.find((r) => r.id === modalRoomId) ?? null
     : null;
@@ -524,7 +532,7 @@ function RoomMap({
             <button
               key={r.id}
               type="button"
-              onClick={() => setModalRoomId(r.id)}
+              onClick={() => openRoomModal(r.id)}
               className={cn(
                 "absolute flex flex-col overflow-hidden rounded-lg border p-2 text-left text-[11px] leading-tight transition-colors",
                 STATE_COLOR[state],
@@ -545,7 +553,6 @@ function RoomMap({
                         aria-hidden
                         className={cn(
                           "h-3.5 w-3.5 self-center",
-                          state === "mixed" && "animate-spin-slow",
                         )}
                       />
                     );
@@ -575,29 +582,26 @@ function RoomMap({
                   ))}
                   {list.slice(0, 3).map((res) => {
                     const ds = displayStatus(res);
+                    const purposeShort =
+                      res.purpose.length > 5
+                        ? `${res.purpose.slice(0, 5)}…`
+                        : res.purpose;
                     return (
                       <li key={res.id} className="leading-tight">
-                        <div>
-                          <span className="font-semibold">
-                            [{STATUS_LABEL[ds]}]
-                          </span>{" "}
-                          {formatTime(res.start_at)}–
-                          {formatTime(res.end_at)}
+                        <div className="font-semibold">
+                          [{STATUS_LABEL[ds]}]
                         </div>
-                        <div className="opacity-90">{res.dept?.name ?? "?"}</div>
-                        <div className="opacity-90">{res.applicant.name}</div>
-                        {res.applicant.phone && (
-                          <div className="font-mono opacity-80">
-                            {res.applicant.phone}
-                          </div>
-                        )}
+                        <div className="font-mono">
+                          {formatTime(res.start_at)}–{formatTime(res.end_at)}
+                        </div>
+                        <div className="truncate opacity-90">
+                          {res.dept?.name ?? "?"} {purposeShort}
+                        </div>
                       </li>
                     );
                   })}
-                  {list.length + fixedList.length > 5 && (
-                    <li className="opacity-70">
-                      +{list.length + fixedList.length - 5}건
-                    </li>
+                  {list.length > 3 && (
+                    <li className="opacity-70">+{list.length - 3}건</li>
                   )}
                 </ul>
               )}
@@ -610,7 +614,7 @@ function RoomMap({
           room={modalRoom}
           list={modalList}
           fixedList={modalFixedList}
-          onClose={() => setModalRoomId(null)}
+          onClose={closeRoomModal}
           isAdmin={isAdmin}
         />
       )}
@@ -712,32 +716,35 @@ function RoomDetailModal({
             <ul className="space-y-2">
               {list.map((res) => {
                 const ds = displayStatus(res);
+                const Icon = STATUS_ICON[ds];
                 return (
                   <li key={res.id}>
                     <Link
                       href={reservationHref(res.id, isAdmin)}
-                      className="block rounded-xl border border-stone-200 bg-white p-3 transition-colors hover:bg-stone-50"
+                      className="flex flex-col gap-1 rounded-xl border border-stone-200 bg-white p-3 transition-colors hover:bg-stone-50"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm text-stone-600">
                           {formatTime(res.start_at)} – {formatTime(res.end_at)}
                         </span>
-                        <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
-                          {STATUS_LABEL[ds]}
+                        <span className="text-xs text-stone-500">
+                          ({formatDuration(res.start_at, res.end_at)})
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                            STATUS_BADGE_CLASS[ds],
+                          )}
+                        >
+                          <Icon className="h-3 w-3" aria-hidden />
+                          {STATUS_LABEL_SHORT[ds]}
                         </span>
                       </div>
-                      <div className="mt-1 text-base text-stone-900">
-                        <div className="font-medium">
+                      <div className="text-sm text-stone-700">
+                        <span className="font-medium text-stone-900">
                           {res.dept?.name ?? "(부서 미지정)"}
-                        </div>
-                        <div>{res.applicant.name}</div>
-                      </div>
-                      {res.applicant.phone && (
-                        <div className="font-mono text-sm text-stone-700">
-                          {res.applicant.phone}
-                        </div>
-                      )}
-                      <div className="mt-1 text-xs text-stone-500">
+                        </span>
+                        <span className="mx-1 text-stone-400">·</span>
                         {res.purpose}
                       </div>
                     </Link>
@@ -773,93 +780,106 @@ function RoomGrid({
   fixedEvents: FixedEventInstance[];
   isAdmin?: boolean;
 }) {
+  // RoomMap 과 동일 모달 패턴 + URL 백업 — detail 갔다 뒤로가기 시 모달 자동 복원.
+  const [modalRoomId, openRoomModal, closeRoomModal] = useUrlModal("room");
+  const modalRoom = modalRoomId
+    ? rooms.find((r) => r.id === modalRoomId) ?? null
+    : null;
+  const modalList = modalRoomId
+    ? reservations.filter((res) => res.room_id === modalRoomId)
+    : [];
+  const modalFixedList = modalRoomId
+    ? fixedEvents.filter((e) => e.room_id === modalRoomId)
+    : [];
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      {rooms.map((r) => {
-        const state = statusFor(reservations, r.id);
-        const list = reservations.filter((res) => res.room_id === r.id);
-        const fixedList = fixedEvents.filter((e) => e.room_id === r.id);
-        return (
-          <div
-            key={r.id}
-            id={`room-${r.id}`}
-            className={cn(
-              "flex min-h-32 flex-col rounded-lg border p-3",
-              STATE_COLOR[state],
-            )}
-          >
-            <div className="flex items-center gap-1">
-              <span className="font-bold">{r.name}</span>
-              {fixedList.length > 0 && (
-                <span className="rounded bg-stone-200/80 px-1 text-[10px] font-medium text-stone-700">
-                  고정
-                </span>
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {rooms.map((r) => {
+          const state = statusFor(reservations, r.id);
+          const list = reservations.filter((res) => res.room_id === r.id);
+          const fixedList = fixedEvents.filter((e) => e.room_id === r.id);
+          return (
+            <button
+              key={r.id}
+              id={`room-${r.id}`}
+              type="button"
+              onClick={() => openRoomModal(r.id)}
+              className={cn(
+                "flex min-h-32 flex-col rounded-lg border p-3 text-left transition-colors",
+                STATE_COLOR[state],
               )}
-            </div>
-            <div className="flex items-center gap-1 text-sm opacity-80">
-              {(() => {
-                const Icon = STATE_ICON[state];
-                return (
-                  <Icon
-                    aria-hidden
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      state === "mixed" && "animate-spin-slow",
-                    )}
-                  />
-                );
-              })()}
-              {STATE_LABEL[state]}
-            </div>
-            {(fixedList.length > 0 || list.length > 0) && (
-              <ul className="mt-2 space-y-2 text-xs">
-                {fixedList.slice(0, 2).map((ev) => (
-                  <li
-                    key={ev.id}
-                    className="rounded bg-stone-200/70 px-1.5 py-1 leading-snug text-stone-800"
-                  >
-                    <div className="font-semibold">[고정] {ev.name}</div>
-                    <div className="font-mono opacity-80">
-                      {formatTime(ev.start_at)}–{formatTime(ev.end_at)}
-                    </div>
-                  </li>
-                ))}
-                {list.slice(0, 3).map((res) => {
-                  const ds = displayStatus(res);
-                  return (
-                    <li key={res.id}>
-                      <Link
-                        href={reservationHref(res.id, isAdmin)}
-                        className="block leading-snug hover:underline"
-                      >
-                        <div>
-                          <span className="font-semibold">
-                            [{STATUS_LABEL[ds]}]
-                          </span>{" "}
-                          {formatTime(res.start_at)}–
-                          {formatTime(res.end_at)}
-                        </div>
-                        <div className="opacity-90">{res.dept?.name ?? "?"}</div>
-                        <div className="opacity-90">{res.applicant.name}</div>
-                        {res.applicant.phone && (
-                          <div className="font-mono opacity-70">
-                            {res.applicant.phone}
-                          </div>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-                {list.length + fixedList.length > 5 && (
-                  <li className="text-stone-500">
-                    +{list.length + fixedList.length - 5}건
-                  </li>
+            >
+              <div className="flex items-center gap-1">
+                <span className="font-bold">{r.name}</span>
+                {fixedList.length > 0 && (
+                  <span className="rounded bg-stone-200/80 px-1 text-[10px] font-medium text-stone-700">
+                    고정
+                  </span>
                 )}
-              </ul>
-            )}
-          </div>
-        );
-      })}
-    </div>
+              </div>
+              {/* 호실 집계 상태 — 예약·고정행사 둘 다 없을 때만 (군더더기 방지).
+                  예약 있으면 아래 ul 의 각 항목별 [결재상태] 로 충분. */}
+              {list.length === 0 && fixedList.length === 0 && (
+                <div className="flex items-center gap-1 text-sm opacity-80">
+                  {(() => {
+                    const Icon = STATE_ICON[state];
+                    return <Icon aria-hidden className="h-3.5 w-3.5" />;
+                  })()}
+                  {STATE_LABEL[state]}
+                </div>
+              )}
+              {(fixedList.length > 0 || list.length > 0) && (
+                <ul className="mt-2 space-y-2 text-xs">
+                  {fixedList.slice(0, 2).map((ev) => (
+                    <li
+                      key={ev.id}
+                      className="rounded bg-stone-200/70 px-1.5 py-1 leading-snug text-stone-800"
+                    >
+                      <div className="font-semibold">[고정] {ev.name}</div>
+                      <div className="font-mono opacity-80">
+                        {formatTime(ev.start_at)}–{formatTime(ev.end_at)}
+                      </div>
+                    </li>
+                  ))}
+                  {list.slice(0, 3).map((res) => {
+                    const ds = displayStatus(res);
+                    const purposeShort =
+                      res.purpose.length > 5
+                        ? `${res.purpose.slice(0, 5)}…`
+                        : res.purpose;
+                    return (
+                      <li key={res.id} className="leading-snug">
+                        <div className="font-semibold">
+                          [{STATUS_LABEL[ds]}]
+                        </div>
+                        <div className="font-mono">
+                          {formatTime(res.start_at)}–{formatTime(res.end_at)}
+                        </div>
+                        <div className="truncate opacity-90">
+                          {res.dept?.name ?? "?"} {purposeShort}
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {list.length > 3 && (
+                    <li className="text-stone-500">+{list.length - 3}건</li>
+                  )}
+                </ul>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {modalRoom && (
+        <RoomDetailModal
+          room={modalRoom}
+          list={modalList}
+          fixedList={modalFixedList}
+          onClose={closeRoomModal}
+          isAdmin={isAdmin}
+        />
+      )}
+    </>
   );
 }

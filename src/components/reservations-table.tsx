@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { ApprovalTracker } from "@/components/approval-tracker";
 import { ReservationBadge } from "@/components/ui/badge";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, formatDuration, formatTime } from "@/lib/utils";
 import { maskName } from "@/lib/privacy";
 import type {
   ApprovalRoute,
@@ -328,7 +328,200 @@ export function ReservationsTable({
 
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm md:hidden">
+        <table className="min-w-[60rem] table-fixed text-base">
+          {/* 모바일 컬럼 순서: 사용일시 / 장소 / 부서·작성자 / 상태 / 신청번호 / 결재 라인 / 작성일 / (extra) */}
+          <colgroup>
+            <col className="w-[12.5rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[7.5rem]" />
+            <col className="w-[7.5rem]" />
+            <col className="w-[7.5rem]" />
+            <col className="w-[6.5rem]" />
+            <col className="w-[9.5rem]" />
+            {extraColumn && <col className="w-[7rem]" />}
+          </colgroup>
+          <thead className="bg-stone-50 text-stone-700">
+            <tr>
+              <SortTh field="start_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>사용일시</SortTh>
+              <SortTh field="room" sortField={sortField} sortDir={sortDir} onSort={handleSort}>장소</SortTh>
+              <SortTh field="dept" sortField={sortField} sortDir={sortDir} onSort={handleSort}>
+                부서<br/>작성자
+              </SortTh>
+              <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>상태</SortTh>
+              <SortTh field="ref_no" sortField={sortField} sortDir={sortDir} onSort={handleSort}>신청번호</SortTh>
+              <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
+              <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>작성일</SortTh>
+              {extraColumn && (
+                <th className="px-2 py-2 text-left font-semibold text-stone-700">
+                  {extraColumn.header}
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((entry) => {
+              const link = rowLink(entry);
+              const linkProps = {
+                href: link.href,
+                target: link.target,
+                rel:
+                  link.target === "_blank"
+                    ? "noopener noreferrer"
+                    : undefined,
+              };
+              const data = entry.data;
+              const isSeries = entry.kind === "series";
+              const cgi = entry.conflictGroupIndex;
+              const palette =
+                cgi != null
+                  ? CONFLICT_PALETTE[cgi % CONFLICT_PALETTE.length]
+                  : null;
+              return (
+                <tr
+                  key={`${entry.kind}-${data.id}`}
+                  className={cn(
+                    "cursor-pointer border-t border-stone-100 hover:bg-stone-50",
+                    palette && `border-l-4 ${palette.left}`,
+                  )}
+                >
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      {entry.kind === "reservation" ? (
+                        <>
+                          <div className="text-stone-700">
+                            {formatDateTime(entry.data.start_at)}
+                          </div>
+                          <div className="text-xs text-stone-500">
+                            {entry.data.start_at.slice(0, 10) ===
+                            entry.data.end_at.slice(0, 10) ? (
+                              <>
+                                ~ {formatTime(entry.data.end_at)} (
+                                {formatDuration(
+                                  entry.data.start_at,
+                                  entry.data.end_at,
+                                )}
+                                )
+                              </>
+                            ) : (
+                              <>~ {formatDateTime(entry.data.end_at)}</>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-stone-700">
+                            매주 {weekdayLabel(entry.data.weekday)}{" "}
+                            {entry.data.time_blocks
+                              .map((b) => `${b.start}–${b.end}`)
+                              .join(" / ")}
+                          </div>
+                          <div className="text-xs text-stone-500">
+                            {entry.data.start_date} ~{" "}
+                            {entry.data.end_date} ·{" "}
+                            {entry.data.occurrence_count}회
+                          </div>
+                        </>
+                      )}
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      <div className="text-stone-700">
+                        {data.room.floor.building.name}{" "}
+                        {data.room.floor.label}
+                      </div>
+                      <div className="font-medium text-stone-900">
+                        {data.room.name}
+                      </div>
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      <div className="font-medium text-stone-900">
+                        {data.dept?.name ?? "-"}
+                      </div>
+                      <div className="text-stone-500">
+                        {isAdmin
+                          ? data.applicant.name
+                          : maskName(data.applicant.name)}
+                      </div>
+                    </Link>
+                  </Td>
+                  <Td>
+                    <div className="flex flex-col items-start gap-1">
+                      <ReservationBadge reservation={statusInputFor(entry)} />
+                      {printEnabled && data.print_status === "failed" && (
+                        <span
+                          className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-red-200"
+                          title="사무실 프린터 연결에 문제가 있어 인쇄가 실패했어요. 신청서 상세에서 다시 요청 가능합니다."
+                        >
+                          ⚠ 프린트문제
+                        </span>
+                      )}
+                    </div>
+                  </Td>
+                  <Td>
+                    <div className="flex flex-col items-start gap-1">
+                      <Link
+                        {...linkProps}
+                        className={cn(
+                          "font-mono hover:underline",
+                          isSeries
+                            ? "text-emerald-700"
+                            : "text-brand-700",
+                        )}
+                      >
+                        #{data.ref_no ?? data.id.slice(0, 8)}
+                      </Link>
+                      {palette && cgi != null && (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums",
+                            palette.chip,
+                          )}
+                          title={`같은 호실·시간대로 다른 신청서와 겹쳐 있어요 (충돌 그룹 ${cgi + 1})`}
+                          aria-label={`충돌 그룹 ${cgi + 1}`}
+                        >
+                          중복 {cgi + 1}
+                        </span>
+                      )}
+                    </div>
+                  </Td>
+                  <Td>
+                    <ApprovalTracker
+                      route={data.route}
+                      approvals={data.approvals}
+                      currentStep={data.current_step}
+                      compact
+                    />
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      {formatDateTime(data.created_at)}
+                    </Link>
+                  </Td>
+                  {extraColumn && <Td>{extraColumn.render(entry)}</Td>}
+                </tr>
+              );
+            })}
+            {pageItems.length === 0 && (
+              <tr>
+                <td
+                  colSpan={colSpan}
+                  className="p-12 text-center text-stone-500"
+                >
+                  {isSearching
+                    ? `"${query.trim()}" 검색 결과가 없습니다.`
+                    : emptyMessage}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm md:block">
         {/* table-fixed + colgroup 으로 컬럼 폭 고정 — 정렬·페이지 전환 시 행
             내용이 달라져도 너비가 들썩이지 않게. 결재 라인은 가장 가변적이라
             폭 미지정으로 두고 나머지 fixed 폭의 잔여 공간을 가져가게 함. */}
@@ -451,7 +644,19 @@ export function ReservationsTable({
                             {formatDateTime(entry.data.start_at)}
                           </div>
                           <div className="text-xs text-stone-500">
-                            ~ {formatDateTime(entry.data.end_at)}
+                            {entry.data.start_at.slice(0, 10) ===
+                            entry.data.end_at.slice(0, 10) ? (
+                              <>
+                                ~ {formatTime(entry.data.end_at)} (
+                                {formatDuration(
+                                  entry.data.start_at,
+                                  entry.data.end_at,
+                                )}
+                                )
+                              </>
+                            ) : (
+                              <>~ {formatDateTime(entry.data.end_at)}</>
+                            )}
                           </div>
                         </>
                       ) : (

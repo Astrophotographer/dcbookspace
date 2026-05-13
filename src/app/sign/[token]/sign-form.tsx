@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Check, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatKst as format } from "@/lib/utils";
 import type { ActiveConflictItem } from "@/lib/conflicts";
 import {
   cancelByChairman,
@@ -108,8 +108,10 @@ export function SignByPinForm({
     );
   }
 
-  const fail = () => {
-    setError("잘못된 번호입니다");
+  // 서버 메시지가 있으면 그대로 노출 (예: "아직 차례가 아닙니다 ...", "이미 결재하셨습니다 ...").
+  // 없으면 기본 메시지. 입력 자체 형식 오류 등 클라 단계에서는 기본 메시지로.
+  const fail = (msg?: string) => {
+    setError(msg ?? "잘못된 번호입니다");
     setShakeKey((k) => k + 1);
     setPin("");
   };
@@ -126,7 +128,7 @@ export function SignByPinForm({
         // 마지막 단계 충돌 → 모달 띄우고 사용자 결정 대기
         setConflictPrompt({ conflicts: res.needsConfirm, via: "pin", pin });
       } else if (res.error) {
-        fail();
+        fail(res.error);
       } else {
         setDone({
           name: res.approverName ?? "",
@@ -406,8 +408,8 @@ export function ChairmanCancelForm({ token }: { token: string }) {
     setError(null);
   }
 
-  function fail() {
-    setError("잘못된 번호입니다");
+  function fail(msg?: string) {
+    setError(msg ?? "잘못된 번호입니다");
     setShakeKey((k) => k + 1);
     setPin("");
   }
@@ -420,7 +422,7 @@ export function ChairmanCancelForm({ token }: { token: string }) {
     }
     startTransition(async () => {
       const res = await cancelByChairman({ token, pin });
-      if (res.error) fail();
+      if (res.error) fail(res.error);
       else {
         setDone({ name: res.approverName ?? "" });
         router.refresh();

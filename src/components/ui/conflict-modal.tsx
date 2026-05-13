@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatKst as format } from "@/lib/utils";
 import { Button } from "./button";
 import type {
   RoomConflictResult,

@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>장소사용 신청 — 도입 1단계 흐름</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif;
+    background: #fafaf9;
+    color: #1c1917;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* ─── Hero ─── */
+  .hero {
+    text-align: center;
+    padding: 56px 32px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 32px;
+    margin-bottom: 56px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+  .hero .badge {
+    display: inline-block;
+    padding: 8px 20px;
+    background: #ffffff;
+    color: #92400e;
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 999px;
+    margin-bottom: 24px;
+    border: 2px solid #f59e0b;
+  }
+  .hero h1 {
+    font-size: 56px;
+    font-weight: 900;
+    margin: 0 0 16px;
+    color: #78350f;
+    line-height: 1.2;
+  }
+  .hero .sub {
+    font-size: 28px;
+    color: #92400e;
+    font-weight: 600;
+    margin: 0;
+  }
+  .hero .emoji {
+    font-size: 72px;
+    margin-bottom: 8px;
+  }
+
+  /* ─── Big Step Cards ─── */
+  .step {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 32px;
+    background: #ffffff;
+    border-radius: 28px;
+    padding: 40px 44px;
+    margin-bottom: 28px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 2px solid #e7e5e4;
+    align-items: center;
+  }
+
+  .step-num {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: #4f46e5;
+    color: #ffffff;
+    font-size: 64px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step-title {
+    font-size: 36px;
+    font-weight: 800;
+    color: #1c1917;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .step-visual {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 80px;
+  }
+
+  .step-visual .arrow {
+    font-size: 56px;
+    color: #a8a29e;
+    font-weight: 900;
+  }
+
+  .step-visual .label {
+    font-size: 22px;
+    color: #57534e;
+    font-weight: 600;
+    margin-left: -8px;
+  }
+
+  .step-note {
+    font-size: 20px;
+    color: #44403c;
+    margin: 0;
+  }
+
+  /* OR 분기 */
+  .or-split {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    margin: 8px 0;
+  }
+  .or-branch {
+    background: #f5f5f4;
+    border-radius: 16px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .or-branch .icons {
+    font-size: 56px;
+  }
+  .or-branch .text {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1c1917;
+  }
+  .or-label {
+    font-size: 24px;
+    font-weight: 900;
+    color: #f59e0b;
+    background: #fef3c7;
+    padding: 8px 16px;
+    border-radius: 999px;
+  }
+
+  /* ─── Connector ─── */
+  .connector {
+    text-align: center;
+    margin: -8px 0 20px;
+    font-size: 48px;
+    color: #d6d3d1;
+    line-height: 1;
+  }
+
+  /* ─── Bottom callout ─── */
+  .callout {
+    margin-top: 56px;
+    padding: 48px;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-radius: 32px;
+    text-align: center;
+    border: 3px solid #3b82f6;
+  }
+  .callout .emoji {
+    font-size: 72px;
+    margin-bottom: 16px;
+  }
+  .callout h2 {
+    font-size: 40px;
+    font-weight: 900;
+    color: #1e3a8a;
+    margin: 0 0 12px;
+  }
+  .callout p {
+    font-size: 24px;
+    color: #1e40af;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  /* ─── Before/After comparison ─── */
+  .compare {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .compare .cell {
+    padding: 28px;
+    border-radius: 24px;
+    text-align: center;
+  }
+  .compare .before {
+    background: #fef2f2;
+    border: 2px solid #fecaca;
+  }
+  .compare .after {
+    background: #f0fdf4;
+    border: 2px solid #bbf7d0;
+  }
+  .compare .label {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .compare .before .label { background: #fecaca; color: #991b1b; }
+  .compare .after  .label { background: #bbf7d0; color: #166534; }
+  .compare .ico { font-size: 60px; margin-bottom: 8px; }
+  .compare .desc { font-size: 20px; font-weight: 600; color: #1c1917; line-height: 1.4; }
+  .compare-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    color: #f59e0b;
+    font-weight: 900;
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    margin-top: 56px;
+    text-align: center;
+    color: #a8a29e;
+    font-size: 16px;
+  }
+
+  /* 인쇄 — A4 / 한 페이지에 잘 들어가게 */
+  @media print {
+    body { background: #ffffff; }
+    .page { padding: 16px; max-width: none; }
+    .step { box-shadow: none; page-break-inside: avoid; }
+    .hero, .callout { box-shadow: none; }
+    .connector { margin: 4px 0; }
+  }
+
+  /* 모바일 */
+  @media (max-width: 720px) {
+    .page { padding: 24px 16px 48px; }
+    .hero { padding: 40px 20px; }
+    .hero h1 { font-size: 36px; }
+    .hero .sub { font-size: 20px; }
+    .hero .emoji { font-size: 56px; }
+    .step {
+      grid-template-columns: 1fr;
+      padding: 28px 24px;
+      gap: 20px;
+    }
+    .step-num { width: 80px; height: 80px; font-size: 40px; margin: 0 auto; }
+    .step-title { font-size: 26px; text-align: center; }
+    .step-visual { font-size: 56px; justify-content: center; }
+    .step-visual .arrow { font-size: 40px; }
+    .step-visual .label { font-size: 18px; }
+    .step-note { font-size: 17px; text-align: center; }
+    .or-split { grid-template-columns: 1fr; }
+    .or-label { justify-self: center; }
+    .or-branch { flex-direction: column; text-align: center; }
+    .callout { padding: 32px 20px; }
+    .callout h2 { font-size: 28px; }
+    .callout p { font-size: 18px; }
+    .compare { grid-template-columns: 1fr; }
+    .compare-arrow { transform: rotate(90deg); font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="emoji">📋 → 🖨️ → ✍️</div>
+    <div class="badge">도입 1단계 — 어떻게 바뀌나요?</div>
+    <h1>지금과 똑같이 사용하시면 됩니다</h1>
+    <p class="sub">달라진 건 딱 하나, <strong>"종이가 자동으로 출력"</strong></p>
+  </section>
+
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <h3 class="step-title">부서장이 장소 사용 신청</h3>
+      <div class="or-split">
+        <div class="or-branch">
+          <div class="icons">📱 💻</div>
+          <div class="text">휴대폰 / 컴퓨터로<br>직접 작성</div>
+        </div>
+        <div class="or-label">또는</div>
+        <div class="or-branch">
+          <div class="icons">🏢 📲</div>
+          <div class="text">관리사무소 가서<br>태블릿으로 작성</div>
+        </div>
+      </div>
+      <p class="step-note">📝 부서장님이 어려우시면 관리사무소 직원이 도와드립니다.</p>
+    </div>
+  </div>
+
+  <div class="connector">▼</div>
+
+  <!-- Step 2 -->
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <h3 class="step-title">사무실 프린터에서 자동 출력</h3>
+      <div class="step-visual">
+        <span>📄</span>
+        <span class="arrow">→</span>
+        <span>🖨️</span>
+        <span class="arrow">→</span>
+        <span>📃</span>
+        <span class="label">종이 신청서 완성</span>
+      </div>
+      <p class="step-note">관리사무소에서 종이 신청서를 받아 보관합니다.</p>
+    </div>
+  </div>
+
+  <div class="connector">▼</div>
+
+  <!-- Step 3 -->
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <h3 class="step-title">담당 장로님부터 사인 시작</h3>
+      <div class="step-visual">
+        <span>👴</span>
+        <span class="arrow">→</span>
+        <span>✍️</span>
+        <span class="arrow">→</span>
+        <span>📄</span>
+      </div>
+      <p class="step-note">담당 장로님이 종이에 사인하시면 결재가 시작됩니다.</p>
+    </div>
+  </div>
+
+  <div class="connector">▼</div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <h3 class="step-title">결재 라인 따라 순서대로 사인</h3>
+      <div class="step-visual">
+        <span>✍️</span>
+        <span class="arrow">→</span>
+        <span>✍️</span>
+        <span class="arrow">→</span>
+        <span>✍️</span>
+        <span class="label">예전과 똑같이 진행</span>
+      </div>
+      <p class="step-note">예전처럼 종이에 사인만 하시면 됩니다. 새로 배울 것 없음.</p>
+    </div>
+  </div>
+
+  <div class="connector">▼</div>
+
+  <!-- Step 5 -->
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <h3 class="step-title">당회장 · 관리집사가 마지막 확인</h3>
+      <div class="or-split">
+        <div class="or-branch">
+          <div class="icons">📱</div>
+          <div class="text">종이 옆 QR 코드<br>찰칵 한 번</div>
+        </div>
+        <div class="or-label">또는</div>
+        <div class="or-branch">
+          <div class="icons">💻</div>
+          <div class="text">웹/모바일에서<br>확인 버튼</div>
+        </div>
+      </div>
+      <p class="step-note">사인이 모두 모인 걸 확인하고 마지막 단계에서 시스템에 등록.</p>
+    </div>
+  </div>
+
+  <div class="connector">▼</div>
+
+  <!-- Step 6 -->
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-content">
+      <h3 class="step-title">모든 교인이 예약 현황 확인 가능</h3>
+      <div class="step-visual">
+        <span>👥</span>
+        <span class="arrow">→</span>
+        <span>🌐</span>
+        <span class="arrow">→</span>
+        <span>📅</span>
+        <span class="label">"어느 방이 비어 있나" 한눈에</span>
+      </div>
+      <p class="step-note">중복 신청 사고 방지, 빈 시간·빈 호실 누구나 확인.</p>
+    </div>
+  </div>
+
+
+  <!-- Key callout -->
+  <section class="callout">
+    <div class="emoji">💡</div>
+    <h2>핵심: 종이 흐름은 그대로입니다</h2>
+    <p>장로님들 사인 방식 그대로 · 다만 <strong>자동 출력</strong>으로 사무실 발걸음만 줄어듭니다</p>
+  </section>
+
+
+  <!-- Before / After -->
+  <div class="compare">
+    <div class="cell before">
+      <span class="label">예전</span>
+      <div class="ico">🚶‍♂️ 🏢 📝</div>
+      <div class="desc">사무실 방문 →<br>종이 받아 작성 →<br>다시 제출</div>
+    </div>
+    <div class="compare-arrow">→</div>
+    <div class="cell after">
+      <span class="label">바뀐 점</span>
+      <div class="ico">📱 ✨ 🖨️</div>
+      <div class="desc">집·이동 중에 신청 →<br>사무실에 자동 출력 →<br>장로님 사인만</div>
+    </div>
+  </div>
+
+
+  <div class="footer">
+    DCbookspace · 등촌교회 장소사용 신청 시스템 · 도입 1단계 흐름도
+  </div>
+
+</div>
+</body>
+</html>

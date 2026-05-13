@@ -129,14 +129,17 @@ export function AdminActions({
 
   return (
     <>
-      <div className="flex flex-wrap justify-end gap-2">
+      {/* 모바일: 모든 버튼 1줄 (flex-1 로 균등 분배 + 폰트/아이콘 축소)
+          데스크탑: 기존 flex-wrap 우측정렬 */}
+      <div className="flex gap-2 sm:flex-wrap sm:justify-end">
         {canForceApprove && (
           <Button
             size="lg"
             variant="primary"
             onClick={() => setOpen("force")}
+            className="flex-1 whitespace-nowrap px-2 text-xs sm:flex-none sm:px-4 sm:text-base"
           >
-            <CheckCircle2 className="h-5 w-5" />
+            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             강제 예약
           </Button>
         )}
@@ -145,9 +148,9 @@ export function AdminActions({
             size="lg"
             variant="secondary"
             onClick={() => setOpen("reject")}
-            className="border-red-300 bg-white text-red-700 hover:bg-red-50"
+            className="flex-1 whitespace-nowrap border-red-300 bg-white px-2 text-xs text-red-700 hover:bg-red-50 sm:flex-none sm:px-4 sm:text-base"
           >
-            <XCircle className="h-5 w-5" />
+            <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             강제 반려
           </Button>
         )}
@@ -156,8 +159,9 @@ export function AdminActions({
             size="lg"
             variant="primary"
             onClick={() => setOpen("revive")}
+            className="flex-1 whitespace-nowrap px-2 text-xs sm:flex-none sm:px-4 sm:text-base"
           >
-            <RotateCcw className="h-5 w-5" />
+            <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
             다시 결재 진행
           </Button>
         )}
@@ -165,8 +169,9 @@ export function AdminActions({
           size="lg"
           variant="danger"
           onClick={() => setOpen("delete")}
+          className="flex-1 whitespace-nowrap px-2 text-xs sm:flex-none sm:px-4 sm:text-base"
         >
-          <Trash2 className="h-5 w-5" />
+          <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
           신청서 삭제
         </Button>
       </div>

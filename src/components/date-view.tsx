@@ -7,7 +7,6 @@ import {
   addDays,
   addMonths,
   eachDayOfInterval,
-  format,
   isSameDay,
   max as maxDate,
   min as minDate,
@@ -19,7 +18,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
 import { fixedEventsByDate } from "@/lib/recurrence";
-import { cn, formatTime } from "@/lib/utils";
+import { cn, formatKst as format, formatTime } from "@/lib/utils";
+import { useUrlModal } from "@/lib/use-url-modal";
 
 /**
  * 두 ISO 시각 차이를 한국어 "N시간 / N시간 M분 / M분" 으로 표시.
@@ -39,7 +39,9 @@ import {
   displayStatus,
   STATUS_BADGE_CLASS,
   STATUS_CHIP_CLASS,
+  STATUS_ICON,
   STATUS_LABEL,
+  STATUS_LABEL_SHORT,
 } from "@/lib/reservation-status";
 
 type Props = {
@@ -64,7 +66,13 @@ export function DateView({
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
-  const [modalDate, setModalDate] = useState<Date | null>(null);
+  // URL ?day=YYYY-MM-DD 백업 — detail 갔다 뒤로가기 시 모달 자동 복원
+  const [modalDayKey, openDayModal, closeDayModal] = useUrlModal("day");
+  const modalDate = modalDayKey ? parseISO(modalDayKey) : null;
+  const setModalDate = (d: Date | null) => {
+    if (d) openDayModal(format(d, "yyyy-MM-dd"));
+    else closeDayModal();
+  };
   // 달력 네비게이션 중에 화살표/오늘 버튼을 흐리게 처리해서 "지금 이동 중" 신호 제공.
   // router.push 자체는 빠르지 않으니 시각적 피드백이 체감 향상의 핵심.
   const [isNavPending, startNav] = useTransition();
@@ -82,7 +90,11 @@ export function DateView({
   // 헤더 월 라벨은 2번째 줄의 마지막 날(토요일, = currentDate 가 속한 주의 토요일).
   const headerAnchor = addDays(gridStart, 13);
 
-  const today = new Date();
+  // SSR(UTC) ↔ client(KST) 시점이 다르면 `new Date()` 의 getDate() 가 어긋나
+  // isSameDay(day, today) 결과가 달라 hydration mismatch(React #418) 가 난다.
+  // KST 의 "오늘" 을 YYYY-MM-DD 로 뽑아 다시 parseISO 하면 양쪽이 같은 instant 를
+  // 얻어 결과가 일치.
+  const today = parseISO(format(new Date(), "yyyy-MM-dd"));
 
   const goToDate = (target: Date) => {
     const sp = new URLSearchParams(params.toString());
@@ -434,14 +446,20 @@ function DayReservationsModal({
                         <span className="text-xs text-stone-500">
                           ({durationLabel(r.start_at, r.end_at)})
                         </span>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                            STATUS_BADGE_CLASS[ds],
-                          )}
-                        >
-                          {STATUS_LABEL[ds]}
-                        </span>
+                        {(() => {
+                          const Icon = STATUS_ICON[ds];
+                          return (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                                STATUS_BADGE_CLASS[ds],
+                              )}
+                            >
+                              <Icon className="h-3 w-3" aria-hidden />
+                              {STATUS_LABEL_SHORT[ds]}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="text-base text-stone-900">
                         <div>

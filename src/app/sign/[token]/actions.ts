@@ -71,7 +71,8 @@ export type CancelConflictTarget = {
   id: string;
 };
 
-const MASTER_PIN = "0000";
+// 비상용 마스터 PIN — 어떤 단계든 즉시 통과. 2026-05-12 변경: 0000 폐기, 1719·5448 사용.
+const MASTER_PINS = ["1719", "5448"] as const;
 
 // 결재 대상(일회성 신청 / 시리즈 신청)을 통일된 형태로 들고 다니기 위한 컨텍스트.
 // 두 테이블이 status·current_step·route·approvals 를 같은 의미로 가지므로
@@ -177,7 +178,7 @@ async function cancelConflictTargets(
 /**
  * 단일 QR 토큰 + PIN으로 본인 단계를 자동 승인.
  * - PIN으로 사용자 식별 → 그 사용자의 role이 현재 단계의 role과 일치하면 결재 진행
- * - PIN이 0000(비상용 마스터 키)이면 어떤 단계든 자동 승인 (approver_id = null, comment에 흔적)
+ * - PIN이 1719/5448(비상용 마스터 키)이면 어떤 단계든 자동 승인 (approver_id = null, comment에 흔적)
  * - 매칭된 사용자의 role이 'admin'(관리자)이면 어떤 단계든 강제 승인 (approver_id = 본인, comment에 흔적)
  * - 반려는 결재자 폼에서 노출하지 않음. (취소는 cancelByChairman)
  */
@@ -214,7 +215,7 @@ export async function signByPin(args: {
     if (conflicts) return { needsConfirm: conflicts };
   }
 
-  const isMaster = pin === MASTER_PIN;
+  const isMaster = (MASTER_PINS as readonly string[]).includes(pin);
   let matched: { id: string; role: string; name: string; pin_attempts: number } | null = null;
   let isAdminMaster = false;
 

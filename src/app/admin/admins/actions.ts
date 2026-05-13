@@ -7,6 +7,10 @@ import { updateAdminPassword } from "@/lib/admin-credentials";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type { AppUser } from "@/lib/supabase/types";
 
+// 비상용 마스터 PIN — 휴대폰 뒷자리가 여기에 해당하면 관리자 PIN 으로 못 씀.
+// (sign/[token]/actions.ts 의 MASTER_PINS 와 동기화 유지 필요)
+const RESERVED_MASTER_PINS = ["1719", "5448"];
+
 function revalidateAdminPages() {
   revalidatePath("/admin/admins");
   // 충돌 모달의 1차 연락 관리자 (getPrimaryAdminContact) 도 영향받음
@@ -63,10 +67,9 @@ export async function createAdmin(
         "휴대폰 뒷 4자리를 마스터 PIN 으로 사용합니다. 휴대폰 번호를 정확히 입력해주세요.",
     };
   }
-  if (tail === "0000") {
+  if (RESERVED_MASTER_PINS.includes(tail)) {
     return {
-      error:
-        "PIN 0000 은 비상용 마스터 키로 예약되어 있습니다. 다른 휴대폰 번호를 사용해주세요.",
+      error: `PIN ${tail} 은 비상용 마스터 키로 예약되어 있습니다. 다른 휴대폰 번호를 사용해주세요.`,
     };
   }
 
@@ -135,10 +138,9 @@ export async function issueAdminPin(
         "휴대폰 뒷 4자리를 추출할 수 없습니다. 휴대폰 번호를 먼저 갱신해주세요.",
     };
   }
-  if (tail === "0000") {
+  if (RESERVED_MASTER_PINS.includes(tail)) {
     return {
-      error:
-        "PIN 0000 은 비상용 마스터 키로 예약되어 있습니다. 휴대폰 번호를 변경해주세요.",
+      error: `PIN ${tail} 은 비상용 마스터 키로 예약되어 있습니다. 휴대폰 번호를 변경해주세요.`,
     };
   }
 
