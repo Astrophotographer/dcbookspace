@@ -799,6 +799,16 @@ function RoomGrid({
           const state = statusFor(reservations, r.id);
           const list = reservations.filter((res) => res.room_id === r.id);
           const fixedList = fixedEvents.filter((e) => e.room_id === r.id);
+          const isEmpty = list.length === 0 && fixedList.length === 0;
+          const summaryLabel =
+            list.length === 0 && fixedList.length > 0
+              ? "고정 일정"
+              : STATE_LABEL[state];
+          const summaryCount = list.length + fixedList.length;
+          const SummaryIcon =
+            list.length === 0 && fixedList.length > 0
+              ? CalendarDays
+              : STATE_ICON[state];
           return (
             <button
               key={r.id}
@@ -806,7 +816,7 @@ function RoomGrid({
               type="button"
               onClick={() => openRoomModal(r.id)}
               className={cn(
-                "flex min-h-32 flex-col rounded-lg border p-3 text-left transition-colors",
+                "flex min-h-16 flex-col justify-center rounded-lg border p-2 text-left transition-colors",
                 STATE_COLOR[state],
               )}
             >
@@ -818,55 +828,11 @@ function RoomGrid({
                   </span>
                 )}
               </div>
-              {/* 호실 집계 상태 — 예약·고정행사 둘 다 없을 때만 (군더더기 방지).
-                  예약 있으면 아래 ul 의 각 항목별 [결재상태] 로 충분. */}
-              {list.length === 0 && fixedList.length === 0 && (
-                <div className="flex items-center gap-1 text-sm opacity-80">
-                  {(() => {
-                    const Icon = STATE_ICON[state];
-                    return <Icon aria-hidden className="h-3.5 w-3.5" />;
-                  })()}
-                  {STATE_LABEL[state]}
-                </div>
-              )}
-              {(fixedList.length > 0 || list.length > 0) && (
-                <ul className="mt-2 space-y-2 text-xs">
-                  {fixedList.slice(0, 2).map((ev) => (
-                    <li
-                      key={ev.id}
-                      className="rounded bg-stone-200/70 px-1.5 py-1 leading-snug text-stone-800"
-                    >
-                      <div className="font-semibold">[고정] {ev.name}</div>
-                      <div className="font-mono opacity-80">
-                        {formatTime(ev.start_at)}–{formatTime(ev.end_at)}
-                      </div>
-                    </li>
-                  ))}
-                  {list.slice(0, 3).map((res) => {
-                    const ds = displayStatus(res);
-                    const purposeShort =
-                      res.purpose.length > 5
-                        ? `${res.purpose.slice(0, 5)}…`
-                        : res.purpose;
-                    return (
-                      <li key={res.id} className="leading-snug">
-                        <div className="font-semibold">
-                          [{STATUS_LABEL[ds]}]
-                        </div>
-                        <div className="font-mono">
-                          {formatTime(res.start_at)}–{formatTime(res.end_at)}
-                        </div>
-                        <div className="truncate opacity-90">
-                          {res.dept?.name ?? "?"} {purposeShort}
-                        </div>
-                      </li>
-                    );
-                  })}
-                  {list.length > 3 && (
-                    <li className="text-stone-500">+{list.length - 3}건</li>
-                  )}
-                </ul>
-              )}
+              <div className="flex items-center gap-1 text-xs opacity-80">
+                <SummaryIcon aria-hidden className="h-3.5 w-3.5" />
+                <span>{summaryLabel}</span>
+                {!isEmpty && <span>· {summaryCount}건</span>}
+              </div>
             </button>
           );
         })}
