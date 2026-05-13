@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import {
   addDays,
   addMonths,
@@ -231,30 +231,29 @@ export function DateView({
             return (
               <div
                 key={key}
+                role="button"
+                tabIndex={0}
+                aria-label={`${format(day, "yyyy/MM/dd")} 예약 목록 열기`}
+                onClick={() => setModalDate(day)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setModalDate(day);
+                  }
+                }}
                 className={cn(
-                  "relative flex min-h-24 flex-col p-1.5 sm:min-h-28 sm:p-1.5",
+                  "relative flex min-h-24 cursor-pointer flex-col p-1.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400 sm:min-h-28 sm:p-1.5",
                   isEvenMonth ? "bg-orange-50" : "bg-white",
+                  isEvenMonth ? "hover:bg-orange-100" : "hover:bg-stone-50",
                 )}
               >
-                {/* 모바일 전용 — 셀 어디 탭해도 모달이 뜨게. 칩 글씨가 작아서
-                    개별 링크 누르기 어려운 모바일 UX 보강. 데스크톱(sm+)에선
-                    오버레이 숨김 → 기존대로 칩 클릭이 신청 상세로 동작. */}
-                <button
-                  type="button"
-                  onClick={() => setModalDate(day)}
-                  aria-label={`${format(day, "yyyy/MM/dd")} 예약 목록 열기`}
-                  className="absolute inset-0 z-10 sm:hidden"
-                />
                 <div className="flex items-center justify-between gap-1">
-                  <button
-                    onClick={() => setModalDate(day)}
-                    aria-label={`${format(day, "yyyy/MM/dd")} 예약 ${list.length}건 보기`}
+                  <span
                     className={cn(
-                      "inline-flex h-6 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 sm:h-7",
+                      "inline-flex h-6 items-center justify-center rounded-full px-2 text-sm font-medium sm:h-7",
                       isToday
                         ? "bg-brand-600 text-white"
                         : cn(
-                            "hover:bg-stone-100",
                             isFirstOfMonth && "font-bold text-stone-900",
                             !isFirstOfMonth && dow === 0 && "text-red-600",
                             !isFirstOfMonth && dow === 6 && "text-blue-600",
@@ -266,15 +265,11 @@ export function DateView({
                     )}
                   >
                     {dayLabel}
-                  </button>
+                  </span>
                   {(list.length > 0 || fixedList.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => setModalDate(day)}
-                      className="hidden text-xs text-stone-500 hover:text-stone-800 sm:inline"
-                    >
+                    <span className="hidden text-xs text-stone-500 sm:inline">
                       {list.length + fixedList.length}건
-                    </button>
+                    </span>
                   )}
                 </div>
                 <ul className="mt-0.5 space-y-0.5 overflow-hidden sm:mt-1">
@@ -295,11 +290,10 @@ export function DateView({
                     const ds = displayStatus(r);
                     return (
                       <li key={r.id}>
-                        <Link
-                          href={reservationHref(r.id, isAdmin)}
+                        <span
                           title={`[${STATUS_LABEL[ds]}] ${formatTime(r.start_at)}–${formatTime(r.end_at)} · ${r.dept?.name ?? ""} · ${r.purpose}`}
                           className={cn(
-                            "block truncate rounded px-1 py-0.5 text-xs transition-opacity hover:opacity-80",
+                            "block truncate rounded px-1 py-0.5 text-xs",
                             STATUS_CHIP_CLASS[ds],
                           )}
                         >
@@ -307,7 +301,7 @@ export function DateView({
                             {formatTime(r.start_at)}
                           </span>{" "}
                           {r.room.name}
-                        </Link>
+                        </span>
                       </li>
                     );
                   })}
