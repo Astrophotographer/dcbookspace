@@ -162,10 +162,12 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
 
   return (
     <div>
-      {/* 토글(segmented control) — 모바일은 가로 꽉, 데스크톱은 좌측 끝 정렬.
-          오른쪽엔 달력 태그 범례 (데스크탑에서만; 모바일은 공간 부족) */}
-      <div role="tablist" className="mb-4 flex items-center justify-between gap-3">
+      {/* 제목 라인 + 토글(segmented control). 모든 신청내역 탭과 같은 배치. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-bold text-stone-900">예약 현황</h1>
         <div
+          role="tablist"
+          aria-label="예약 현황 보기 방식"
           className="inline-flex w-full touch-pan-y rounded-full bg-stone-100 p-1 sm:w-auto"
           onTouchStart={onToggleTouchStart}
           onTouchEnd={onToggleTouchEnd}
@@ -201,23 +203,23 @@ export function HomeTabs({ dateView, buildingViewProps }: Props) {
             장소별
           </button>
         </div>
+      </div>
 
-        {/* 달력 태그 범례 — 데스크탑에서만 노출 (모바일은 가로 공간 부족) */}
-        <div className="hidden flex-wrap items-center gap-3 text-xs sm:flex">
-          {LEGEND_ITEMS.map(({ key, label, color, Icon }) => (
-            <span key={key} className="inline-flex items-center gap-1.5">
-              <span
-                className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded border",
-                  color,
-                )}
-              >
-                <Icon aria-hidden className="h-3.5 w-3.5" />
-              </span>
-              {label}
+      {/* 달력 태그 범례 — 데스크탑에서만 노출 (모바일은 가로 공간 부족) */}
+      <div className="mb-4 hidden flex-wrap items-center justify-end gap-3 text-xs sm:flex">
+        {LEGEND_ITEMS.map(({ key, label, color, Icon }) => (
+          <span key={key} className="inline-flex items-center gap-1.5">
+            <span
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded border",
+                color,
+              )}
+            >
+              <Icon aria-hidden className="h-3.5 w-3.5" />
             </span>
-          ))}
-        </div>
+            {label}
+          </span>
+        ))}
       </div>
 
       {/* 가로 스크롤 + snap. 스크롤바는 시각적으로 숨김 (스와이프 메타포 유지). */}

@@ -16,6 +16,7 @@ import {
   Inbox,
   LogOut,
   Maximize2,
+  Megaphone,
   Network,
   QrCode,
   Settings as SettingsIcon,
@@ -49,6 +50,12 @@ const TILES = [
     label: "신청서관리",
     desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
     Icon: FileText,
+  },
+  {
+    href: "/admin/notices",
+    label: "공지관리",
+    desc: "공지사항 제목과 내용을 작성·수정",
+    Icon: Megaphone,
   },
   {
     href: "/admin/departments",

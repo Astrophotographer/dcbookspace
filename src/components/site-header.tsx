@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ShieldCheck, Tablet } from "lucide-react";
+import { Tablet } from "lucide-react";
 import { isAdmin } from "@/lib/admin-server";
+import { SiteNav } from "./site-nav";
 
 type Props = {
   /** 키오스크 모드 — 사무실 태블릿 신청 전용. 네비 GUI 다 숨김 */
@@ -18,7 +19,7 @@ type Props = {
 function StagingLabel() {
   if (process.env.VERCEL_ENV === "production") return null;
   return (
-    <span className="hidden flex-none text-sm font-bold text-amber-600 sm:inline md:text-base">
+    <span className="inline-flex flex-none rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 sm:text-sm md:text-base">
       🧪 테스트용 페이지
     </span>
   );
@@ -56,11 +57,11 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
 
   const admin = await isAdmin();
   return (
-    <header className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+    <header className="border-b border-stone-200 bg-white/95">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 sm:px-4 md:min-h-20 md:flex-nowrap md:py-0">
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-2 sm:gap-4"
+          className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:flex-none"
           aria-label="등촌교회 홈"
         >
           <Image
@@ -73,51 +74,7 @@ export async function SiteHeader({ kiosk = false }: Props = {}) {
           />
         </Link>
         <StagingLabel />
-        <nav className="flex flex-none items-center gap-1 text-sm sm:gap-1.5 sm:text-base">
-          <Link
-            href="/"
-            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-          >
-            <span className="sm:hidden">현황판</span>
-            <span className="hidden sm:inline">현황판보기</span>
-          </Link>
-          <Link
-            href="/reservations"
-            className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-          >
-            <span className="sm:hidden">신청내역</span>
-            <span className="hidden sm:inline">모든 신청내역</span>
-          </Link>
-          {admin ? (
-            // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
-            // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 font-medium text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-              title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
-            >
-              <ShieldCheck className="h-4 w-4" aria-hidden />
-              <span>관리자</span>
-              <span className="hidden text-xs font-normal text-emerald-700 sm:inline">
-                · 활성화중
-              </span>
-            </Link>
-          ) : (
-            <Link
-              href="/admin"
-              className="rounded-lg px-3 py-2.5 transition-colors hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-            >
-              관리자
-            </Link>
-          )}
-          {/* 장소신청 — primary CTA. brand color, 약간 더 두꺼운 글씨로 한눈에 띄게. */}
-          <Link
-            href="/apply"
-            className="rounded-lg bg-brand-600 px-3 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:px-4 sm:py-3"
-          >
-            장소신청
-          </Link>
-        </nav>
+        <SiteNav isAdmin={admin} />
       </div>
     </header>
   );

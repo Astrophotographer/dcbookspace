@@ -10,14 +10,21 @@ type Props = {
   /** 관리자면 일회성 신청 클릭 시 /admin/reservations/[id] 로 직행. */
   isAdmin?: boolean;
   printEnabled?: boolean;
+  emptyMessage?: string;
 };
 
-export function ReservationsList({ entries, isAdmin, printEnabled }: Props) {
+export function ReservationsList({
+  entries,
+  isAdmin,
+  printEnabled,
+  emptyMessage,
+}: Props) {
   return (
     <ReservationsTable
       entries={entries}
       isAdmin={isAdmin}
       printEnabled={printEnabled}
+      emptyMessage={emptyMessage}
       rowLink={(e) => ({
         href:
           e.kind === "series"
