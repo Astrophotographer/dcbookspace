@@ -59,7 +59,10 @@ select count(*) from reservations where end_at < now() - interval '3 years';    
 - `npm run dev` 가 `predev` hook 으로 [scripts/check-db-env.mjs](scripts/check-db-env.mjs) 자동 실행 → `.env.local` + `supabase/.temp/project-ref` 검사. prod 감지 시 exit 1 → dev 시작 안 됨.
 - 언제든 수동 점검: `npm run db:check`.
 
-**prod 마이그레이션은 사람의 명시적 클릭만**: GitHub Actions → "DB migrate (prod)" → confirm 입력 `PROD` ([db-migrate-prod.yml](.github/workflows/db-migrate-prod.yml)). CLI 에서 `supabase link --project-ref lcndkzfvrkwlzkyppdzh` 같은 명령은 절대 실행 X.
+**prod 코드 배포와 마이그레이션은 사람의 명시적 클릭만**:
+- 코드 배포: GitHub Actions → "Deploy production (manual)" → confirm 입력 `PROD` ([deploy-prod.yml](.github/workflows/deploy-prod.yml)).
+- DB 마이그레이션: GitHub Actions → "DB migrate (prod)" → confirm 입력 `PROD` ([db-migrate-prod.yml](.github/workflows/db-migrate-prod.yml)).
+- CLI 에서 `vercel deploy --prod`, `supabase link --project-ref lcndkzfvrkwlzkyppdzh` 같은 prod 명령은 절대 실행 X.
 
 작업 도중 prod ref 가 어떤 위치(코드/env/명령어)에 등장하면 **즉시 사용자에게 알리고 멈출 것**.
 
@@ -70,8 +73,8 @@ select count(*) from reservations where end_at < now() - interval '3 years';    
 | `main` | **production** | `dcbook.vercel.app` | **신규 ref `lcndkzfvrkwlzkyppdzh`** (2026-05-12 신설, 빈 DB) |
 | `develop` | **staging** | `dcbookspace.vercel.app` | **기존 ref `bqtxkkqgpgyviczyoqix`** (기존 테스트 데이터 재활용) |
 
-**일상 작업**: develop 에 푸시 → preview 배포 → `dcbookspace.vercel.app` 에서 검증.
-**릴리스**: `git checkout main && git merge develop --no-ff` → tag → push → prod 배포. 후 `develop` 도 `main` 으로 sync.
+**일상 작업**: develop 에 푸시 → 자동 배포 → `dcbookspace.vercel.app` 에서 검증.
+**릴리스**: `git checkout main && git merge develop --no-ff` → tag → push. 이때 `main` push 만으로는 prod 배포 금지. 반드시 GitHub Actions → "Deploy production (manual)" 를 사람이 실행해야 `dcbook.vercel.app` 에 반영된다. 후 `develop` 도 `main` 으로 sync.
 **핫픽스**: `hotfix/*` 브랜치 main 분기 → 수정 → main 머지 → develop 으로 forward-merge.
 
 **버전 표기**:
@@ -80,13 +83,20 @@ select count(*) from reservations where end_at < now() - interval '3 years';    
 - `dcbookspace` / develop / staging / preview / localhost 는 개발·테스트용이므로 사이트 하단 버전 옆에 반드시 `- DEV(test)` 를 표시한다.
 - production(`dcbook.vercel.app`, `VERCEL_ENV=production`) 으로 올릴 때는 `- DEV(test)` 가 절대 보이면 안 된다. 현재 구현은 [src/components/site-footer.tsx](src/components/site-footer.tsx) 에서 `VERCEL_ENV` 로 자동 분기한다.
 
+**Vercel 자동 배포 규칙 (엄수)**:
+- [vercel.json](vercel.json) 에서 `git.deploymentEnabled.main=false`, `develop=true` 로 고정한다.
+- `dcbookspace.vercel.app` / develop / dev 환경은 자동 배포 허용.
+- `dcbook.vercel.app` / main / production 환경은 자동 배포 금지. GitHub Actions 수동 실행만 허용.
+- 수동 prod 배포 액션에는 GitHub Secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID_PROD` 가 필요하다.
+
 **마이그레이션 순서 (엄수)**:
 1. develop 푸시 → **GitHub Actions 가 staging DB 에 자동 적용** ([db-migrate-staging.yml](.github/workflows/db-migrate-staging.yml))
 2. `dcbookspace.vercel.app` preview 에서 검증
-3. main 머지 → Vercel prod 빌드 (코드만)
-4. **GitHub Actions 페이지 → "DB migrate (prod)" → Run workflow → confirm=`PROD`** 입력해 수동 적용 ([db-migrate-prod.yml](.github/workflows/db-migrate-prod.yml))
+3. main 머지/푸시 → **Vercel prod 자동 배포가 일어나면 안 됨**
+4. **GitHub Actions 페이지 → "Deploy production (manual)" → Run workflow → confirm=`PROD`** 입력해 코드 배포 ([deploy-prod.yml](.github/workflows/deploy-prod.yml))
+5. DB 변경이 있으면 **GitHub Actions 페이지 → "DB migrate (prod)" → Run workflow → confirm=`PROD`** 입력해 수동 적용 ([db-migrate-prod.yml](.github/workflows/db-migrate-prod.yml))
 
-> prod 자동 적용은 의도적으로 안 함. 실 사용자 DB 변형은 사람의 한 번의 클릭을 거쳐야 한다는 원칙.
+> prod 자동 적용은 의도적으로 안 함. 실 사용자 코드/DB 변경은 사람의 한 번의 클릭을 거쳐야 한다는 원칙.
 
 자세한 절차: [/Users/chris/.claude/plans/moonlit-growing-petal.md](file:///Users/chris/.claude/plans/moonlit-growing-petal.md)
 

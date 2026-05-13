@@ -1,0 +1,42 @@
+name: Deploy production (manual)
+
+# production(dcbook.vercel.app) 코드 배포는 항상 수동 트리거.
+# GitHub Actions 페이지 → "Deploy production (manual)" → Run workflow 버튼 클릭.
+# main 브랜치 push 만으로는 Vercel prod 배포가 시작되지 않아야 한다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '"PROD" 라고 입력해야 진행됩니다 (오타 방지)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: vercel deploy --prod
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_PROD }}
+    steps:
+      - name: Verify confirmation
+        if: ${{ inputs.confirm != 'PROD' }}
+        run: |
+          echo "::error::Input 'confirm' 가 'PROD' 가 아닙니다. 안전을 위해 중단합니다."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull production environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build production artifact
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy production artifact
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
