@@ -190,3 +190,15 @@ export type FixedEvent = {
   created_at: string;
   updated_at: string;
 };
+
+export type Notice = {
+  id: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  active: boolean;
+  display_order: number;
+  published_at: string;
+  created_at: string;
+  updated_at: string;
+};

@@ -77,6 +77,8 @@ select count(*) from reservations where end_at < now() - interval '3 years';    
 **버전 표기**:
 - develop = `vX.Y*` (별표 = 미릴리스)
 - main release = `vX.Y` (별표 제거) + `git tag vX.Y`
+- `dcbookspace` / develop / staging / preview / localhost 는 개발·테스트용이므로 사이트 하단 버전 옆에 반드시 `- DEV(test)` 를 표시한다.
+- production(`dcbook.vercel.app`, `VERCEL_ENV=production`) 으로 올릴 때는 `- DEV(test)` 가 절대 보이면 안 된다. 현재 구현은 [src/components/site-footer.tsx](src/components/site-footer.tsx) 에서 `VERCEL_ENV` 로 자동 분기한다.
 
 **마이그레이션 순서 (엄수)**:
 1. develop 푸시 → **GitHub Actions 가 staging DB 에 자동 적용** ([db-migrate-staging.yml](.github/workflows/db-migrate-staging.yml))

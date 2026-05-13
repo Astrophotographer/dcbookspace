@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, Plus } from "lucide-react";
+import { CircleCheck, Clock, Download, Plus } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -11,7 +11,49 @@ import { isAdmin } from "@/lib/admin-server";
 import { getPrintEnabled } from "@/lib/site-settings";
 import { ReservationsList } from "./reservations-list";
 
-export default async function ReservationsListPage() {
+type ReservationView = "active" | "completed";
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseReservationView(value: string | undefined): ReservationView {
+  return value === "completed" ? "completed" : "active";
+}
+
+function kstDateString(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function isActiveEntry(entry: TableEntry, today: string): boolean {
+  if (entry.kind === "series") return entry.data.end_date >= today;
+  return kstDateString(new Date(entry.data.end_at)) >= today;
+}
+
+function viewHref(view: ReservationView): string {
+  return view === "active" ? "/reservations" : "/reservations?view=completed";
+}
+
+function viewClass(active: boolean): string {
+  return [
+    "flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 sm:flex-none sm:px-6 sm:py-3 sm:text-base",
+    active
+      ? "bg-white text-brand-700 shadow-sm"
+      : "text-stone-600 hover:text-stone-900",
+  ].join(" ");
+}
+
+export default async function ReservationsListPage(
+  props: PageProps<"/reservations">,
+) {
+  const searchParams = await props.searchParams;
+  const selectedView = parseReservationView(firstParam(searchParams.view));
+
   if (!isSupabaseConfigured()) {
     return (
       <>
@@ -110,15 +152,65 @@ export default async function ReservationsListPage() {
     })),
   ];
 
+  const today = kstDateString(new Date());
+  const activeEntries = entries.filter((entry) => isActiveEntry(entry, today));
+  const completedEntries = entries.filter(
+    (entry) => !isActiveEntry(entry, today),
+  );
+  const visibleEntries = admin
+    ? selectedView === "active"
+      ? activeEntries
+      : completedEntries
+    : entries;
+  const emptyMessage = admin
+    ? selectedView === "active"
+      ? "오늘 이후 진행 중인 신청서가 없습니다."
+      : "과거 완료 신청서가 없습니다."
+    : undefined;
+
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">모든 신청내역</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold">모든 신청내역</h1>
+            {admin && (
+              <div
+                role="tablist"
+                aria-label="신청내역 기간 구분"
+                className="inline-flex w-full rounded-full bg-stone-100 p-1 sm:w-auto"
+              >
+                <Link
+                  href={viewHref("active")}
+                  role="tab"
+                  aria-selected={selectedView === "active"}
+                  className={viewClass(selectedView === "active")}
+                >
+                  <Clock className="h-5 w-5" aria-hidden />
+                  진행건
+                  <span className="ml-1 text-xs opacity-80">
+                    {activeEntries.length}
+                  </span>
+                </Link>
+                <Link
+                  href={viewHref("completed")}
+                  role="tab"
+                  aria-selected={selectedView === "completed"}
+                  className={viewClass(selectedView === "completed")}
+                >
+                  <CircleCheck className="h-5 w-5" aria-hidden />
+                  완료건
+                  <span className="ml-1 text-xs opacity-80">
+                    {completedEntries.length}
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-stone-500">
-              총 {entries.length}건
+              총 {visibleEntries.length}건
             </span>
             {admin && (
               // 종이 신청서를 직접 입력하는 admin 셀프-등록 진입.
@@ -148,9 +240,10 @@ export default async function ReservationsListPage() {
           </div>
         </div>
         <ReservationsList
-          entries={entries}
+          entries={visibleEntries}
           isAdmin={admin}
           printEnabled={printEnabled}
+          emptyMessage={emptyMessage}
         />
       </main>
     </>

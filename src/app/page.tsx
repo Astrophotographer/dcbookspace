@@ -44,7 +44,6 @@ export default async function Home(props: PageProps<"/">) {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
-        <h1 className="mb-6 text-2xl font-bold text-stone-900">예약 현황</h1>
         <Suspense fallback={<HomeSkeleton />}>
           <ReservationsArea dateStr={dateStr} />
         </Suspense>

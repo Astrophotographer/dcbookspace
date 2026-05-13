@@ -21,6 +21,7 @@ import type {
   AppUser,
   ApprovalRoute,
   FixedEvent,
+  Notice,
   ReservationSeries,
 } from "@/lib/supabase/types";
 
@@ -109,6 +110,27 @@ export const getFixedEvents = cache(async (
     throw error;
   }
   return (data ?? []) as FixedEvent[];
+});
+
+/** 공지사항. 기본은 공개(active=true) 공지만 중요 → 수동순서 → 최신순으로 노출. */
+export const getNotices = cache(async (
+  options: { includeInactive?: boolean } = {},
+): Promise<Notice[]> => {
+  const supabase = createServiceClient();
+  let q = supabase
+    .from("notices")
+    .select("*")
+    .order("pinned", { ascending: false })
+    .order("published_at", { ascending: false });
+  if (!options.includeInactive) q = q.eq("active", true);
+
+  const { data, error } = await q;
+  if (error) {
+    // PGRST205: PostgREST schema cache에 테이블 없음 (마이그레이션 미적용)
+    if ((error as { code?: string }).code === "PGRST205") return [];
+    throw error;
+  }
+  return (data ?? []) as Notice[];
 });
 
 /**
