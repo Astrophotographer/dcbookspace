@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Bot,
-  Check,
   Copy,
   ExternalLink,
   LinkIcon,
@@ -305,12 +304,6 @@ export function TelegramRegisterForm({
           id="register"
           className="overflow-hidden rounded-lg border border-[#ded9cd] bg-[#fffdf8]/95 shadow-[0_18px_45px_rgba(31,39,38,0.09)]"
         >
-          <ProgressBar
-            profileDone={sharedValid}
-            connectDone={!!link || !!chatId.trim()}
-            completeDone={!!linked}
-          />
-
           <StepCard number={1} title="본인 정보">
             <p className="mb-4 text-[#65706d]">
               알림 구독자 식별을 위해 이름, 휴대폰, 소속 대분류/중분류를
@@ -506,51 +499,6 @@ function RegistrationHeader({ botUsername }: { botUsername: string }) {
           : "알림봇 설정 필요"}
       </div>
     </header>
-  );
-}
-
-function ProgressBar({
-  profileDone,
-  connectDone,
-  completeDone,
-}: {
-  profileDone: boolean;
-  connectDone: boolean;
-  completeDone: boolean;
-}) {
-  const steps = [
-    { key: "profile", label: "본인 정보", done: profileDone },
-    { key: "scope", label: "알림 범위", done: profileDone },
-    { key: "connect", label: "텔레그램", done: connectDone },
-    { key: "test", label: "테스트", done: completeDone },
-    { key: "done", label: "완료", done: completeDone },
-  ];
-
-  return (
-    <div className="grid border-b border-[#ded9cd] bg-[#f0eee6] md:grid-cols-5">
-      {steps.map((step, index) => (
-        <div
-          key={step.key}
-          className={cn(
-            "flex min-h-[60px] items-center justify-center gap-2 border-[#ded9cd] text-sm font-black",
-            index > 0 && "border-t md:border-l md:border-t-0",
-            step.done ? "text-[#084f50]" : "text-[#65706d]",
-          )}
-        >
-          <span
-            className={cn(
-              "grid h-[26px] w-[26px] place-items-center rounded-full border text-xs",
-              step.done
-                ? "border-[#0b6f70] bg-[#0b6f70] text-white"
-                : "border-[#c9c1b2] bg-white text-[#8a928f]",
-            )}
-          >
-            {step.done ? <Check className="h-3.5 w-3.5" /> : index + 1}
-          </span>
-          {step.label}
-        </div>
-      ))}
-    </div>
   );
 }
 

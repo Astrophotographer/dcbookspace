@@ -45,8 +45,8 @@ type AdminSection = {
 
 const ADMIN_SECTIONS: AdminSection[] = [
   {
-    title: "사람과 알림",
-    desc: "관리자, 결재자, 알림 수신자를 정리합니다.",
+    title: "관리자와 결재",
+    desc: "관리자, 결재자, 관리자 알림을 정리합니다.",
     Icon: Users,
     items: [
       {
@@ -62,16 +62,16 @@ const ADMIN_SECTIONS: AdminSection[] = [
         Icon: Users,
       },
       {
-        href: "/admin/notifications",
-        label: "관리자 알림",
-        desc: "강제 중복 신청 알림 ON/OFF",
-        Icon: Bell,
+        href: "/admin/reservations",
+        label: "신청서관리",
+        desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
+        Icon: FileText,
       },
       {
-        href: "/admin/telegram",
-        label: "텔레그램 알림봇",
-        desc: "알림봇 신청자와 알림 범위 확인",
-        Icon: MessageCircle,
+        href: "/admin/apply-qr",
+        label: "신청 QR",
+        desc: "휴대폰 스캔으로 신청서 바로 열기",
+        Icon: QrCode,
       },
     ],
   },
@@ -81,10 +81,10 @@ const ADMIN_SECTIONS: AdminSection[] = [
     Icon: FileText,
     items: [
       {
-        href: "/admin/reservations",
-        label: "신청서관리",
-        desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
-        Icon: FileText,
+        href: "/admin/notifications",
+        label: "관리자 알림",
+        desc: "강제 중복 신청 알림 ON/OFF",
+        Icon: Bell,
       },
       {
         href: "/admin/notices",
@@ -93,10 +93,10 @@ const ADMIN_SECTIONS: AdminSection[] = [
         Icon: Megaphone,
       },
       {
-        href: "/admin/apply-qr",
-        label: "신청 QR",
-        desc: "휴대폰 스캔으로 신청서 바로 열기",
-        Icon: QrCode,
+        href: "/admin/telegram",
+        label: "텔레그램 알림봇",
+        desc: "알림봇 신청자와 알림 범위 확인",
+        Icon: MessageCircle,
       },
     ],
   },

@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>텔레그램 알림 등록 플로우</title>
+<style>
+  :root {
+    --canvas: #f7f5ef;
+    --surface: #fffdf8;
+    --surface-strong: #ffffff;
+    --ink: #1f2726;
+    --muted: #65706d;
+    --soft: #8a928f;
+    --line: #ded9cd;
+    --line-strong: #c9c1b2;
+    --brand: #0b6f70;
+    --brand-deep: #084f50;
+    --brand-soft: #e3f2ef;
+    --blue: #2563eb;
+    --blue-soft: #dbeafe;
+    --amber: #b45309;
+    --amber-soft: #fff3d7;
+    --green: #047857;
+    --green-soft: #dcfce7;
+    --red: #b42318;
+    --red-soft: #fee4e2;
+    --shadow: 0 18px 45px rgba(31, 39, 38, 0.09);
+    --radius: 8px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background:
+      linear-gradient(90deg, rgba(11, 111, 112, 0.05) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(11, 111, 112, 0.05) 1px, transparent 1px),
+      var(--canvas);
+    background-size: 28px 28px;
+    color: var(--ink);
+    font-family:
+      "Apple SD Gothic Neo",
+      "Noto Sans KR",
+      "Malgun Gothic",
+      system-ui,
+      sans-serif;
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  .shell {
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 64px;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 8px 0 22px;
+  }
+
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--brand-deep);
+    font-weight: 800;
+  }
+
+  .brand-icon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid rgba(11, 111, 112, 0.24);
+    border-radius: 10px;
+    background: var(--surface-strong);
+    box-shadow: 0 10px 22px rgba(11, 111, 112, 0.12);
+  }
+
+  .brand-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .header-copy {
+    max-width: 640px;
+  }
+
+  .eyebrow {
+    margin: 0 0 6px;
+    color: var(--brand);
+    font-size: 0.88rem;
+    font-weight: 800;
+  }
+
+  h1 {
+    margin: 0;
+    color: #15201f;
+    font-size: clamp(1.65rem, 3vw, 2.55rem);
+    line-height: 1.14;
+    letter-spacing: 0;
+  }
+
+  .lead {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 1.02rem;
+  }
+
+  .notice-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    margin: 8px 0 22px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-left: 7px solid var(--brand);
+    border-radius: var(--radius);
+    background: var(--surface-strong);
+    box-shadow: 0 12px 30px rgba(31, 39, 38, 0.07);
+  }
+
+  .notice-title {
+    margin: 0 0 6px;
+    font-weight: 850;
+  }
+
+  .notice-text {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .notice-link {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--brand);
+    color: white;
+    padding: 0 18px;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform 160ms ease, background 160ms ease;
+  }
+
+  .notice-link:hover {
+    transform: translateY(-1px);
+    background: var(--brand-deep);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .flow,
+  .summary {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 253, 248, 0.94);
+    box-shadow: var(--shadow);
+  }
+
+  .flow {
+    overflow: hidden;
+  }
+
+  .summary {
+    position: sticky;
+    top: 20px;
+    padding: 18px;
+  }
+
+  .progress {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-bottom: 1px solid var(--line);
+    background: #f0eee6;
+  }
+
+  .progress-item {
+    position: relative;
+    display: flex;
+    min-height: 60px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-weight: 800;
+  }
+
+  .progress-item + .progress-item {
+    border-left: 1px solid var(--line);
+  }
+
+  .progress-dot {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--surface-strong);
+    color: var(--soft);
+    font-size: 0.78rem;
+  }
+
+  .progress-item.done {
+    color: var(--brand-deep);
+  }
+
+  .progress-item.done .progress-dot {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: white;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 20px;
+    padding: 28px 28px 30px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .step:last-child {
+    border-bottom: 0;
+  }
+
+  .step-num {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-strong);
+    color: var(--brand);
+    font-size: 1.2rem;
+    font-weight: 900;
+  }
+
+  .step h2,
+  .summary h2 {
+    margin: 0 0 8px;
+    font-size: 1.25rem;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  .step p {
+    margin: 0 0 16px;
+    color: var(--muted);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .field {
+    display: grid;
+    gap: 7px;
+  }
+
+  .field.full {
+    grid-column: 1 / -1;
+  }
+
+  .label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  label,
+  .field-label {
+    color: #26312f;
+    font-weight: 800;
+  }
+
+  .hint {
+    color: var(--soft);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    min-height: 50px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface-strong);
+    color: var(--ink);
+    padding: 0 13px;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  textarea {
+    min-height: 108px;
+    padding: 12px 13px;
+    resize: vertical;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 4px rgba(11, 111, 112, 0.15);
+  }
+
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    background: #ece8df;
+    color: var(--soft);
+    cursor: not-allowed;
+  }
+
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .check-card {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-strong);
+    padding: 10px 12px;
+    font-weight: 800;
+  }
+
+  .check-card input {
+    width: 22px;
+    min-height: 22px;
+    accent-color: var(--brand);
+  }
+
+  .mode-tabs {
+    display: inline-flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    border-radius: 999px;
+    background: #ebe7dd;
+    padding: 4px;
+  }
+
+  .mode-tab {
+    min-height: 44px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    padding: 0 16px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .mode-tab[aria-pressed="true"] {
+    background: white;
+    color: var(--brand-deep);
+    box-shadow: 0 4px 14px rgba(31, 39, 38, 0.08);
+  }
+
+  .panel {
+    display: none;
+  }
+
+  .panel.active {
+    display: block;
+  }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 14px;
+  }
+
+  .btn {
+    display: inline-flex;
+    min-height: 50px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: 0 17px;
+    color: white;
+    background: var(--brand);
+    font-weight: 900;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 150ms ease, background 150ms ease, opacity 150ms ease;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+    background: var(--brand-deep);
+  }
+
+  .btn.secondary {
+    border-color: var(--line-strong);
+    background: var(--surface-strong);
+    color: var(--ink);
+  }
+
+  .btn.secondary:hover {
+    background: #f6f3ec;
+  }
+
+  .btn.blue {
+    background: var(--blue);
+  }
+
+  .btn.blue:hover {
+    background: #1d4ed8;
+  }
+
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    transform: none;
+  }
+
+  .callout {
+    margin: 14px 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    color: var(--muted);
+    background: #f6f3ec;
+  }
+
+  .callout strong {
+    color: var(--ink);
+  }
+
+  .callout.info {
+    border-color: #a7d8d3;
+    background: var(--brand-soft);
+    color: var(--brand-deep);
+  }
+
+  .callout.warn {
+    border-color: #f5c879;
+    background: var(--amber-soft);
+    color: #713f12;
+  }
+
+  .callout.ok {
+    border-color: #86efac;
+    background: var(--green-soft);
+    color: #14532d;
+  }
+
+  .callout.err {
+    border-color: #fda29b;
+    background: var(--red-soft);
+    color: #7a271a;
+  }
+
+  .link-box {
+    display: none;
+    grid-template-columns: 170px minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+    margin-top: 16px;
+    border: 1px solid #b7d8d4;
+    border-radius: var(--radius);
+    background: #f1fbf8;
+    padding: 14px;
+  }
+
+  .link-box.show {
+    display: grid;
+  }
+
+  .qr-frame {
+    display: grid;
+    width: 160px;
+    height: 160px;
+    place-items: center;
+    border: 1px solid #c7d2ce;
+    border-radius: var(--radius);
+    background: white;
+  }
+
+  .qr-frame img {
+    width: 146px;
+    height: 146px;
+  }
+
+  .inline-code,
+  code {
+    border-radius: 6px;
+    background: rgba(31, 39, 38, 0.08);
+    padding: 2px 6px;
+    color: #26312f;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  .copy-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-top: 9px;
+  }
+
+  .copy-line input {
+    min-height: 46px;
+    font-size: 0.9rem;
+  }
+
+  .payload {
+    margin: 12px 0 0;
+    border: 1px solid #22302e;
+    border-radius: var(--radius);
+    background: #17201f;
+    color: #d7f7ef;
+    padding: 14px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .summary-list {
+    display: grid;
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .summary-row {
+    display: grid;
+    gap: 2px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 9px;
+  }
+
+  .summary-row:last-child {
+    border-bottom: 0;
+  }
+
+  .summary-key {
+    color: var(--soft);
+    font-size: 0.76rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .summary-value {
+    color: var(--ink);
+    font-weight: 800;
+    word-break: break-word;
+  }
+
+  .mini-flow {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .mini-step {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 9px;
+    align-items: start;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .mini-badge {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 50%;
+    background: #efe9dd;
+    color: var(--brand-deep);
+    font-size: 0.78rem;
+    font-weight: 900;
+  }
+
+  .toast {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 20;
+    max-width: min(420px, calc(100% - 36px));
+    border: 1px solid #86efac;
+    border-radius: var(--radius);
+    background: #f0fdf4;
+    color: #14532d;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    font-weight: 800;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  svg {
+    flex: none;
+  }
+
+  @media (max-width: 940px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .summary {
+      position: static;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .shell {
+      width: min(100% - 22px, 1180px);
+      padding-top: 16px;
+    }
+
+    .app-header,
+    .notice-preview {
+      align-items: stretch;
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+
+    .notice-link {
+      width: 100%;
+      white-space: normal;
+    }
+
+    .progress {
+      grid-template-columns: 1fr;
+    }
+
+    .progress-item + .progress-item {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .step {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 22px 16px;
+    }
+
+    .form-grid,
+    .checkbox-grid,
+    .link-box {
+      grid-template-columns: 1fr;
+    }
+
+    .qr-frame {
+      width: 100%;
+      height: auto;
+      min-height: 170px;
+    }
+
+    .copy-line {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="app-header">
+    <div class="header-copy">
+      <p class="eyebrow">장소사용신청서 알림 연결 시안</p>
+      <h1>공지사항에서 바로 들어오는 텔레그램 chat_id 등록 플로우</h1>
+      <p class="lead">
+        사용자는 이름, 휴대폰, 소속 부서, 알림 범위를 입력하고 텔레그램 봇을 시작한 뒤,
+        테스트 메시지까지 한 번에 확인합니다.
+      </p>
+    </div>
+    <div class="brand-mark" aria-label="장소사용신청서">
+      <span class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Z" stroke="currentColor" stroke-width="1.8" />
+          <path d="M8 10.5h8M8 13.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+      </span>
+      장소사용신청서
+    </div>
+  </header>
+
+  <section class="notice-preview" aria-label="공지사항 링크 예시">
+    <div>
+      <p class="notice-title">텔레그램/슬랙을 통한 신청 현황 실시간 알림 서비스</p>
+      <p class="notice-text">
+        부서별 신청서의 진행 상태(접수, 반려, 완료)를 실시간으로 확인하고 싶으시다면,
+        등록하기 페이지에서 텔레그램 봇 아이디를 등록해 주세요.
+      </p>
+    </div>
+    <a class="notice-link" href="#register">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m21 5-6.5 15-3.8-6.8L4 10.2 21 5Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" />
+      </svg>
+      내 chat_id 등록하기
+    </a>
+  </section>
+
+  <div class="layout">
+    <main class="flow" id="register">
+      <div class="progress" aria-label="등록 진행 단계">
+        <div class="progress-item done" data-progress="profile"><span class="progress-dot">1</span>본인 정보</div>
+        <div class="progress-item" data-progress="scope"><span class="progress-dot">2</span>알림 범위</div>
+        <div class="progress-item" data-progress="connect"><span class="progress-dot">3</span>텔레그램</div>
+        <div class="progress-item" data-progress="test"><span class="progress-dot">4</span>테스트</div>
+        <div class="progress-item" data-progress="done"><span class="progress-dot">5</span>완료</div>
+      </div>
+
+      <section class="step" aria-labelledby="profile-title">
+        <div class="step-num">1</div>
+        <div>
+          <h2 id="profile-title">본인 정보</h2>
+          <p>알림 구독자 식별을 위해 이름, 휴대폰, 소속 대분류/중분류를 입력합니다.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="name">이름</label>
+              <input id="name" autocomplete="name" maxlength="20" placeholder="예: 홍길동" />
+            </div>
+            <div class="field">
+              <div class="label-row">
+                <label for="phone">휴대폰</label>
+                <span class="hint">010-1234-5678</span>
+              </div>
+              <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="13" value="010-" />
+            </div>
+            <div class="field">
+              <label for="deptGroup">소속 대분류</label>
+              <select id="deptGroup">
+                <option value="">대분류 선택</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="dept">소속 중분류(부서)</label>
+              <select id="dept">
+                <option value="">대분류 먼저 선택</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="scope-title">
+        <div class="step-num">2</div>
+        <div>
+          <h2 id="scope-title">알림 받을 범위</h2>
+          <p>위에서 입력한 본인 소속 부서만 받을지, 모든 부서 알림을 받을지 선택합니다.</p>
+          <div class="form-grid">
+            <div class="field hidden">
+              <label for="loginState">로그인 상태(시안)</label>
+              <select id="loginState">
+                <option value="user">일반 사용자로 접속</option>
+                <option value="admin">관리자로 로그인됨</option>
+              </select>
+            </div>
+            <div class="field hidden">
+              <label for="userRole">권한(자동 판정)</label>
+              <select id="userRole">
+                <option value="user">일반 사용자</option>
+                <option value="admin">관리자</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="watchScope">부서 범위</label>
+              <select id="watchScope">
+                <option value="home">본인 소속 부서만</option>
+                <option value="all">모든 부서</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="botUsername">알림 봇 username</label>
+              <input id="botUsername" value="PlaceUseRequestBot" spellcheck="false" />
+            </div>
+            <div class="field full" id="watchDeptWrap">
+              <label for="watchDepts">선택 부서</label>
+              <input id="watchDepts" placeholder="예: 유치1,2부, 초등1,2부, 사무처" />
+            </div>
+          </div>
+          <div class="callout info" id="scopeRule">
+            일반 사용자도 모든 부서 알림을 신청할 수 있습니다. 선택하지 않으면 본인 소속 중분류(부서)만 등록됩니다.
+          </div>
+          <div class="field full hidden" style="margin-top: 14px;">
+            <span class="field-label">받을 알림</span>
+            <div class="checkbox-grid" role="group" aria-label="받을 알림 종류">
+              <label class="check-card"><input type="checkbox" name="event" value="접수" checked /> 접수</label>
+              <label class="check-card"><input type="checkbox" name="event" value="반려" checked /> 반려</label>
+              <label class="check-card"><input type="checkbox" name="event" value="완료" checked /> 완료</label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="connect-title">
+        <div class="step-num">3</div>
+        <div>
+          <h2 id="connect-title">텔레그램 연결</h2>
+          <p>추천 방식은 봇 딥링크입니다. 사용자가 Start를 누르면 n8n이 chat_id를 받아 사이트에 등록합니다.</p>
+
+          <div class="mode-tabs" role="group" aria-label="텔레그램 연결 방식">
+            <button class="mode-tab" type="button" data-mode="auto" aria-pressed="true">자동 연결</button>
+            <button class="mode-tab" type="button" data-mode="manual" aria-pressed="false">수동 입력</button>
+          </div>
+
+          <div class="panel active" data-panel="auto">
+            <div class="callout info">
+              <strong>실제 구현:</strong> 사이트가 일회용 토큰을 만들고
+              <code>https://t.me/봇username?start=TOKEN</code> 링크를 보여줍니다.
+              n8n Telegram Trigger가 <code>/start TOKEN</code>을 받으면
+              <code>message.chat.id</code>를 등록 API로 보냅니다.
+            </div>
+            <div class="action-row">
+              <button class="btn" type="button" id="createLinkBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9.5 14.5 14.5 9.5M8 11l-1.6 1.6a3.2 3.2 0 0 0 4.5 4.5L13 15M16 13l1.6-1.6a3.2 3.2 0 0 0-4.5-4.5L11 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                자동 연결 링크 만들기
+              </button>
+              <span class="hint">모바일에서는 생성 후 텔레그램 앱을 바로 열면 됩니다.</span>
+            </div>
+
+            <div class="link-box" id="linkBox">
+              <div class="qr-frame">
+                <img id="qrImage" alt="텔레그램 연결 QR" />
+              </div>
+              <div>
+                <div class="callout warn" style="margin-top: 0;">
+                  텔레그램에서 봇이 열리면 Start를 눌러 주세요. 토큰은 10분 안에 처리하는 전제로 설계합니다.
+                </div>
+                <div class="copy-line">
+                  <input id="deepLink" readonly class="mono" />
+                  <button class="btn secondary" type="button" id="copyLinkBtn">복사</button>
+                </div>
+                <div class="action-row">
+                  <a class="btn blue" id="openTelegram" target="_blank" rel="noreferrer">
+                    텔레그램에서 열기
+                  </a>
+                  <button class="btn secondary" type="button" id="simulateN8nBtn">
+                    n8n 수신 시뮬레이션
+                  </button>
+                </div>
+                <p class="hint" id="tokenHint" style="margin: 10px 0 0;"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" data-panel="manual">
+            <div class="callout warn">
+              자동 연결이 어려운 경우 직접 chat_id를 넣습니다. 텔레그램에서
+              <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer">@userinfobot</a>
+              을 시작하면 본인 chat_id를 확인할 수 있습니다.
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="chatId">chat_id</label>
+                <input id="chatId" inputmode="numeric" placeholder="예: 123456789" />
+              </div>
+              <div class="field">
+                <label for="testWebhook">테스트 Webhook URL(선택)</label>
+                <input id="testWebhook" placeholder="예: n8n test webhook URL" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="test-title">
+        <div class="step-num">4</div>
+        <div>
+          <h2 id="test-title">테스트 메시지</h2>
+          <p>등록될 값을 확인하고 테스트 메시지 페이로드를 보냅니다. Webhook URL이 없으면 화면에서 성공 흐름만 시뮬레이션합니다.</p>
+          <div class="action-row">
+            <button class="btn" type="button" id="testBtn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              등록하고 테스트 메시지 보내기
+            </button>
+            <button class="btn secondary" type="button" id="payloadBtn">페이로드 갱신</button>
+          </div>
+          <div id="testResult" class="callout hidden"></div>
+          <pre class="payload" id="payloadPreview">{}</pre>
+        </div>
+      </section>
+
+      <section class="step" aria-labelledby="done-title">
+        <div class="step-num">5</div>
+        <div>
+          <h2 id="done-title">완료 화면</h2>
+          <p>실제 서비스에서는 Supabase 저장 후 텔레그램 테스트 메시지가 도착하면 아래 상태로 전환합니다.</p>
+          <div class="callout ok" id="donePanel">
+            아직 등록 전입니다. 위 정보를 입력하고 테스트 메시지를 보내면 완료 상태로 바뀝니다.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="summary" aria-label="등록 정보 요약">
+      <h2>등록 정보 요약</h2>
+      <p class="hint">입력할 때마다 실제 저장될 값을 미리 확인합니다.</p>
+      <div class="summary-list">
+        <div class="summary-row">
+          <span class="summary-key">이름</span>
+          <span class="summary-value" id="sumName">미입력</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">휴대폰</span>
+          <span class="summary-value" id="sumPhone">미입력</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">부서</span>
+          <span class="summary-value" id="sumDept">미선택</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">권한</span>
+          <span class="summary-value" id="sumRole">일반 사용자</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">알림 범위</span>
+          <span class="summary-value" id="sumScope">본인 소속 부서만</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">이벤트</span>
+          <span class="summary-value" id="sumEvents">접수, 반려, 완료</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key">chat_id</span>
+          <span class="summary-value mono" id="sumChatId">대기 중</span>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <strong>공지사항 링크 최종 문구:</strong><br />
+        <span class="inline-code">내 chat_id 등록하기</span>를
+        <span class="inline-code">/me/telegram</span> 또는 이 등록 페이지로 연결합니다.
+      </div>
+
+      <div class="mini-flow">
+        <div class="mini-step"><span class="mini-badge">1</span><span>사용자가 공지사항 링크 클릭</span></div>
+        <div class="mini-step"><span class="mini-badge">2</span><span>사이트가 일회용 토큰 발급</span></div>
+        <div class="mini-step"><span class="mini-badge">3</span><span>텔레그램 봇 Start</span></div>
+        <div class="mini-step"><span class="mini-badge">4</span><span>n8n이 chat_id를 등록 API로 전달</span></div>
+        <div class="mini-step"><span class="mini-badge">5</span><span>테스트 메시지 도착 확인</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+  const state = {
+    token: "",
+    deepLink: "",
+    mode: "auto",
+    autoCaptured: false,
+    completed: false,
+  };
+
+  const departmentTree = {
+    "교육청년부": [
+      "영아1,2부",
+      "유치1,2부",
+      "유년1,2부",
+      "초등1,2부",
+      "중등부",
+      "영어초중등부",
+      "고등부",
+      "1청년회",
+      "2청년회",
+      "3청년회",
+    ],
+    "구역회": [
+      "제 1지역",
+      "제 2지역",
+      "제 3지역",
+      "제 4지역",
+      "제 5지역",
+      "제 6지역",
+      "제 7지역",
+      "제 8지역",
+    ],
+    "남전도회": [
+      "1남전도회",
+      "2남전도회",
+      "3남전도회",
+      "4남전도회",
+      "5남전도회",
+      "6남전도회",
+      "7남전도회",
+      "8남전도회",
+    ],
+    "여전도회": [
+      "소망회(남)",
+      "사랑회(여)",
+      "1여전도회",
+      "2여전도회",
+      "3여전도회",
+      "4여전도회",
+      "5여전도회",
+      "6여전도회",
+      "7여전도회",
+      "8여전도회",
+      "9여전도회",
+      "10여전도회",
+      "11여전도회",
+      "12여전도회",
+    ],
+    "찬양대": [
+      "1부 부니엘찬양대",
+      "2부 임마누엘찬양대",
+      "3부 글로리아찬양대",
+      "씨드 찬양단",
+    ],
+    "선교": ["국내선교", "해외선교", "특수선교"],
+    "훈련": [
+      "새가족훈련",
+      "양육훈련",
+      "기초제자훈련",
+      "제자훈련",
+      "사역훈련",
+      "전도폭발훈련",
+      "성경대학",
+      "말씀인도자",
+    ],
+    "부설기관": [
+      "등촌유치원",
+      "등촌어린이집",
+      "등촌학사",
+      "실버대학",
+      "문화교실",
+    ],
+    "행정": ["당회", "사무처"],
+  };
+
+  const fields = {
+    name: $("#name"),
+    phone: $("#phone"),
+    deptGroup: $("#deptGroup"),
+    dept: $("#dept"),
+    loginState: $("#loginState"),
+    userRole: $("#userRole"),
+    watchScope: $("#watchScope"),
+    watchDepts: $("#watchDepts"),
+    watchDeptWrap: $("#watchDeptWrap"),
+    botUsername: $("#botUsername"),
+    chatId: $("#chatId"),
+    testWebhook: $("#testWebhook"),
+  };
+
+  const progressOrder = ["profile", "scope", "connect", "test", "done"];
+
+  function showToast(message) {
+    const toast = $("#toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2600);
+  }
+
+  function formatPhone(value) {
+    const digits = value.replace(/\D/g, "");
+    const tail = (digits.startsWith("010") ? digits.slice(3) : digits).slice(0, 8);
+    if (tail.length <= 4) return `010-${tail}`;
+    return `010-${tail.slice(0, 4)}-${tail.slice(4)}`;
+  }
+
+  function randomToken() {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    let raw = "";
+    bytes.forEach((byte) => {
+      raw += String.fromCharCode(byte);
+    });
+    return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function checkedEvents() {
+    return $$("input[name='event']:checked").map((input) => input.value);
+  }
+
+  function populateDeptGroups() {
+    fields.deptGroup.innerHTML =
+      '<option value="">대분류 선택</option>' +
+      Object.keys(departmentTree)
+        .map((name) => `<option value="${name}">${name}</option>`)
+        .join("");
+  }
+
+  function populateDeptOptions() {
+    const group = fields.deptGroup.value;
+    const leaves = departmentTree[group] || [];
+    if (!group) {
+      fields.dept.innerHTML = '<option value="">대분류 먼저 선택</option>';
+      return;
+    }
+    fields.dept.innerHTML =
+      '<option value="">중분류 선택</option>' +
+      leaves.map((name) => `<option value="${name}">${name}</option>`).join("");
+  }
+
+  function applyRoleRules() {
+    fields.userRole.value = "user";
+    fields.userRole.disabled = true;
+    fields.watchScope.disabled = false;
+    fields.watchDepts.disabled = true;
+    $("#scopeRule").className = "callout info";
+    $("#scopeRule").textContent =
+      "일반 사용자도 모든 부서 알림을 신청할 수 있습니다. 선택하지 않으면 본인 소속 중분류(부서)만 등록됩니다.";
+  }
+
+  function selectedWatchScopeLabel() {
+    const scope = fields.watchScope.value;
+    if (scope === "all") return "모든 부서";
+    return "본인 소속 부서만";
+  }
+
+  function currentChatId() {
+    if (state.mode === "manual") return fields.chatId.value.trim();
+    if (state.autoCaptured) return fields.chatId.value.trim() || "123456789";
+    return "";
+  }
+
+  function buildPayload() {
+    const name = fields.name.value.trim() || "홍길동";
+    const scopeLabel = selectedWatchScopeLabel();
+    const homeDept = fields.dept.value || "유치1,2부";
+    const dept = homeDept;
+    const chatId = currentChatId() || "123456789";
+    return {
+      event: "test.message",
+      occurred_at: new Date().toISOString(),
+      data: {
+        kind: "test",
+        purpose: "텔레그램 알림 연결 테스트",
+        role: "subscriber",
+        watch_scope: fields.watchScope.value,
+        watch_dept_names:
+          fields.watchScope.value === "all" ? [] : [homeDept],
+        home_dept_name: homeDept,
+        dept_name: scopeLabel,
+        recipients: [
+          {
+            chat_id: chatId,
+            name,
+            dept_name: scopeLabel,
+            events: checkedEvents(),
+          },
+        ],
+      },
+    };
+  }
+
+  function validateBase() {
+    const name = fields.name.value.trim();
+    const phone = fields.phone.value.replace(/\D/g, "");
+    const dept = fields.dept.value;
+    if (!name) return "이름을 입력해 주세요.";
+    if (phone.length !== 11) return "휴대폰 번호 뒤 8자리를 입력해 주세요.";
+    if (!dept) return "소속 중분류(부서)를 선택해 주세요.";
+    if (!fields.botUsername.value.trim()) return "텔레그램 봇 username을 입력해 주세요.";
+    return "";
+  }
+
+  function setProgress() {
+    const done = new Set();
+    if (fields.name.value.trim() && fields.phone.value.replace(/\D/g, "").length === 11 && fields.dept.value) {
+      done.add("profile");
+    }
+    if (fields.dept.value && fields.watchScope.value) done.add("scope");
+    if (currentChatId() || state.deepLink) done.add("connect");
+    if ($("#testResult").classList.contains("ok")) done.add("test");
+    if (state.completed) done.add("done");
+
+    progressOrder.forEach((key) => {
+      const el = document.querySelector(`[data-progress="${key}"]`);
+      el.classList.toggle("done", done.has(key));
+    });
+  }
+
+  function updateSummary() {
+    applyRoleRules();
+    $("#sumName").textContent = fields.name.value.trim() || "미입력";
+    $("#sumPhone").textContent = fields.phone.value.trim() || "미입력";
+    $("#sumDept").textContent =
+      fields.deptGroup.value && fields.dept.value
+        ? `${fields.deptGroup.value} > ${fields.dept.value}`
+        : "해당 없음";
+    $("#sumRole").textContent = "일반 사용자";
+    $("#sumScope").textContent = selectedWatchScopeLabel();
+    $("#sumEvents").textContent = "접수, 반려, 완료";
+    $("#sumChatId").textContent = currentChatId() || "대기 중";
+    $("#payloadPreview").textContent = JSON.stringify(buildPayload(), null, 2);
+    fields.watchDeptWrap.classList.toggle(
+      "hidden",
+      true,
+    );
+    setProgress();
+  }
+
+  function switchMode(mode) {
+    state.mode = mode;
+    $$(".mode-tab").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+    });
+    $$(".panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.dataset.panel === mode);
+    });
+    updateSummary();
+  }
+
+  function createDeepLink() {
+    const error = validateBase();
+    if (error) {
+      showToast(error);
+      return;
+    }
+    const bot = fields.botUsername.value.trim().replace(/^@/, "");
+    if (!bot) {
+      showToast("텔레그램 봇 username을 입력해 주세요.");
+      return;
+    }
+    state.token = randomToken();
+    state.deepLink = `https://t.me/${encodeURIComponent(bot)}?start=${state.token}`;
+    state.autoCaptured = false;
+    $("#deepLink").value = state.deepLink;
+    $("#openTelegram").href = state.deepLink;
+    $("#qrImage").src = `https://api.qrserver.com/v1/create-qr-code/?size=146x146&data=${encodeURIComponent(state.deepLink)}`;
+    $("#tokenHint").innerHTML = `토큰 <code>${state.token}</code> 생성됨. 실제 운영에서는 telegram_link_tokens 테이블에 10분 만료로 저장합니다.`;
+    $("#linkBox").classList.add("show");
+    showToast("텔레그램 연결 링크를 만들었습니다.");
+    updateSummary();
+  }
+
+  async function copyDeepLink() {
+    if (!state.deepLink) return;
+    try {
+      await navigator.clipboard.writeText(state.deepLink);
+      showToast("연결 링크를 복사했습니다.");
+    } catch {
+      fields.deepLink?.select?.();
+      showToast("브라우저가 자동 복사를 막았습니다. 링크를 직접 복사해 주세요.");
+    }
+  }
+
+  function simulateN8n() {
+    if (!state.deepLink) {
+      showToast("먼저 자동 연결 링크를 만들어 주세요.");
+      return;
+    }
+    state.autoCaptured = true;
+    if (!fields.chatId.value.trim()) fields.chatId.value = "123456789";
+    showToast("n8n이 /start 토큰과 chat_id를 받은 것으로 처리했습니다.");
+    updateSummary();
+  }
+
+  async function runTest() {
+    const error = validateBase();
+    if (error) {
+      showToast(error);
+      return;
+    }
+    if (!currentChatId()) {
+      showToast("자동 연결을 완료하거나 수동 chat_id를 입력해 주세요.");
+      return;
+    }
+
+    const result = $("#testResult");
+    const payload = buildPayload();
+    result.className = "callout";
+    result.textContent = "테스트 메시지 전송 중입니다.";
+
+    const webhook = fields.testWebhook.value.trim();
+    if (webhook) {
+      try {
+        const response = await fetch(webhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        result.className = "callout ok";
+        result.textContent = "Webhook 테스트 전송 성공. 텔레그램에서 메시지 도착을 확인해 주세요.";
+      } catch (err) {
+        result.className = "callout err";
+        result.textContent = `Webhook 테스트 실패: ${err.message}. URL, CORS, n8n test 실행 상태를 확인해 주세요.`;
+        updateSummary();
+        return;
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      result.className = "callout ok";
+      result.textContent = "시뮬레이션 성공. 실제 구현에서는 서버가 n8n 또는 Telegram Bot API로 테스트 메시지를 보냅니다.";
+    }
+
+    state.completed = true;
+    $("#donePanel").className = "callout ok";
+    $("#donePanel").innerHTML =
+      `<strong>${fields.name.value.trim()}</strong> 님 등록 완료. ` +
+      `chat_id <code>${currentChatId()}</code> 로 접수, 반려, 완료 알림을 보낼 준비가 됐습니다.`;
+    showToast("등록과 테스트 흐름이 완료됐습니다.");
+    updateSummary();
+  }
+
+  fields.phone.addEventListener("input", (event) => {
+    event.target.value = formatPhone(event.target.value);
+    updateSummary();
+  });
+
+  fields.deptGroup.addEventListener("change", () => {
+    populateDeptOptions();
+    updateSummary();
+  });
+
+  Object.values(fields).forEach((field) => {
+    if (!field || field === fields.phone || field === fields.deptGroup) return;
+    field.addEventListener("input", updateSummary);
+    field.addEventListener("change", updateSummary);
+  });
+
+  $$("input[name='event']").forEach((input) => {
+    input.addEventListener("change", updateSummary);
+  });
+
+  $$(".mode-tab").forEach((button) => {
+    button.addEventListener("click", () => switchMode(button.dataset.mode));
+  });
+
+  $("#createLinkBtn").addEventListener("click", createDeepLink);
+  $("#copyLinkBtn").addEventListener("click", copyDeepLink);
+  $("#simulateN8nBtn").addEventListener("click", simulateN8n);
+  $("#testBtn").addEventListener("click", runTest);
+  $("#payloadBtn").addEventListener("click", () => {
+    updateSummary();
+    showToast("페이로드를 갱신했습니다.");
+  });
+
+  populateDeptGroups();
+  updateSummary();
+</script>
+</body>
+</html>
