@@ -16,6 +16,7 @@ import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { getPrintEnabled } from "@/lib/site-settings";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,12 @@ export default async function SeriesPage(props: PageArgs) {
           )
         )}
 
+        {justSubmitted && series.applicant.phone && (
+          <div className="mb-4">
+            <PushPermissionPrompt applicantPhone={series.applicant.phone} />
+          </div>
+        )}
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-stone-900">
             정기 신청 #{series.ref_no}
@@ -98,6 +105,12 @@ export default async function SeriesPage(props: PageArgs) {
           editable={series.status === "pending" && series.current_step === 1}
           totalRows={totalRows}
         />
+
+        {!justSubmitted && series.applicant.phone && (
+          <div className="mb-4">
+            <PushPermissionPrompt applicantPhone={series.applicant.phone} />
+          </div>
+        )}
 
         {printEnabled && (
           <div className="mb-6">

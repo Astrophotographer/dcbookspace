@@ -108,6 +108,30 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           )
         )}
 
+        {justSubmitted && !isKiosk && r.applicant.phone && (
+          <div className="mb-4">
+            <PushPermissionPrompt applicantPhone={r.applicant.phone} />
+          </div>
+        )}
+
+        {/* 신청 완료 직후 텔레그램 알림 등록 안내 — 키오스크(공용 단말) 모드는
+            제외해서 공용 폰으로 등록되는 사고 방지. 이름·휴대폰 prefill 로
+            한 화면에서 바로 등록 가능. */}
+        {justSubmitted && !isKiosk && (
+          <Link
+            href={`/me/telegram?name=${encodeURIComponent(r.applicant.name)}&phone=${encodeURIComponent(r.applicant.phone ?? "")}`}
+            className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-sky-300 bg-sky-50 p-4 text-sky-900 hover:bg-sky-100"
+          >
+            <div>
+              <div className="font-semibold">📱 진행 상황을 텔레그램으로 받기</div>
+              <div className="mt-0.5 text-sm text-sky-800">
+                결재가 끝났는지·반려됐는지 텔레그램으로 바로 알림 받기.
+              </div>
+            </div>
+            <span className="flex-none text-sm font-semibold">등록하기 →</span>
+          </Link>
+        )}
+
         {/* 키오스크 자동 복귀 — 인쇄 상태 기반이라 print 비활성 시엔 의미 없음.
             (인쇄 OFF 면 키오스크 흐름 자체도 함께 비활성으로 가정) */}
         {isKiosk && printEnabled && (
@@ -131,7 +155,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
         />
 
         {/* PWA 푸시 알림 — 키오스크 모드(공용 단말)에서는 숨김 */}
-        {!isKiosk && r.applicant.phone && (
+        {!justSubmitted && !isKiosk && r.applicant.phone && (
           <div className="mb-4">
             <PushPermissionPrompt applicantPhone={r.applicant.phone} />
           </div>

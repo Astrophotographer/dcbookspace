@@ -20,7 +20,7 @@ import {
   emitSeriesEventAfter,
 } from "@/lib/webhook";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
-import { notifyForcedOverlap } from "@/lib/push";
+import { notifyForcedOverlap, sendPushToUser } from "@/lib/push";
 
 type SubmitResult = { id?: string; error?: string };
 type Result = { error?: string };
@@ -307,6 +307,15 @@ export async function submitApplication(
   }));
   const { error: apErr } = await supabase.from("approvals").insert(apprRows);
   if (apErr) return { error: apErr.message };
+
+  void sendPushToUser(applicantId, {
+    title: "신청서가 접수되었습니다",
+    body: `${purpose} 신청서가 접수되었습니다. 결재가 진행되면 이어서 알려드릴게요.`,
+    url: `/reservations/${res.id}`,
+    tag: `reservation-submitted-${res.id}`,
+  }).catch(() => {
+    /* ignore — 신청 자체는 성공한 상태 */
+  });
 
   revalidatePath("/");
   emitReservationEventAfter("reservation.created", res.id);
@@ -810,6 +819,15 @@ export async function submitSeriesApplication(
     if (rErr.message?.includes("이미 예약")) return { error: rErr.message };
     return { error: rErr.message };
   }
+
+  void sendPushToUser(applicantId, {
+    title: "정기 신청이 접수되었습니다",
+    body: `${purpose} 정기 신청이 접수되었습니다. 결재가 진행되면 이어서 알려드릴게요.`,
+    url: `/series/${series.id}`,
+    tag: `series-submitted-${series.id}`,
+  }).catch(() => {
+    /* ignore — 신청 자체는 성공한 상태 */
+  });
 
   revalidatePath("/");
   revalidatePath("/reservations");

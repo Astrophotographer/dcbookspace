@@ -500,7 +500,7 @@ function RegistrationHeader({ botUsername }: { botUsername: string }) {
           장소사용신청서 알림 연결
         </p>
         <h1 className="m-0 text-[1.65rem] font-black leading-tight text-[#15201f] md:text-[2.35rem]">
-          공지사항에서 바로 들어오는 텔레그램 알림 등록
+          텔레그램 알림 등록
         </h1>
         <p className="mt-2 text-base leading-relaxed text-[#65706d]">
           이름, 휴대폰, 소속 부서, 알림 범위를 입력하고 텔레그램 봇을

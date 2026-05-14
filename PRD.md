@@ -1,8 +1,8 @@
-# DCbookspace — 교회 장소 사용 신청·결재 시스템 PRD
+# 장소사용신청서 — 교회 장소 사용 신청·결재 시스템 PRD
 
 | 항목 | 값 |
 |---|---|
-| 프로젝트명 | DCbookspace |
+| 프로젝트명 | 장소사용신청서 |
 | 버전 | 1.0 (운영 가능) |
 | 최초 배포 | 2026-05 |
 | Repo | github.com/Astrophotographer/dcbookspace |

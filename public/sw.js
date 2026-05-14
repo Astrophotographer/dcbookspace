@@ -1,5 +1,5 @@
 /**
- * DCbookspace 푸시 알림 Service Worker
+ * 장소사용신청서 푸시 알림 Service Worker
  *
  * 트리거:
  *   1) push 이벤트 → 시스템 알림 표시

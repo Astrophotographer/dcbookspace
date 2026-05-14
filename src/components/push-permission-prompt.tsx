@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  registerPushSubscription,
-  unregisterPushSubscription,
-} from "@/app/push/actions";
+import { registerPushSubscription } from "@/app/push/actions";
 
 type Props = {
   /** 신청자 본인 휴대폰 — 본인 확인용 */
@@ -132,22 +129,6 @@ export function PushPermissionPrompt({ applicantPhone }: Props) {
     }
   };
 
-  const disable = async () => {
-    setError(null);
-    try {
-      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
-      const sub = await reg?.pushManager.getSubscription();
-      if (sub) {
-        await unregisterPushSubscription({ endpoint: sub.endpoint });
-        await sub.unsubscribe();
-      }
-      setState("off");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "알림 해제 중 오류가 발생했습니다.");
-      setState("error");
-    }
-  };
-
   if (state === "init" || state === "unsupported") return null;
 
   const isOn = state === "on";
@@ -166,10 +147,7 @@ export function PushPermissionPrompt({ applicantPhone }: Props) {
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <label
-          htmlFor="push-toggle"
-          className="flex min-w-0 flex-1 items-center gap-2 text-sm"
-        >
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
           {isOn ? (
             <Bell className="h-4 w-4 flex-none text-emerald-600" />
           ) : isDenied ? (
@@ -189,45 +167,47 @@ export function PushPermissionPrompt({ applicantPhone }: Props) {
           >
             {isOn ? (
               <>
-                <strong>결재 알림 받는 중</strong> — 결재 완료·반려, 같은 시간 강제 신청 시 즉시 알림
+                <strong>이 폰에 알림 등록됨</strong> — 접수·결재 완료·반려 알림을 보내드립니다.
               </>
             ) : isDenied ? (
               <>
-                알림이 차단되어 있어요. 주소창 자물쇠 → 알림 → 허용으로 변경해 주세요.
+                알림이 차단되어 있어요. 휴대폰/브라우저 설정에서 알림을 허용해 주세요.
               </>
             ) : (
               <>
-                결재 완료·반려, 누군가 같은 시간에 신청 시 <strong>홈 화면에 알림</strong>으로 받기
+                신청서 진행 상황을 <strong>이 폰의 홈 화면 알림</strong>으로 받기
               </>
             )}
           </span>
-        </label>
+        </div>
 
-        <button
-          id="push-toggle"
-          type="button"
-          role="switch"
-          aria-checked={isOn}
-          aria-label={isOn ? "알림 끄기" : "알림 켜기"}
-          disabled={isBusy || isDenied}
-          onClick={isOn ? disable : enable}
-          className={cn(
-            "relative inline-flex h-7 w-12 flex-none items-center rounded-full transition-colors",
-            isOn ? "bg-emerald-500" : "bg-stone-300",
-            "disabled:cursor-not-allowed disabled:opacity-60",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
-          )}
-        >
-          <span
+        {isOn ? (
+          <span className="inline-flex min-h-10 flex-none items-center rounded-full bg-emerald-600 px-3 text-sm font-semibold text-white">
+            등록됨
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label="알림 허용하기"
+            disabled={isBusy || isDenied}
+            onClick={enable}
             className={cn(
-              "inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform",
-              isOn ? "translate-x-6" : "translate-x-1",
+              "inline-flex min-h-10 flex-none items-center justify-center rounded-full px-3 text-sm font-semibold text-white transition-colors",
+              isDenied ? "bg-stone-400" : "bg-brand-600 hover:bg-brand-700",
+              "disabled:cursor-not-allowed disabled:opacity-60",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
             )}
-          />
-          {isBusy && (
-            <Loader2 className="pointer-events-none absolute inset-0 m-auto h-3.5 w-3.5 animate-spin text-white" />
-          )}
-        </button>
+          >
+            {isBusy ? (
+              <>
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                등록 중
+              </>
+            ) : (
+              "알림 허용"
+            )}
+          </button>
+        )}
       </div>
 
       {error && <div className="mt-2 text-xs text-red-700">{error}</div>}
