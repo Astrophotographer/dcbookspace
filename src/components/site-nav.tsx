@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ClipboardList,
+  FilePlus,
   LayoutDashboard,
   type LucideIcon,
   Megaphone,
@@ -56,54 +57,77 @@ export function SiteNav({ isAdmin }: Props) {
     <>
       <nav
         aria-label="주요 메뉴"
-        className="hidden items-center gap-1 rounded-full border border-stone-200 bg-white/85 p-1 text-base shadow-sm md:flex"
+        className="hidden items-center gap-[2ch] text-base md:flex"
       >
-        <DesktopNavLink href="/" active={isActive(pathname, "/")}>
-          현황판보기
-        </DesktopNavLink>
-
-        <DesktopNavLink
-          href="/reservations"
-          active={isActive(pathname, "/reservations")}
-        >
-          모든 신청내역
-        </DesktopNavLink>
-
-        <DesktopNavLink href="/notices" active={isActive(pathname, "/notices")}>
-          공지사항
-        </DesktopNavLink>
-
-        {isAdmin ? (
-          // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
-          // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
-          <Link
-            href="/admin"
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-3 font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
-            title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
-          >
-            <ShieldCheck className="h-4 w-4" aria-hidden />
-            <span>관리자</span>
-            <span className="text-xs font-normal text-emerald-700">
-              · 활성화중
-            </span>
-          </Link>
-        ) : (
-          <DesktopNavLink href="/admin" active={isActive(pathname, "/admin")}>
-            관리자
+        <div className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/85 p-1 shadow-sm">
+          <DesktopNavLink href="/" active={isActive(pathname, "/")}>
+            현황판보기
           </DesktopNavLink>
-        )}
+
+          <DesktopNavLink
+            href="/reservations"
+            active={isActive(pathname, "/reservations")}
+          >
+            모든 신청내역
+          </DesktopNavLink>
+
+          <DesktopNavLink href="/notices" active={isActive(pathname, "/notices")}>
+            공지사항
+          </DesktopNavLink>
+
+          {isAdmin ? (
+            // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
+            // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
+            <Link
+              href="/admin"
+              className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-3 font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+              title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span>관리자</span>
+              <span className="text-xs font-normal text-emerald-700">
+                · 활성화중
+              </span>
+            </Link>
+          ) : (
+            <DesktopNavLink href="/admin" active={isActive(pathname, "/admin")}>
+              관리자
+            </DesktopNavLink>
+          )}
+        </div>
 
         {/* 장소신청 — 데스크톱 primary CTA. 모바일에서는 별도 FAB 로 노출한다. */}
         <Link
           href="/apply"
           className={cn(
-            "inline-flex min-h-12 items-center justify-center rounded-full px-4 py-3 font-bold text-white shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
+            "group inline-flex min-h-12 items-stretch overflow-hidden rounded-lg border bg-white font-bold shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
             isActive(pathname, "/apply")
-              ? "bg-brand-700 ring-2 ring-brand-200"
-              : "bg-brand-600 hover:bg-brand-700",
+              ? "border-brand-600 ring-2 ring-brand-200"
+              : "border-brand-200 hover:border-brand-500 hover:shadow-md",
           )}
         >
-          장소사용신청
+          <span
+            className={cn(
+              "w-2 flex-none transition-colors",
+              isActive(pathname, "/apply")
+                ? "bg-brand-700"
+                : "bg-brand-600 group-hover:bg-brand-700",
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "inline-flex items-center justify-center gap-2 px-3.5 py-2.5 transition-colors",
+              isActive(pathname, "/apply")
+                ? "bg-brand-50 text-brand-700"
+                : "text-brand-700 group-hover:bg-brand-50",
+            )}
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-md bg-brand-50 text-brand-700 ring-1 ring-brand-100 transition-colors group-hover:bg-brand-100">
+              <FilePlus className="h-4 w-4" aria-hidden />
+            </span>
+            <span>장소사용신청서</span>
+          </span>
         </Link>
       </nav>
 
