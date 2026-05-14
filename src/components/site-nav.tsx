@@ -139,6 +139,7 @@ export function SiteNav({ isAdmin }: Props) {
           href="/admin"
           active={isActive(pathname, "/admin")}
           icon={ShieldCheck}
+          adminActive={isAdmin}
         >
           관리자
         </MobileTabLink>
@@ -176,23 +177,30 @@ function MobileTabLink({
   href,
   active,
   icon: Icon,
+  adminActive = false,
   children,
 }: {
   href: string;
   active: boolean;
   icon: LucideIcon;
+  adminActive?: boolean;
   children: React.ReactNode;
 }) {
+  const highlighted = active || adminActive;
+
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
         "inline-flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 font-bold leading-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
-        active
-          ? "bg-brand-50 text-brand-700 ring-1 ring-brand-100"
-          : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
+        adminActive
+          ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100"
+          : highlighted
+            ? "bg-brand-50 text-brand-700 ring-1 ring-brand-100"
+            : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
       )}
+      title={adminActive ? "관리자 모드 활성" : undefined}
     >
       <Icon className="h-5 w-5" aria-hidden />
       <span>{children}</span>
