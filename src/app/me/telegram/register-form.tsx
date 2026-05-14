@@ -288,7 +288,7 @@ export function TelegramRegisterForm({
     <div className="space-y-5 text-[#1f2726]">
       <RegistrationHeader botUsername={botUsername} />
 
-      <section className="grid items-center gap-4 rounded-lg border border-[#ded9cd] border-l-[7px] border-l-[#0b6f70] bg-white p-4 shadow-[0_12px_30px_rgba(31,39,38,0.07)] md:grid-cols-[minmax(0,1fr)_auto]">
+      <section className="rounded-lg border border-[#ded9cd] border-l-[7px] border-l-[#0b6f70] bg-white p-4 shadow-[0_12px_30px_rgba(31,39,38,0.07)]">
         <div>
           <p className="mb-1 font-black text-[#1f2726]">
             텔레그램을 통한 신청 현황 실시간 알림 서비스
@@ -298,13 +298,6 @@ export function TelegramRegisterForm({
             확인하고 싶으시다면 텔레그램 알림을 등록해 주세요.
           </p>
         </div>
-        <a
-          href="#register"
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#0b6f70] px-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-[#084f50]"
-        >
-          <Send className="h-5 w-5" aria-hidden />
-          텔레그램으로 등록하기
-        </a>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -511,9 +504,7 @@ function RegistrationHeader({ botUsername }: { botUsername: string }) {
         <span className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#0b6f70]/25 bg-white shadow-[0_10px_22px_rgba(11,111,112,0.12)]">
           <Bot className="h-6 w-6" aria-hidden />
         </span>
-        {botUsername
-          ? `알림봇 확인됨 @${botUsername.replace(/^@/, "")}`
-          : "알림봇 설정 필요"}
+        {botUsername ? "알림봇 연결됨" : "알림봇 설정 필요"}
       </div>
     </header>
   );
