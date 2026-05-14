@@ -305,7 +305,8 @@
           font-size: 20px;
         }
         .hero .emoji {
-          font-size: 56px;
+          font-size: clamp(32px, 9vw, 38px);
+          white-space: nowrap;
         }
         .step {
           grid-template-columns: 1fr;
@@ -323,14 +324,25 @@
           text-align: center;
         }
         .step-visual {
-          font-size: 56px;
+          row-gap: 8px;
+          column-gap: clamp(6px, 2vw, 10px);
+          font-size: clamp(34px, 11vw, 48px);
           justify-content: center;
+          line-height: 1;
+        }
+        .step-visual > span:not(.label) {
+          flex: 0 0 auto;
         }
         .step-visual .arrow {
-          font-size: 40px;
+          font-size: clamp(24px, 7vw, 32px);
+          line-height: 1;
         }
         .step-visual .label {
-          font-size: 18px;
+          flex: 0 0 100%;
+          margin: 2px 0 0;
+          font-size: 16px;
+          line-height: 1.35;
+          text-align: center;
         }
         .step-note {
           font-size: 17px;
