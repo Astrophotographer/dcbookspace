@@ -4,8 +4,8 @@ import { Noto_Sans_KR } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
-import { SiteFooter } from "@/components/site-footer";
 import { MobileApplyFab } from "@/components/mobile-apply-fab";
+import { SiteFooter } from "@/components/site-footer";
 
 const notoSansKR = Noto_Sans_KR({
   variable: "--font-sans-kr",
@@ -41,7 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${notoSansKR.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
+      <body className="min-h-full flex flex-col bg-stone-50 pb-24 text-stone-900 print:pb-0 md:pb-0">
         {children}
         {/* MobileApplyFab 가 usePathname 을 쓰므로 Suspense 안에 — prerender 안전성 */}
         <Suspense fallback={null}>

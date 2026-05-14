@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   Search,
   X,
 } from "lucide-react";
@@ -143,8 +141,7 @@ const ROLE_ORDER: Record<UserRole, number> = {
 // 아무 단계도 통과 못한(결재 대기) 신청서는 제일 아래.
 const NOT_APPROVED = -1;
 
-const PAGE_SIZES = [10, 50, 100] as const;
-type PageSize = (typeof PAGE_SIZES)[number];
+const LOAD_CHUNK_SIZE = 10;
 
 // 검색어/필드 비교용 정규화: 대소문자 무시 + 공백·하이픈·#·_ 제거
 // "25-0042", "250042", "#250042", "0042" 가 모두 같은 키로 매칭되도록.
@@ -224,9 +221,9 @@ export function ReservationsTable({
 }: Props) {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [pageSize, setPageSize] = useState<PageSize>(10);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(LOAD_CHUNK_SIZE);
   const [query, setQuery] = useState("");
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const sortedAll = useMemo(() => {
     return [...entries].sort((a, b) => {
@@ -248,12 +245,30 @@ export function ReservationsTable({
   }, [sortedAll, query]);
 
   const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(currentPage, totalPages - 1);
-  const start = safePage * pageSize;
-  const end = start + pageSize;
-  const pageItems = filtered.slice(start, end);
+  const pageItems = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < total;
   const isSearching = query.trim().length > 0;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (observedEntries) => {
+        if (observedEntries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((count) =>
+            Math.min(count + LOAD_CHUNK_SIZE, total),
+          );
+        }
+      },
+      { rootMargin: "360px 0px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, total]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -262,12 +277,7 @@ export function ReservationsTable({
       setSortField(field);
       setSortDir("desc");
     }
-    setCurrentPage(0);
-  };
-
-  const changePageSize = (s: PageSize) => {
-    setPageSize(s);
-    setCurrentPage(0);
+    setVisibleCount(LOAD_CHUNK_SIZE);
   };
 
   const colSpan = 7 + (extraColumn ? 1 : 0);
@@ -275,25 +285,7 @@ export function ReservationsTable({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
-        <label className="flex items-center gap-2 text-sm text-stone-700">
-          보기
-          <select
-            value={pageSize}
-            onChange={(e) =>
-              changePageSize(Number(e.target.value) as PageSize)
-            }
-            aria-label="페이지당 표시 개수"
-            className="h-10 rounded-lg border border-stone-300 bg-white px-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-          >
-            {PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s}개
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="relative ml-auto w-full sm:w-72">
+        <div className="relative ml-auto w-full sm:w-80">
           <span
             aria-hidden
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
@@ -305,7 +297,7 @@ export function ReservationsTable({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setCurrentPage(0);
+              setVisibleCount(LOAD_CHUNK_SIZE);
             }}
             placeholder="신청번호 · 부서 · 신청자"
             aria-label="신청번호, 부서, 신청자 검색"
@@ -316,7 +308,7 @@ export function ReservationsTable({
               type="button"
               onClick={() => {
                 setQuery("");
-                setCurrentPage(0);
+                setVisibleCount(LOAD_CHUNK_SIZE);
               }}
               aria-label="검색어 지우기"
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
@@ -330,11 +322,11 @@ export function ReservationsTable({
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm md:hidden">
         <table className="min-w-[60rem] table-fixed text-base">
-          {/* 모바일 컬럼 순서: 사용일시 / 장소 / 부서·작성자 / 상태 / 신청번호 / 결재 라인 / 작성일 / (extra) */}
+          {/* 모바일 컬럼 순서: 부서·작성자 / 장소 / 사용일시 / 상태 / 신청번호 / 결재 라인 / 작성일 / (extra) */}
           <colgroup>
-            <col className="w-[12.5rem]" />
-            <col className="w-[9rem]" />
             <col className="w-[7.5rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[12.5rem]" />
             <col className="w-[7.5rem]" />
             <col className="w-[7.5rem]" />
             <col className="w-[6.5rem]" />
@@ -343,11 +335,11 @@ export function ReservationsTable({
           </colgroup>
           <thead className="bg-stone-50 text-stone-700">
             <tr>
-              <SortTh field="start_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>사용일시</SortTh>
-              <SortTh field="room" sortField={sortField} sortDir={sortDir} onSort={handleSort}>장소</SortTh>
               <SortTh field="dept" sortField={sortField} sortDir={sortDir} onSort={handleSort}>
                 부서<br/>작성자
               </SortTh>
+              <SortTh field="room" sortField={sortField} sortDir={sortDir} onSort={handleSort}>장소</SortTh>
+              <SortTh field="start_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>사용일시</SortTh>
               <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>상태</SortTh>
               <SortTh field="ref_no" sortField={sortField} sortDir={sortDir} onSort={handleSort}>신청번호</SortTh>
               <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
@@ -387,6 +379,29 @@ export function ReservationsTable({
                 >
                   <Td>
                     <Link {...linkProps} className="block">
+                      <div className="font-medium text-stone-900">
+                        {data.dept?.name ?? "-"}
+                      </div>
+                      <div className="text-stone-500">
+                        {isAdmin
+                          ? data.applicant.name
+                          : maskName(data.applicant.name)}
+                      </div>
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      <div className="text-stone-700">
+                        {data.room.floor.building.name}{" "}
+                        {data.room.floor.label}
+                      </div>
+                      <div className="font-medium text-stone-900">
+                        {data.room.name}
+                      </div>
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
                       {entry.kind === "reservation" ? (
                         <>
                           <div className="text-stone-700">
@@ -423,29 +438,6 @@ export function ReservationsTable({
                           </div>
                         </>
                       )}
-                    </Link>
-                  </Td>
-                  <Td>
-                    <Link {...linkProps} className="block">
-                      <div className="text-stone-700">
-                        {data.room.floor.building.name}{" "}
-                        {data.room.floor.label}
-                      </div>
-                      <div className="font-medium text-stone-900">
-                        {data.room.name}
-                      </div>
-                    </Link>
-                  </Td>
-                  <Td>
-                    <Link {...linkProps} className="block">
-                      <div className="font-medium text-stone-900">
-                        {data.dept?.name ?? "-"}
-                      </div>
-                      <div className="text-stone-500">
-                        {isAdmin
-                          ? data.applicant.name
-                          : maskName(data.applicant.name)}
-                      </div>
                     </Link>
                   </Td>
                   <Td>
@@ -526,13 +518,13 @@ export function ReservationsTable({
             내용이 달라져도 너비가 들썩이지 않게. 결재 라인은 가장 가변적이라
             폭 미지정으로 두고 나머지 fixed 폭의 잔여 공간을 가져가게 함. */}
         <table className="w-full table-fixed text-base">
-          {/* 컬럼 순서: 신청번호 / 작성일 / 부서·신청자 / 장소 / 사용일시 / 상태 / 결재 라인 / (extra) */}
+          {/* 컬럼 순서: 신청번호 / 작성일 / 사용일시 / 장소 / 부서·신청자 / 상태 / 결재 라인 / (extra) */}
           <colgroup>
             <col className="w-[7.5rem]" />
             <col className="w-[9.5rem]" />
-            <col className="w-[7.5rem]" />
-            <col className="w-[9rem]" />
             <col className="w-[12.5rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[7.5rem]" />
             <col className="w-[7.5rem]" />
             <col className="w-[6.5rem]" />
             {extraColumn && <col className="w-[7rem]" />}
@@ -541,11 +533,11 @@ export function ReservationsTable({
             <tr>
               <SortTh field="ref_no" sortField={sortField} sortDir={sortDir} onSort={handleSort}>신청번호</SortTh>
               <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>작성일</SortTh>
+              <SortTh field="start_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>사용일시</SortTh>
+              <SortTh field="room" sortField={sortField} sortDir={sortDir} onSort={handleSort}>장소</SortTh>
               <SortTh field="dept" sortField={sortField} sortDir={sortDir} onSort={handleSort}>
                 부서<br/>신청자
               </SortTh>
-              <SortTh field="room" sortField={sortField} sortDir={sortDir} onSort={handleSort}>장소</SortTh>
-              <SortTh field="start_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>사용일시</SortTh>
               <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>상태</SortTh>
               <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
               {extraColumn && (
@@ -615,29 +607,6 @@ export function ReservationsTable({
                   </Td>
                   <Td>
                     <Link {...linkProps} className="block">
-                      <div className="font-medium text-stone-900">
-                        {data.dept?.name ?? "-"}
-                      </div>
-                      <div className="text-stone-500">
-                        {isAdmin
-                          ? data.applicant.name
-                          : maskName(data.applicant.name)}
-                      </div>
-                    </Link>
-                  </Td>
-                  <Td>
-                    <Link {...linkProps} className="block">
-                      <div className="text-stone-700">
-                        {data.room.floor.building.name}{" "}
-                        {data.room.floor.label}
-                      </div>
-                      <div className="font-medium text-stone-900">
-                        {data.room.name}
-                      </div>
-                    </Link>
-                  </Td>
-                  <Td>
-                    <Link {...linkProps} className="block">
                       {entry.kind === "reservation" ? (
                         <>
                           <div className="text-stone-700">
@@ -674,6 +643,29 @@ export function ReservationsTable({
                           </div>
                         </>
                       )}
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      <div className="text-stone-700">
+                        {data.room.floor.building.name}{" "}
+                        {data.room.floor.label}
+                      </div>
+                      <div className="font-medium text-stone-900">
+                        {data.room.name}
+                      </div>
+                    </Link>
+                  </Td>
+                  <Td>
+                    <Link {...linkProps} className="block">
+                      <div className="font-medium text-stone-900">
+                        {data.dept?.name ?? "-"}
+                      </div>
+                      <div className="text-stone-500">
+                        {isAdmin
+                          ? data.applicant.name
+                          : maskName(data.applicant.name)}
+                      </div>
                     </Link>
                   </Td>
                   <Td>
@@ -718,37 +710,30 @@ export function ReservationsTable({
       </div>
 
       {total > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-center shadow-sm">
           <div className="text-sm text-stone-600">
-            총 {total}건 중 {start + 1}-{Math.min(end, total)}
+            총 {total}건 중 {Math.min(visibleCount, total)}건 표시
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-              disabled={safePage === 0}
-              aria-label="이전 페이지"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-[5rem] text-center text-sm font-medium text-stone-700">
-              {safePage + 1} / {totalPages}
-            </span>
+          {hasMore ? (
             <button
               type="button"
               onClick={() =>
-                setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
+                setVisibleCount((count) =>
+                  Math.min(count + LOAD_CHUNK_SIZE, total),
+                )
               }
-              disabled={safePage >= totalPages - 1}
-              aria-label="다음 페이지"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
             >
-              <ChevronRight className="h-4 w-4" />
+              더 불러오기
             </button>
-          </div>
+          ) : (
+            <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">
+              모두 표시됨
+            </span>
+          )}
         </div>
       )}
+      {hasMore && <div ref={loadMoreRef} className="h-1" aria-hidden />}
     </div>
   );
 }
