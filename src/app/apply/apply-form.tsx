@@ -421,7 +421,7 @@ export function ApplyForm({
     [floors, buildingId],
   );
   const [floorId, setFloorId] = useState(
-    defaults?.floor_id ?? visibleFloors[0]?.id ?? "",
+    defaults?.floor_id ?? "",
   );
   const visibleRooms = useMemo(
     () => rooms.filter((r) => r.floor_id === floorId),
@@ -430,17 +430,8 @@ export function ApplyForm({
   // 호실 cascading 의 leaf — controlled 로 두어 AvailabilityPreview 가
   // roomId 변경을 감지할 수 있게.
   const [roomId, setRoomId] = useState<string>(
-    defaults?.room_id ?? visibleRooms[0]?.id ?? "",
+    defaults?.room_id ?? "",
   );
-  // 층이 바뀌어 현재 roomId 가 그 층의 호실 목록에 더 이상 없으면 첫 호실로 보정.
-  // React 19 의 "render-time setState" 패턴 — 같은 컴포넌트 안이라 안전, 즉시 다시
-  // render 되면서 새 값 적용. 조건이 false 가 되면 멈춤(무한 루프 X).
-  if (
-    visibleRooms.length > 0 &&
-    !visibleRooms.some((r) => r.id === roomId)
-  ) {
-    setRoomId(visibleRooms[0].id);
-  }
 
   // 부서 cascading: 그룹(대분류) → 소분류(leaf). dept_id 는 leaf 만.
   const deptGroups = useMemo(
@@ -680,6 +671,10 @@ export function ApplyForm({
         fd.set("date", date);
         fd.set("end_date", endDate);
         const roomId = String(fd.get("room_id") ?? "");
+        if (!roomId) {
+          setError("사용 장소에서 층과 호실을 선택해 주세요.");
+          return;
+        }
 
         // ===== 정기 OR 다중 시간대 일회성 =====
         // 다중 시간대(2개 이상) 는 일회성이라도 시리즈 path 로 처리.
@@ -778,7 +773,7 @@ export function ApplyForm({
           </Field>
           <Field
             label="휴대폰"
-            hint={isEdit ? "신청자 정보는 수정할 수 없습니다." : "결재 진행 알림에 사용됩니다"}
+            hint={isEdit ? "신청자 정보는 수정할 수 없습니다." : undefined}
           >
             <Input
               ref={phoneRef}
@@ -831,7 +826,7 @@ export function ApplyForm({
               disabled={!deptGroupId}
             >
               <option value="">
-                {deptGroupId ? "소분류 선택" : "대분류 먼저"}
+                {deptGroupId ? "소분류 선택" : "대분류 먼저 선택"}
               </option>
               {visibleDeptLeaves.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -853,8 +848,8 @@ export function ApplyForm({
               value={buildingId}
               onChange={(e) => {
                 setBuildingId(e.target.value);
-                const f = floors.find((x) => x.building_id === e.target.value);
-                setFloorId(f?.id ?? "");
+                setFloorId("");
+                setRoomId("");
               }}
             >
               {buildings.map((b) => (
@@ -869,8 +864,12 @@ export function ApplyForm({
             <Field label="층">
               <Select
                 value={floorId}
-                onChange={(e) => setFloorId(e.target.value)}
+                onChange={(e) => {
+                  setFloorId(e.target.value);
+                  setRoomId("");
+                }}
               >
+                <option value="">층 선택</option>
                 {visibleFloors.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.label}
@@ -884,7 +883,11 @@ export function ApplyForm({
                 required
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
+                disabled={!floorId}
               >
+                <option value="">
+                  {floorId ? "호실 선택" : "층 먼저 선택"}
+                </option>
                 {visibleRooms.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
