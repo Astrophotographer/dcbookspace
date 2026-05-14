@@ -30,11 +30,9 @@ export function MobileApplyFab() {
     <Link
       href="/apply"
       aria-label="장소사용신청"
-      className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-50 inline-flex min-h-11 items-center gap-2 rounded-lg border border-brand-200 bg-white/95 px-3.5 py-2.5 text-sm font-bold text-brand-700 shadow-sm ring-1 ring-white/70 backdrop-blur transition-all hover:border-brand-500 hover:bg-brand-50 hover:shadow-md active:scale-95 md:hidden"
+      className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-50 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-lg ring-1 ring-brand-700/20 transition-all hover:bg-brand-700 hover:shadow-xl active:scale-95 md:hidden"
     >
-      <span className="grid h-7 w-7 place-items-center rounded-md bg-brand-50 text-brand-700 ring-1 ring-brand-100">
-        <Plus className="h-4 w-4" aria-hidden />
-      </span>
+      <Plus className="h-4 w-4" aria-hidden />
       장소사용신청
     </Link>
   );

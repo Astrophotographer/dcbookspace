@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ClipboardList,
-  FilePlus,
   LayoutDashboard,
   type LucideIcon,
   Megaphone,
+  Plus,
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -100,34 +100,14 @@ export function SiteNav({ isAdmin }: Props) {
         <Link
           href="/apply"
           className={cn(
-            "group inline-flex min-h-12 items-stretch overflow-hidden rounded-lg border bg-white font-bold shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
+            "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full px-4 py-3 font-bold text-white shadow-lg ring-1 ring-brand-700/20 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
             isActive(pathname, "/apply")
-              ? "border-brand-600 ring-2 ring-brand-200"
-              : "border-brand-200 hover:border-brand-500 hover:shadow-md",
+              ? "bg-brand-700 ring-2 ring-brand-200"
+              : "bg-brand-600 hover:bg-brand-700 hover:shadow-xl",
           )}
         >
-          <span
-            className={cn(
-              "w-2 flex-none transition-colors",
-              isActive(pathname, "/apply")
-                ? "bg-brand-700"
-                : "bg-brand-600 group-hover:bg-brand-700",
-            )}
-            aria-hidden
-          />
-          <span
-            className={cn(
-              "inline-flex items-center justify-center gap-2 px-3.5 py-2.5 transition-colors",
-              isActive(pathname, "/apply")
-                ? "bg-brand-50 text-brand-700"
-                : "text-brand-700 group-hover:bg-brand-50",
-            )}
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-brand-50 text-brand-700 ring-1 ring-brand-100 transition-colors group-hover:bg-brand-100">
-              <FilePlus className="h-4 w-4" aria-hidden />
-            </span>
-            <span>장소사용신청서</span>
-          </span>
+          <Plus className="h-4 w-4" aria-hidden />
+          장소사용신청서
         </Link>
       </nav>
 
