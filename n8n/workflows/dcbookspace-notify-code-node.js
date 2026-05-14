@@ -59,17 +59,50 @@ const room = data.room
   ? `${data.room.building_name ?? ""} ${data.room.floor_label ?? ""} ${data.room.name ?? ""}`.trim()
   : "";
 
-const date =
-  data.start_at?.slice(0, 10) ??
-  data.start_date ??
-  "";
+const kstDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const kstTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
-const usage =
-  data.start_at && data.end_at
-    ? `${data.start_at.slice(11, 16)}-${data.end_at.slice(11, 16)}`
-    : data.start_date && data.end_date
-      ? `${data.start_date} ~ ${data.end_date}`
-      : "";
+function formatKstDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? "").slice(0, 10);
+  return kstDateFormatter.format(date);
+}
+
+function formatKstTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? "").slice(11, 16);
+  return kstTimeFormatter.format(date);
+}
+
+function formatWhen(data) {
+  if (data.start_at && data.end_at) {
+    const startDate = formatKstDate(data.start_at);
+    const endDate = formatKstDate(data.end_at);
+    const startTime = formatKstTime(data.start_at);
+    const endTime = formatKstTime(data.end_at);
+    return startDate === endDate
+      ? `${startDate} ${startTime}-${endTime}`
+      : `${startDate} ${startTime} ~ ${endDate} ${endTime}`;
+  }
+  if (data.start_date && data.end_date) {
+    return data.start_date === data.end_date
+      ? String(data.start_date)
+      : `${data.start_date} ~ ${data.end_date}`;
+  }
+  return String(data.start_date ?? "");
+}
+
+const when = formatWhen(data);
 
 const purpose = data.purpose ?? "";
 
@@ -79,30 +112,30 @@ let text = "";
 if (event === "reservation.created" || event === "series.created") {
   text =
     `📋 *${deptName} ${applicantName}의 신청서가 접수되었습니다* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}\n` +
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}\n` +
     `\n결재 결과가 나오면 다시 알려드릴게요.`;
 } else if (event === "reservation.rejected") {
   text =
     `❌ *${deptName} ${applicantName} 신청이 반려되었습니다* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}` +
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}` +
     (data.admin_forced ? `\n\n관리자 강제 반려` : "");
 } else if (event === "reservation.approved") {
   text =
     `🎉 *${deptName} ${applicantName} 예약이 확정되었습니다* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}` +
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}` +
     (data.admin_forced ? `\n\n관리자 강제 예약` : "");
 } else if (event === "reservation.cancelled") {
   text =
     `❌ *${deptName} ${applicantName} 예약이 취소되었습니다* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}`;
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}`;
 } else if (event === "reservation.print_failed") {
   text =
     `❌ *${deptName} ${applicantName} 프린트가 나오지 않았습니다* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}`;
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}`;
 } else if (event === "reservation.step_approved") {
   text =
     `📋 *${deptName} ${applicantName}의 결재라인 중 ${stepLabel} ${approverName}의 결재승인이 일어남* #${refNo}\n` +
-    `\n🏛 ${room}\n📅 ${date} ${usage}\n💬 ${purpose}`;
+    `\n🏛 ${room}\n📅 ${when}\n💬 ${purpose}`;
 } else if (event === "test.message") {
   text =
     `*장소사용신청서 알림 연결 확인*\n` +

@@ -102,6 +102,8 @@ Create a new n8n workflow:
 5. Add option **Raw Body** if your n8n version exposes it.
 6. Add **Code** node and paste
    `n8n/workflows/dcbookspace-notify-code-node.js`.
+   This script converts reservation `start_at` / `end_at` to `Asia/Seoul`
+   before composing the Telegram message.
 7. Add **Telegram** node:
    - Resource: `Message`
    - Operation: `Send Message`

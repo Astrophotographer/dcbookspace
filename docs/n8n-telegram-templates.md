@@ -84,7 +84,9 @@ Parse Mode: Markdown
 ```
 
 The Code node builds one item per recipient, so the Telegram node naturally
-sends one message for each `chat_id`.
+sends one message for each `chat_id`. It formats `start_at` / `end_at` in
+`Asia/Seoul`; do not slice raw ISO strings in n8n because Supabase may serialize
+timestamps in UTC.
 
 ## Workflow B: Telegram deep-link registration
 

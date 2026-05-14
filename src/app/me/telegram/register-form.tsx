@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Bot,
   Check,
-  CheckCircle2,
   Copy,
   ExternalLink,
   LinkIcon,
@@ -295,7 +294,8 @@ export function TelegramRegisterForm({
           </p>
           <p className="m-0 text-[#65706d]">
             부서별 신청서의 진행 상태(접수, 반려, 완료)를 실시간으로
-            확인하고 싶으시다면 텔레그램 알림을 등록해 주세요.
+            확인하고 싶으시다면, 등록하기 페이지에서 텔레그램 봇 아이디를
+            등록해 주세요.
           </p>
         </div>
       </section>
@@ -461,14 +461,11 @@ export function TelegramRegisterForm({
           </StepCard>
 
           <StepCard number={5} title="완료 화면" last>
-            {linked ? (
-              <SuccessPanel name={linked.name} scopeLabel={linked.scopeLabel} />
-            ) : (
-              <Callout tone="ok">
-                아직 등록 전입니다. 텔레그램 연결이 끝나면 완료 상태로
-                전환되고 이후 신청 현황 알림을 계속 받을 수 있습니다.
-              </Callout>
-            )}
+            <Callout tone="ok">
+              {linked
+                ? `${linked.name} 님의 ${linked.scopeLabel} 알림 연결이 완료됐습니다. 테스트 메시지는 위 버튼으로 다시 확인할 수 있습니다.`
+                : "아직 등록 전입니다. 텔레그램 연결이 끝나면 완료 상태로 전환되고 이후 신청 현황 알림을 계속 받을 수 있습니다."}
+            </Callout>
           </StepCard>
         </main>
 
@@ -504,7 +501,9 @@ function RegistrationHeader({ botUsername }: { botUsername: string }) {
         <span className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#0b6f70]/25 bg-white shadow-[0_10px_22px_rgba(11,111,112,0.12)]">
           <Bot className="h-6 w-6" aria-hidden />
         </span>
-        {botUsername ? "알림봇 연결됨" : "알림봇 설정 필요"}
+        {botUsername
+          ? `알림봇 확인됨 @${botUsername.replace(/^@/, "")}`
+          : "알림봇 설정 필요"}
       </div>
     </header>
   );
@@ -919,25 +918,6 @@ function TestStatusCard({
         <code>{preview}</code>
       </pre>
       {result && <p className="mt-2 font-black text-white">{result}</p>}
-    </div>
-  );
-}
-
-function SuccessPanel({
-  name,
-  scopeLabel,
-}: {
-  name: string;
-  scopeLabel: string;
-}) {
-  return (
-    <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-7 text-center shadow-[0_18px_45px_rgba(31,39,38,0.09)]">
-      <CheckCircle2 className="mx-auto mb-3 h-14 w-14 text-emerald-700" />
-      <h2 className="mb-2 text-2xl font-black text-emerald-950">등록 완료</h2>
-      <p className="text-base text-emerald-900">
-        <strong>{name}</strong> 님의 <strong>{scopeLabel}</strong> 알림 연결이
-        완료됐습니다. 텔레그램에서 테스트 메시지를 확인해 주세요.
-      </p>
     </div>
   );
 }

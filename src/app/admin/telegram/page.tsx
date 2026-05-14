@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { isSupabaseConfigured } from "@/lib/config";
 import { formatPhone } from "@/lib/phone";
 import { createServiceClient } from "@/lib/supabase/server";
+import { DeleteSubscriberButton } from "./delete-subscriber-button";
 
 type SubscriberRow = {
   id: string;
@@ -255,6 +256,7 @@ export default async function AdminTelegramPage() {
                     <th className="px-4 py-3">신청한 부서</th>
                     <th className="px-4 py-3">알림 내용</th>
                     <th className="px-4 py-3">신청일</th>
+                    <th className="px-4 py-3">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -286,6 +288,12 @@ export default async function AdminTelegramPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 align-top text-stone-500">
                         {row.createdLabel}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 align-top">
+                        <DeleteSubscriberButton
+                          subscriberId={row.id}
+                          name={row.name}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -330,6 +338,12 @@ export default async function AdminTelegramPage() {
                   </div>
                   <div className="mt-3 text-xs text-stone-500">
                     신청일 {row.createdLabel}
+                  </div>
+                  <div className="mt-4">
+                    <DeleteSubscriberButton
+                      subscriberId={row.id}
+                      name={row.name}
+                    />
                   </div>
                 </article>
               ))}
