@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "등촌교회 장소신청",
   },
-  // icons 는 src/app/icon.tsx · src/app/apple-icon.tsx 가 자동으로 link 태그
+  // icons 는 src/app/icon.png · src/app/apple-icon.png 가 자동으로 link 태그
   // 주입하므로 metadata 에 직접 명시 안 함.
 };
 
