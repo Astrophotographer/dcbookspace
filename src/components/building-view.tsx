@@ -6,6 +6,7 @@ import { addDays, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import {
   CalendarDays,
+  CalendarPlus,
   ChevronLeft,
   ArrowRight,
   ChevronRight,
@@ -276,6 +277,7 @@ export function BuildingView({
                   태블릿(sm) 이상에서만 도면 노출. */}
               <div className="hidden sm:block">
                 <RoomMap
+                  currentDate={currentDate}
                   rooms={visibleRooms}
                   reservations={reservations}
                   fixedEvents={fixedEvents}
@@ -284,6 +286,7 @@ export function BuildingView({
               </div>
               <div className="sm:hidden">
                 <RoomGrid
+                  currentDate={currentDate}
                   rooms={visibleRooms}
                   reservations={reservations}
                   fixedEvents={fixedEvents}
@@ -293,6 +296,7 @@ export function BuildingView({
             </>
           ) : (
             <RoomGrid
+              currentDate={currentDate}
               rooms={visibleRooms}
               reservations={reservations}
               fixedEvents={fixedEvents}
@@ -310,6 +314,7 @@ export function BuildingView({
           )}
           reservations={reservations}
           fixedEvents={fixedEvents}
+          currentDate={currentDate}
           isAdmin={isAdmin}
         />
       )}
@@ -342,6 +347,7 @@ export function BuildingView({
                     rooms={bRooms}
                     reservations={reservations}
                     fixedEvents={fixedEvents}
+                    currentDate={currentDate}
                     bare
                     isAdmin={isAdmin}
                   />
@@ -368,6 +374,7 @@ function FloorsOverview({
   rooms,
   reservations,
   fixedEvents,
+  currentDate,
   bare,
   isAdmin,
 }: {
@@ -375,6 +382,7 @@ function FloorsOverview({
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
+  currentDate: string;
   bare?: boolean;
   isAdmin?: boolean;
 }) {
@@ -403,6 +411,7 @@ function FloorsOverview({
               />
             ) : (
               <RoomGrid
+                currentDate={currentDate}
                 rooms={floorRooms}
                 reservations={reservations}
                 fixedEvents={fixedEvents}
@@ -493,11 +502,13 @@ function NavButton({
 }
 
 function RoomMap({
+  currentDate,
   rooms,
   reservations,
   fixedEvents,
   isAdmin,
 }: {
+  currentDate: string;
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
@@ -614,6 +625,7 @@ function RoomMap({
           room={modalRoom}
           list={modalList}
           fixedList={modalFixedList}
+          currentDate={currentDate}
           onClose={closeRoomModal}
           isAdmin={isAdmin}
         />
@@ -626,12 +638,14 @@ function RoomDetailModal({
   room,
   list,
   fixedList,
+  currentDate,
   onClose,
   isAdmin,
 }: {
   room: Room;
   list: ReservationDetail[];
   fixedList: FixedEventInstance[];
+  currentDate: string;
   onClose: () => void;
   isAdmin?: boolean;
 }) {
@@ -647,6 +661,8 @@ function RoomDetailModal({
       document.body.style.overflow = prev;
     };
   }, [onClose]);
+
+  const applyHref = `/apply?date=${encodeURIComponent(currentDate)}&room_id=${encodeURIComponent(room.id)}`;
 
   return (
     <div
@@ -755,7 +771,7 @@ function RoomDetailModal({
           )}
         </div>
 
-        <div className="flex justify-end border-t border-stone-200 px-6 py-3">
+        <div className="flex flex-col-reverse gap-2 border-t border-stone-200 px-6 py-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
@@ -763,6 +779,14 @@ function RoomDetailModal({
           >
             닫기
           </button>
+          <Link
+            href={applyHref}
+            prefetch={false}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+          >
+            <CalendarPlus className="h-5 w-5" aria-hidden />
+            이 날짜/장소로 예약하기
+          </Link>
         </div>
       </div>
     </div>
@@ -770,11 +794,13 @@ function RoomDetailModal({
 }
 
 function RoomGrid({
+  currentDate,
   rooms,
   reservations,
   fixedEvents,
   isAdmin,
 }: {
+  currentDate: string;
   rooms: Room[];
   reservations: ReservationDetail[];
   fixedEvents: FixedEventInstance[];
@@ -842,6 +868,7 @@ function RoomGrid({
           room={modalRoom}
           list={modalList}
           fixedList={modalFixedList}
+          currentDate={currentDate}
           onClose={closeRoomModal}
           isAdmin={isAdmin}
         />

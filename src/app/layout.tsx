@@ -4,8 +4,8 @@ import { Noto_Sans_KR } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
-import { SiteFooter } from "@/components/site-footer";
 import { MobileApplyFab } from "@/components/mobile-apply-fab";
+import { SiteFooter } from "@/components/site-footer";
 
 const notoSansKR = Noto_Sans_KR({
   variable: "--font-sans-kr",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "등촌교회 장소신청",
   },
-  // icons 는 src/app/icon.tsx · src/app/apple-icon.tsx 가 자동으로 link 태그
+  // icons 는 src/app/icon.png · src/app/apple-icon.png 가 자동으로 link 태그
   // 주입하므로 metadata 에 직접 명시 안 함.
 };
 
@@ -41,7 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${notoSansKR.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
+      <body className="min-h-full flex flex-col bg-stone-50 pb-24 text-stone-900 print:pb-0 md:pb-0">
         {children}
         {/* MobileApplyFab 가 usePathname 을 쓰므로 Suspense 안에 — prerender 안전성 */}
         <Suspense fallback={null}>

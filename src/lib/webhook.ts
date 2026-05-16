@@ -3,13 +3,18 @@ import { createHmac, randomUUID } from "node:crypto";
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { ApprovalStep, UserRole } from "@/lib/supabase/types";
+import {
+  isTelegramDirectEnabled,
+  sendTelegramNotification,
+} from "@/lib/telegram";
 
 /**
- * 외부로 이벤트를 푸시하는 fire-and-forget 웹훅.
+ * 외부 webhook 과 Telegram direct 로 이벤트를 발사하는 fire-and-forget 알림 허브.
  *
  * 환경변수
  *   - WEBHOOK_TARGETS: 콤마 구분 URL 목록 (예: "https://n8n.example/hook,https://other/hook")
  *   - WEBHOOK_SECRET:  HMAC-SHA256 서명에 쓰는 비밀 (16자 이상). 비어 있으면 서명 없이 발사.
+ *   - TELEGRAM_BOT_TOKEN: 설정하면 n8n 없이 Telegram Bot API 로 직접 발송.
  *
  * 받는 쪽이 검증할 헤더
  *   - X-DCB-Event:    이벤트 타입
@@ -17,8 +22,8 @@ import type { ApprovalStep, UserRole } from "@/lib/supabase/types";
  *   - X-DCB-Signature: sha256=<base64url HMAC of body>
  *
  * 정책: 결과 await 안 함(서버 액션 응답을 막지 않게). after() 를 통해 응답
- *       전송 후 백그라운드로 발사. 실패는 console.error 로 Vercel 로그에 남김.
- *       n8n 등 fan-out 측이 자체 재시도 책임.
+ *       전송 후 백그라운드로 발사. 실패는 Vercel 로그에 남기고 본 흐름은 계속 진행.
+ *       재시도가 필요하면 이후 outbox/queue 계층에서 담당.
  */
 
 export type WebhookEvent =
@@ -28,9 +33,22 @@ export type WebhookEvent =
   | "reservation.approved"
   | "reservation.rejected"
   | "reservation.cancelled"
-  | "reservation.print_failed";
+  | "reservation.print_failed"
+  | "test.message";
 
 type Payload = Record<string, unknown>;
+
+/**
+ * Telegram 발송 대상 1명. n8n 과 direct sender 가 같은 shape 를 공유한다.
+ * - chat_id: 텔레그램 chat_id (개인 양수 / 그룹 음수)
+ * - name: 인사말용 표시 이름
+ * - dept_name: 메시지 본문 분류용 (nullable)
+ */
+export type TelegramRecipient = {
+  chat_id: string;
+  name: string;
+  dept_name: string | null;
+};
 
 function getTargets(): string[] {
   const raw = process.env.WEBHOOK_TARGETS;
@@ -39,6 +57,10 @@ function getTargets(): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter((s) => /^https?:\/\//.test(s));
+}
+
+function hasNotificationTargets(): boolean {
+  return getTargets().length > 0 || isTelegramDirectEnabled();
 }
 
 function getSecret(): string | null {
@@ -104,6 +126,16 @@ export async function dispatchWebhook(
     }),
   );
   clearTimeout(t);
+}
+
+async function deliverEvent(
+  event: WebhookEvent,
+  data: Payload,
+): Promise<void> {
+  await Promise.allSettled([
+    dispatchWebhook(event, data),
+    sendTelegramNotification(event, data),
+  ]);
 }
 
 // ---- 페이로드 빌더 -----------------------------------------------------------
@@ -311,6 +343,46 @@ async function buildSeriesPayload(id: string): Promise<Payload | null> {
   };
 }
 
+/**
+ * 신청 dept_id 조회 — recipients 필터링용. payload 빌더가 dept_name 만 갖고 있어서
+ * dept_id 를 따로 가져온다. id 못 찾으면 null → 매칭은 watch_all 구독자만.
+ */
+async function findDeptId(
+  table: "reservations" | "reservation_series",
+  id: string,
+): Promise<string | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from(table)
+    .select("dept_id")
+    .eq("id", id)
+    .maybeSingle();
+  return (data?.dept_id as string | null) ?? null;
+}
+
+/**
+ * 이 이벤트·부서 조합으로 알림 받을 텔레그램 구독자 목록.
+ * - DB RPC `get_telegram_recipients` 가 SSoT
+ * - test.message 는 이 함수 안 거치고 emitTestMessage 가 recipients 직접 주입
+ */
+async function buildRecipients(
+  event: WebhookEvent,
+  deptId: string | null,
+): Promise<TelegramRecipient[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("get_telegram_recipients", {
+    p_event_type: event,
+    p_dept_id: deptId,
+  });
+  if (error) {
+    console.error(
+      `[webhook] get_telegram_recipients failed for ${event}: ${error.message}`,
+    );
+    return [];
+  }
+  return (data ?? []) as TelegramRecipient[];
+}
+
 // ---- 호출자 편의 래퍼 ---------------------------------------------------------
 
 /**
@@ -338,12 +410,20 @@ export function emitReservationEventAfter(
   extras?: Payload,
 ): void {
   // env 미설정이면 빌더·dispatch 둘 다 no-op 되도록 짧게 끊는다 — 무의미한 DB 조회 회피.
-  if (getTargets().length === 0) return;
+  if (!hasNotificationTargets()) return;
   after(async () => {
-    const base = await buildReservationPayload(id);
+    const [base, deptId] = await Promise.all([
+      buildReservationPayload(id),
+      findDeptId("reservations", id),
+    ]);
     if (!base) return;
     const payload = await withNextApprovers("reservations", id, base);
-    await dispatchWebhook(event, { ...payload, ...(extras ?? {}) });
+    const recipients = await buildRecipients(event, deptId);
+    await deliverEvent(event, {
+      ...payload,
+      ...(extras ?? {}),
+      recipients,
+    });
   });
 }
 
@@ -352,12 +432,20 @@ export function emitSeriesEventAfter(
   id: string,
   extras?: Payload,
 ): void {
-  if (getTargets().length === 0) return;
+  if (!hasNotificationTargets()) return;
   after(async () => {
-    const base = await buildSeriesPayload(id);
+    const [base, deptId] = await Promise.all([
+      buildSeriesPayload(id),
+      findDeptId("reservation_series", id),
+    ]);
     if (!base) return;
     const payload = await withNextApprovers("reservation_series", id, base);
-    await dispatchWebhook(event, { ...payload, ...(extras ?? {}) });
+    const recipients = await buildRecipients(event, deptId);
+    await deliverEvent(event, {
+      ...payload,
+      ...(extras ?? {}),
+      recipients,
+    });
   });
 }
 
@@ -372,23 +460,55 @@ export function emitApprovalAfter(
   id: string,
   stepInfo: Payload,
 ): void {
-  if (getTargets().length === 0) return;
+  if (!hasNotificationTargets()) return;
   after(async () => {
-    const base =
-      kind === "reservation"
-        ? await buildReservationPayload(id)
-        : await buildSeriesPayload(id);
-    if (!base) return;
     const table = kind === "reservation" ? "reservations" : "reservation_series";
+    const [base, deptId] = await Promise.all([
+      kind === "reservation"
+        ? buildReservationPayload(id)
+        : buildSeriesPayload(id),
+      findDeptId(table, id),
+    ]);
+    if (!base) return;
     const payload = await withNextApprovers(table, id, base);
-    await dispatchWebhook("reservation.step_approved", {
+    const stepRecipients = await buildRecipients(
+      "reservation.step_approved",
+      deptId,
+    );
+    await deliverEvent("reservation.step_approved", {
       ...payload,
       ...stepInfo,
+      recipients: stepRecipients,
     });
     // record_approval RPC 가 마지막 단계 통과 시 status 를 'approved' 로 올림.
     // approved 상태에선 next_approvers 가 빈 배열이라 안전.
     if (payload.status === "approved") {
-      await dispatchWebhook("reservation.approved", payload);
+      const approvedRecipients = await buildRecipients(
+        "reservation.approved",
+        deptId,
+      );
+      await deliverEvent("reservation.approved", {
+        ...payload,
+        recipients: approvedRecipients,
+      });
     }
+  });
+}
+
+/**
+ * 자가 등록 직후 첫 인사 메시지. recipients 1명만 담아서 곧장 발사.
+ * 신청·결재와 무관한 단발성 이벤트라 별도 헬퍼.
+ */
+export function emitTestMessage(
+  recipient: TelegramRecipient,
+  extras?: Payload,
+): void {
+  if (!hasNotificationTargets()) return;
+  after(async () => {
+    await deliverEvent("test.message", {
+      kind: "test",
+      recipients: [recipient],
+      ...(extras ?? {}),
+    });
   });
 }

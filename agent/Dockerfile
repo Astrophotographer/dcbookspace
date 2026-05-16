@@ -1,4 +1,4 @@
-# DCbookspace 인쇄 에이전트
+# 장소사용신청서 인쇄 에이전트
 # Synology Container Manager (DSM 7.x) 또는 일반 Docker 호환.
 #
 # Puppeteer 공식 이미지를 베이스로 — Chromium·필요 폰트 모두 사전 설치돼 있어

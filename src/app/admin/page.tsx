@@ -11,93 +11,144 @@ import {
   Briefcase,
   CalendarCheck,
   CalendarClock,
+  ChevronRight,
   Clock,
   FileText,
   Inbox,
   LogOut,
   Maximize2,
   Megaphone,
+  MessageCircle,
   Network,
   QrCode,
   Settings as SettingsIcon,
   ShieldCheck,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrintEnabled } from "@/lib/site-settings";
 
-const TILES = [
+type AdminMenuItem = {
+  href: string;
+  label: string;
+  desc: string;
+  Icon: LucideIcon;
+};
+
+type AdminSection = {
+  title: string;
+  desc: string;
+  Icon: LucideIcon;
+  items: AdminMenuItem[];
+};
+
+const ADMIN_SECTIONS: AdminSection[] = [
   {
-    href: "/admin/admins",
-    label: "관리자정보",
-    desc: "관리자 추가·삭제, 마스터 PIN 발급",
-    Icon: ShieldCheck,
-  },
-  {
-    href: "/admin/notifications",
-    label: "관리자 알림",
-    desc: "강제 중복 신청 발생 시 이 폰으로 받기 — ON/OFF 토글",
-    Icon: Bell,
-  },
-  {
-    href: "/admin/users",
-    label: "결재자정보",
-    desc: "결재자 등록 및 PIN 관리",
+    title: "관리자와 결재",
+    desc: "관리자, 결재자, 관리자 알림을 정리합니다.",
     Icon: Users,
+    items: [
+      {
+        href: "/admin/admins",
+        label: "관리자정보",
+        desc: "관리자 추가·삭제, 마스터 PIN 발급",
+        Icon: ShieldCheck,
+      },
+      {
+        href: "/admin/users",
+        label: "결재자정보",
+        desc: "결재자 등록 및 PIN 관리",
+        Icon: Users,
+      },
+      {
+        href: "/admin/reservations",
+        label: "신청서관리",
+        desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
+        Icon: FileText,
+      },
+      {
+        href: "/admin/apply-qr",
+        label: "신청 QR",
+        desc: "휴대폰 스캔으로 신청서 바로 열기",
+        Icon: QrCode,
+      },
+    ],
   },
   {
-    href: "/admin/reservations",
-    label: "신청서관리",
-    desc: "전체 신청 내역, 결재 상태, 강제 확정/취소",
+    title: "신청과 소통",
+    desc: "신청서 처리와 교회 안내를 관리합니다.",
     Icon: FileText,
+    items: [
+      {
+        href: "/admin/notifications",
+        label: "관리자 알림",
+        desc: "강제 중복 신청 알림 ON/OFF",
+        Icon: Bell,
+      },
+      {
+        href: "/admin/notices",
+        label: "공지관리",
+        desc: "공지사항 제목과 내용 작성·수정",
+        Icon: Megaphone,
+      },
+      {
+        href: "/admin/telegram",
+        label: "텔레그램 알림봇",
+        desc: "알림봇 신청자와 알림 범위 확인",
+        Icon: MessageCircle,
+      },
+    ],
   },
   {
-    href: "/admin/notices",
-    label: "공지관리",
-    desc: "공지사항 제목과 내용을 작성·수정",
-    Icon: Megaphone,
-  },
-  {
-    href: "/admin/departments",
-    label: "부서관리",
-    desc: "부서 생성·삭제·이름 변경, 부서장·담당장로 등록",
-    Icon: Briefcase,
-  },
-  {
-    href: "/admin/rooms",
-    label: "건물·호실",
-    desc: "건물·층·호실 관리",
+    title: "조직과 공간",
+    desc: "부서, 결재선, 호실, 반복 일정을 맞춥니다.",
     Icon: Building,
+    items: [
+      {
+        href: "/admin/departments",
+        label: "부서관리",
+        desc: "부서 생성·삭제·이름 변경, 담당자 등록",
+        Icon: Briefcase,
+      },
+      {
+        href: "/admin/rooms",
+        label: "건물·호실",
+        desc: "건물·층·호실 관리",
+        Icon: Building,
+      },
+      {
+        href: "/admin/routes",
+        label: "결재선",
+        desc: "결재 단계 템플릿 관리",
+        Icon: Network,
+      },
+      {
+        href: "/admin/fixed-events",
+        label: "고정행사·예배",
+        desc: "주일 예배 등 매주 정기 일정 관리",
+        Icon: CalendarClock,
+      },
+    ],
   },
   {
-    href: "/admin/routes",
-    label: "결재선",
-    desc: "결재 단계 템플릿 관리",
-    Icon: Network,
-  },
-  {
-    href: "/admin/fixed-events",
-    label: "고정행사·예배",
-    desc: "주일 예배 등 매주 정기 일정 관리",
-    Icon: CalendarClock,
-  },
-  {
-    href: "/admin/apply-qr",
-    label: "신청 QR",
-    desc: "휴대폰으로 스캔 시 신청서 바로 열림",
-    Icon: QrCode,
-  },
-  {
-    href: "/kiosk-install",
-    label: "키오스크 설치",
-    desc: "사무실 단말에 키오스크 모드 PWA 로 설치 안내",
-    Icon: Maximize2,
-  },
-  {
-    href: "/admin/settings",
-    label: "프린트ON/OFF",
-    desc: "프린트 자동 출력·진행상태·재출력 버튼 일괄 ON/OFF",
+    title: "운영 설정",
+    desc: "현장 단말, 인쇄, 운영 환경을 조정합니다.",
     Icon: SettingsIcon,
+    items: [
+      {
+        href: "/admin/settings",
+        label: "프린트ON/OFF",
+        desc: "자동 출력·진행상태·재출력 버튼 설정",
+        Icon: SettingsIcon,
+      },
+      {
+        href: "/kiosk-install",
+        label: "키오스크 설치",
+        desc: "사무실 단말에 신청 전용 PWA 설치",
+        Icon: Maximize2,
+      },
+    ],
   },
 ];
 
@@ -186,7 +237,7 @@ export default async function AdminHome() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">관리</h1>
           {/* 로그아웃 — admin 쿠키 클리어. 사이트 어디서든 헤더 "관리자 · 활성화중"
@@ -242,23 +293,68 @@ export default async function AdminHome() {
           )}
         </section>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {TILES.map((t) => (
-            <Link
-              key={t.href}
-              href={t.href}
-              className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm hover:bg-stone-50"
-            >
-              <t.Icon className="mt-0.5 h-6 w-6 text-brand-600" />
-              <div>
-                <div className="text-lg font-semibold">{t.label}</div>
-                <div className="text-sm text-stone-500">{t.desc}</div>
-              </div>
-            </Link>
+        <div className="space-y-7">
+          {ADMIN_SECTIONS.map((section) => (
+            <AdminSectionBlock key={section.title} section={section} />
           ))}
         </div>
       </main>
     </>
+  );
+}
+
+function AdminSectionBlock({ section }: { section: AdminSection }) {
+  const sectionId = `admin-section-${section.title.replace(/\s+/g, "-")}`;
+  const SectionIcon = section.Icon;
+
+  return (
+    <section aria-labelledby={sectionId}>
+      <div className="mb-2 flex items-start gap-3">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">
+          <SectionIcon className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <h2 id={sectionId} className="text-lg font-bold text-stone-900">
+            {section.title}
+          </h2>
+          <p className="mt-0.5 text-sm leading-relaxed text-stone-500">
+            {section.desc}
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {section.items.map((item) => (
+          <AdminMenuLink key={item.href} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AdminMenuLink({ item }: { item: AdminMenuItem }) {
+  const ItemIcon = item.Icon;
+
+  return (
+    <Link
+      href={item.href}
+      className="group flex min-h-20 items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-brand-200 hover:bg-brand-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+    >
+      <span className="grid h-11 w-11 flex-none place-items-center rounded-lg bg-stone-50 text-brand-600 ring-1 ring-stone-200 transition-colors group-hover:bg-white group-hover:ring-brand-100">
+        <ItemIcon className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-bold text-stone-900">
+          {item.label}
+        </span>
+        <span className="mt-0.5 block text-sm leading-snug text-stone-500">
+          {item.desc}
+        </span>
+      </span>
+      <ChevronRight
+        className="h-5 w-5 flex-none text-stone-300 transition-colors group-hover:text-brand-500"
+        aria-hidden
+      />
+    </Link>
   );
 }
 

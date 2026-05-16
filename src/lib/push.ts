@@ -25,13 +25,25 @@ export type PushPayload = {
 };
 
 let vapidConfigured = false;
+function normalizeVapidSubject(value: string | undefined): string {
+  const subject = value?.trim();
+  if (!subject) return "mailto:admin@example.com";
+  if (/^(mailto:|https?:\/\/)/i.test(subject)) return subject;
+  return `mailto:${subject}`;
+}
+
 function configureVapid(): boolean {
   if (vapidConfigured) return true;
   const pub = process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
-  const subj = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+  const subj = normalizeVapidSubject(process.env.VAPID_SUBJECT);
   if (!pub || !priv) return false;
-  webpush.setVapidDetails(subj, pub, priv);
+  try {
+    webpush.setVapidDetails(subj, pub, priv);
+  } catch (e) {
+    console.warn("[push] invalid VAPID config", e);
+    return false;
+  }
   vapidConfigured = true;
   return true;
 }

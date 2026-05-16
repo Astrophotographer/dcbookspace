@@ -13,7 +13,13 @@ import {
   parseISO,
   startOfWeek,
 } from "date-fns";
-import { CalendarOff, ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  CalendarOff,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ReservationDetail } from "@/lib/repo";
 import type { FixedEventInstance } from "@/lib/recurrence";
@@ -357,6 +363,7 @@ function DayReservationsModal({
   }, [onClose]);
 
   const heading = format(date, "yyyy/MM/dd (E)", { locale: ko });
+  const applyHref = `/apply?date=${encodeURIComponent(format(date, "yyyy-MM-dd"))}`;
 
   return (
     <div
@@ -472,7 +479,7 @@ function DayReservationsModal({
           )}
         </div>
 
-        <div className="flex justify-end border-t border-stone-200 px-6 py-3">
+        <div className="flex flex-col-reverse gap-2 border-t border-stone-200 px-6 py-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
@@ -480,6 +487,14 @@ function DayReservationsModal({
           >
             닫기
           </button>
+          <Link
+            href={applyHref}
+            prefetch={false}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+          >
+            <CalendarPlus className="h-5 w-5" aria-hidden />
+            이 날짜로 예약하기
+          </Link>
         </div>
       </div>
     </div>

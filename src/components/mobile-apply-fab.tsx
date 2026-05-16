@@ -5,10 +5,9 @@ import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 
 /**
- * 모바일 전용 떠다니는 "장소신청" 버튼.
- * 데스크톱(sm+) 에서는 헤더의 파란 CTA 가 잘 보이지만, 모바일에서는
- * 헤더가 스크롤 위로 올라가면 안 보여서 기능 접근성이 떨어진다.
- * 화면 우하단에 항상 떠 있는 pill 버튼으로 보강.
+ * 모바일 전용 떠다니는 "장소사용신청" 버튼.
+ * 데스크톱(md+) 에서는 헤더의 파란 CTA 가 잘 보이지만, 모바일에서는
+ * 하단 탭바와 겹치지 않도록 화면 우측 상단에 떠 있는 pill 버튼으로 보강.
  *
  * 노출 안 하는 페이지:
  *   - /apply, /apply/* (이미 신청 폼)
@@ -20,7 +19,9 @@ export function MobileApplyFab() {
   const pathname = usePathname() ?? "/";
 
   const HIDE_PREFIXES = ["/apply", "/admin", "/sign"];
-  if (HIDE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+  if (
+    HIDE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
     return null;
   }
   if (pathname.endsWith("/print")) return null;
@@ -28,11 +29,11 @@ export function MobileApplyFab() {
   return (
     <Link
       href="/apply"
-      aria-label="장소 신청"
-      className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-brand-600 px-5 py-3.5 text-base font-semibold text-white shadow-lg ring-1 ring-brand-700/20 transition-all hover:bg-brand-700 hover:shadow-xl active:scale-95 sm:hidden"
+      aria-label="장소사용신청"
+      className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-50 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-lg ring-1 ring-brand-700/20 transition-all hover:bg-brand-700 hover:shadow-xl active:scale-95 md:hidden"
     >
-      <Plus className="h-5 w-5" aria-hidden />
-      장소신청
+      <Plus className="h-4 w-4" aria-hidden />
+      장소사용신청
     </Link>
   );
 }

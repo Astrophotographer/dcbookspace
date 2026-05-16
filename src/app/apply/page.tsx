@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
-import { ApplyForm } from "./apply-form";
+import { ApplyForm, type ApplyFormDefaults } from "./apply-form";
 import { isSupabaseConfigured } from "@/lib/config";
 import {
   getBuildings,
@@ -10,6 +10,17 @@ import {
   getDepartments,
 } from "@/lib/repo";
 import { getPrintEnabled } from "@/lib/site-settings";
+
+function computeTomorrowKst(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  kst.setUTCDate(kst.getUTCDate() + 1);
+  return kst.toISOString().slice(0, 10);
+}
+
+function firstString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
 
 /**
  * 키오스크 모드(?kiosk=1) 진입 시점에 manifest 를 키오스크 전용으로 오버라이드.
@@ -59,6 +70,42 @@ export default async function ApplyPage(props: PageProps<"/apply">) {
       getPrintEnabled(),
     ]);
 
+  const queryDate = firstString(sp.date);
+  const prefillDate =
+    queryDate && /^\d{4}-\d{2}-\d{2}$/.test(queryDate)
+      ? queryDate
+      : undefined;
+  const queryRoomId = firstString(sp.room_id);
+  const prefillRoom = queryRoomId
+    ? rooms.find((room) => room.id === queryRoomId)
+    : undefined;
+  const prefillFloor = prefillRoom
+    ? floors.find((floor) => floor.id === prefillRoom.floor_id)
+    : undefined;
+  const prefillBuilding = prefillFloor
+    ? buildings.find((building) => building.id === prefillFloor.building_id)
+    : undefined;
+  const fallbackDate = prefillDate ?? computeTomorrowKst();
+  const prefillDefaults: ApplyFormDefaults | undefined =
+    prefillDate || prefillRoom
+      ? {
+          applicant_name: "",
+          applicant_phone: "010-",
+          dept_id: "",
+          building_id: prefillBuilding?.id ?? buildings[0]?.id ?? "",
+          floor_id: prefillFloor?.id ?? "",
+          room_id: prefillRoom?.id ?? "",
+          date: fallbackDate,
+          end_date: fallbackDate,
+          start_time: "09:00",
+          end_time: "11:00",
+          purpose: "",
+          attendee_count: 10,
+          is_external: false,
+          notes: "",
+        }
+      : undefined;
+
   return (
     <>
       <SiteHeader kiosk={isKiosk} />
@@ -71,6 +118,7 @@ export default async function ApplyPage(props: PageProps<"/apply">) {
           floors={floors}
           rooms={rooms}
           departments={departments}
+          defaults={prefillDefaults}
           printEnabled={printEnabled}
         />
       </main>

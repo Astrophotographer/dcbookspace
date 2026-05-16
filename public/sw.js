@@ -1,5 +1,5 @@
 /**
- * DCbookspace 푸시 알림 Service Worker
+ * 장소사용신청서 푸시 알림 Service Worker
  *
  * 트리거:
  *   1) push 이벤트 → 시스템 알림 표시
@@ -32,8 +32,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "등촌교회 장소사용신청";
   const options = {
     body: data.body || "",
-    icon: "/icon",
-    badge: "/icon",
+    icon: "/pwa-icon-192.png",
+    badge: "/pwa-icon-192.png",
     // 같은 tag 의 알림은 한 묶음으로 (예: 같은 신청서 여러 단계 알림 누적 방지)
     tag: data.tag || undefined,
     data: { url: data.url || "/" },

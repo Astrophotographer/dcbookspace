@@ -39,6 +39,7 @@ export const Select = forwardRef<HTMLSelectElement, ComponentProps<"select">>(
       className={cn(
         "h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-base",
         "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500",
+        "disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400 disabled:opacity-100",
         className,
       )}
       {...props}

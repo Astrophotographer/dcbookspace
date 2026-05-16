@@ -3,6 +3,9 @@ import { Megaphone } from "lucide-react";
 import { getNotices } from "@/lib/repo";
 import type { Notice } from "@/lib/supabase/types";
 
+const TELEGRAM_NOTICE_LINK_RE = /(\(?\s*추후\s*안내\s*(?:예정)?\s*\)?)/g;
+const TELEGRAM_NOTICE_LINK_PART_RE = /^\(?\s*추후\s*안내\s*(?:예정)?\s*\)?$/;
+
 /**
  * 현황판 좌측의 공지사항 탭 콘텐츠.
  * DB 의 `notices` 테이블에서 active=true 인 공지만 보여준다.
@@ -55,9 +58,28 @@ function NoticeCard({ notice }: { notice: Notice }) {
         </span>
       </header>
       <h3 className="mb-1.5 text-lg font-bold text-stone-900">{notice.title}</h3>
-      <p className="whitespace-pre-line text-base leading-relaxed text-stone-700">
-        {notice.body}
-      </p>
+      <div className="whitespace-pre-line text-base leading-relaxed text-stone-700">
+        {renderNoticeBody(notice.body)}
+      </div>
     </article>
   );
+}
+
+function renderNoticeBody(body: string) {
+  const parts = body.split(TELEGRAM_NOTICE_LINK_RE);
+
+  return parts.map((part, index) => {
+    if (TELEGRAM_NOTICE_LINK_PART_RE.test(part)) {
+      return (
+        <Link
+          key={`${part}-${index}`}
+          href="/me/telegram"
+          className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-900"
+        >
+          등록하기
+        </Link>
+      );
+    }
+    return part;
+  });
 }

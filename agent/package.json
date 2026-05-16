@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "DCbookspace 인쇄 에이전트 — Vercel 사이트의 인쇄 요청을 폴링해서 사무실 프린터로 보냄. NAS Docker 컨테이너로 동작.",
+  "description": "장소사용신청서 인쇄 에이전트 — Vercel 사이트의 인쇄 요청을 폴링해서 사무실 프린터로 보냄. NAS Docker 컨테이너로 동작.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p .",

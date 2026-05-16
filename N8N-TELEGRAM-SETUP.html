@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>n8n + 텔레그램 알림 — 설정 가이드</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --bg-card: #ffffff;
+    --bg-code: #1e293b;
+    --fg: #1c1917;
+    --fg-muted: #57534e;
+    --fg-faint: #78716c;
+    --border: #e7e5e4;
+    --brand: #4f46e5;
+    --brand-bg: #eef2ff;
+    --warn: #92400e;
+    --warn-bg: #fef3c7;
+    --warn-border: #fde68a;
+    --ok: #047857;
+    --ok-bg: #ecfdf5;
+    --ok-border: #a7f3d0;
+    --err: #b91c1c;
+    --err-bg: #fef2f2;
+    --err-border: #fecaca;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .page { max-width: 920px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%);
+    border-radius: 20px;
+    padding: 40px 32px;
+    margin-bottom: 36px;
+    color: #1e1b4b;
+  }
+  .hero h1 { font-size: 32px; font-weight: 800; margin: 0 0 8px; }
+  .hero .sub { font-size: 17px; color: #312e81; margin: 0; }
+
+  /* TOC */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+  }
+  .toc h2 { font-size: 14px; font-weight: 700; color: var(--fg-muted); margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { padding: 2px 0; }
+  .toc a { color: var(--brand); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Sections */
+  section.step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+  section.step h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0 0 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  section.step h2 .num {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    transform: translateY(2px);
+  }
+  section.step h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 20px 0 10px;
+    color: var(--fg);
+  }
+  section.step p { margin: 8px 0; color: var(--fg-muted); }
+  section.step ol, section.step ul { margin: 8px 0; padding-left: 24px; }
+  section.step li { margin: 4px 0; color: var(--fg-muted); }
+  section.step li strong { color: var(--fg); }
+
+  /* Code */
+  pre {
+    background: var(--bg-code);
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 12px 0;
+  }
+  code {
+    background: #f1f5f9;
+    color: #334155;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: 13px; }
+
+  /* Callouts */
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-left: 4px solid;
+  }
+  .callout p { margin: 0; }
+  .callout strong { font-weight: 700; }
+  .callout.note { background: var(--brand-bg); border-color: var(--brand); color: #312e81; }
+  .callout.warn { background: var(--warn-bg); border-color: #d97706; color: var(--warn); }
+  .callout.ok   { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+  .callout.err  { background: var(--err-bg); border-color: var(--err); color: var(--err); }
+
+  /* Screenshot placeholder */
+  .shot {
+    background: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 32px 20px;
+    text-align: center;
+    margin: 14px 0;
+    color: #64748b;
+    font-size: 14px;
+  }
+  .shot .icon { font-size: 32px; margin-bottom: 6px; }
+  .shot .label { font-weight: 700; color: #475569; }
+  .shot .hint { font-size: 12px; margin-top: 4px; }
+
+  /* Env table */
+  table.env {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  table.env th, table.env td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.env th { background: #f5f5f4; font-weight: 700; color: var(--fg-muted); }
+  table.env td code { font-size: 12px; }
+
+  /* Anchor offset for scrollspy */
+  section.step { scroll-margin-top: 24px; }
+
+  details summary {
+    cursor: pointer;
+    padding: 10px 14px;
+    background: #f5f5f4;
+    border-radius: 8px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  details[open] summary { margin-bottom: 8px; }
+
+  /* footer */
+  .footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--fg-faint);
+    font-size: 13px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <h1>n8n + 텔레그램 알림 설정 가이드</h1>
+    <p class="sub">장소사용신청서 신청 → n8n → 텔레그램 알림. 두 워크플로우(발송 + 자가 등록) 셋업.</p>
+  </header>
+
+  <nav class="toc">
+    <h2>목차</h2>
+    <ol>
+      <li><a href="#prereq">준비물</a></li>
+      <li><a href="#step1">1단계: BotFather 로 봇 생성</a></li>
+      <li><a href="#step2">2단계: n8n credentials 등록</a></li>
+      <li><a href="#step3">3단계: 워크플로우 A — 발송용</a></li>
+      <li><a href="#step4">4단계: 워크플로우 B — 자가 등록용</a></li>
+      <li><a href="#step5">5단계: 환경 변수 설정 (Vercel · .env.local)</a></li>
+      <li><a href="#step6">6단계: 검증</a></li>
+      <li><a href="#trouble">트러블슈팅</a></li>
+      <li><a href="#payload">참고: 페이로드 스펙</a></li>
+    </ol>
+  </nav>
+
+  <!-- ─────────── 준비물 ─────────── -->
+  <section class="step" id="prereq">
+    <h2><span class="num">0</span>준비물</h2>
+    <ul>
+      <li>텔레그램 계정 (관리자 본인 계정)</li>
+      <li>n8n 인스턴스 (self-hosted 또는 cloud — webhook 받을 수 있어야)</li>
+      <li>장소사용신청서 관리자 권한 (Vercel/`.env.local` 수정 가능)</li>
+    </ul>
+    <div class="callout note">
+      <p><strong>아키텍처:</strong> 수신자 목록 = Supabase <code>telegram_subscribers</code> 테이블이 SSoT. 사용자는 이름·휴대폰·소속 부서와 알림 범위(내 부서/모든 부서)를 등록하고, n8n 은 발송과 자가 등록 두 워크플로우만 담당.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 1단계: BotFather ─────────── -->
+  <section class="step" id="step1">
+    <h2><span class="num">1</span>BotFather 로 봇 생성</h2>
+
+    <ol>
+      <li>텔레그램에서 <code>@BotFather</code> 검색 → 채팅 시작.</li>
+      <li><code>/newbot</code> 명령 입력.</li>
+      <li><strong>봇 표시 이름</strong> 입력 (예: "등촌교회 알림")</li>
+      <li><strong>봇 username</strong> 입력 — 반드시 <code>bot</code> 으로 끝나야 함. 예: <code>PlaceUseRequestBot</code></li>
+      <li>BotFather 가 답장하는 <strong>HTTP API token</strong> 을 안전한 곳에 복사 (n8n credential 에 등록할 값).</li>
+    </ol>
+
+    <div class="shot">
+      <div class="icon">📸</div>
+      <div class="label">BotFather /newbot 대화 캡쳐</div>
+      <div class="hint">봇 이름 입력 → username 입력 → token 받기까지 3컷</div>
+    </div>
+
+    <h3>(선택) 봇 프로필 꾸미기</h3>
+    <ul>
+      <li><code>/setdescription</code> — 봇 소개 글 (사용자가 처음 봇 채팅 열면 보임)</li>
+      <li><code>/setuserpic</code> — 봇 프로필 사진</li>
+      <li><code>/setcommands</code> — 명령어 메뉴 (없어도 됨, 자동 등록은 /start 만 씀)</li>
+    </ul>
+
+    <div class="callout warn">
+      <p><strong>주의:</strong> token 은 비밀번호급. 누가 알면 봇을 탈취당하니 GitHub · Slack 등에 절대 노출 금지.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 2단계: n8n credentials ─────────── -->
+  <section class="step" id="step2">
+    <h2><span class="num">2</span>n8n credentials 등록</h2>
+
+    <ol>
+      <li>n8n 좌측 메뉴 → <strong>Credentials</strong> → <strong>+ Add credential</strong></li>
+      <li>검색에서 <code>Telegram API</code> 선택</li>
+      <li>이름: 예) "DCB Telegram Bot"</li>
+      <li><strong>Access Token</strong>: 1단계에서 받은 BotFather token 붙여 넣기</li>
+      <li><strong>Save</strong> → 연결 테스트 성공 확인</li>
+    </ol>
+
+    <div class="shot">
+      <div class="icon">📸</div>
+      <div class="label">n8n Credentials → Telegram API 추가 화면</div>
+    </div>
+  </section>
+
+  <!-- ─────────── 3단계: 워크플로우 A ─────────── -->
+  <section class="step" id="step3">
+    <h2><span class="num">3</span>워크플로우 A — 발송 (DCB Notify)</h2>
+
+    <p>장소사용신청서가 신청 이벤트마다 호출. 페이로드의 <code>recipients[]</code> 배열을 each-loop 로 돌려 텔레그램 메시지 발송.</p>
+
+    <h3>노드 구성</h3>
+    <ol>
+      <li><strong>Webhook</strong> — POST. URL 복사해 장소사용신청서의 <code>WEBHOOK_TARGETS</code> 에 등록.</li>
+      <li><strong>HMAC 검증</strong> (Function 노드) — <code>WEBHOOK_SECRET</code> 으로 <code>X-DCB-Signature</code> 헤더 검증.</li>
+      <li><strong>Split In Batches</strong> 또는 <strong>Item Lists → Split Out</strong> — <code>body.recipients</code> 배열을 항목별로 분할.</li>
+      <li><strong>Set/Function</strong> — 이벤트 타입(<code>x-dcb-event</code>) 별 메시지 본문 템플릿.</li>
+      <li><strong>Telegram</strong> — <code>chat_id</code> = <code>{{$json.chat_id}}</code>, Text = 위 본문, Parse mode = MarkdownV2.</li>
+    </ol>
+
+    <h3>메시지 템플릿 예시 (Function 노드)</h3>
+<pre><code>const event = $('Webhook').first().json.headers['x-dcb-event'];
+const d = $('Webhook').first().json.body.data;
+const r = $json;  // 현재 each-loop 의 recipient
+const room = `${d.room.building_name} ${d.room.floor_label} ${d.room.name}`;
+const titles = {
+  'reservation.created':       '🆕 새 신청 접수',
+  'series.created':            '🔁 정기 신청 접수',
+  'reservation.step_approved': '✍️ 결재 단계 진행',
+  'reservation.approved':      '✅ 결재 완료 (확정)',
+  'reservation.rejected':      '❌ 반려',
+  'reservation.cancelled':     '🚫 취소',
+  'reservation.print_failed':  '🖨️ 인쇄 실패',
+  'test.message':              '🔔 연결 테스트',
+};
+return [{
+  json: {
+    chat_id: r.chat_id,
+    text: [
+      `*${titles[event] ?? event}*`,
+      `${r.name}님 알림입니다.`,
+      ``,
+      `📋 *${d.purpose ?? '연결 테스트'}*`,
+      d.dept_name ? `🏷️ ${d.dept_name}` : null,
+      d.room ? `📍 ${room}` : null,
+      d.start_at ? `🕒 ${d.start_at} ~ ${d.end_at}` : null,
+    ].filter(Boolean).join('\n'),
+  }
+}];</code></pre>
+
+    <div class="callout note">
+      <p><strong>호환 모드:</strong> 페이로드에 <code>recipients</code> 가 없으면(=옛날 흐름) Switch 로 분기시켜 <code>applicant.telegram_chat_id</code> 하나만 보내도록 백업 경로 유지 가능. 단계적 마이그레이션 권장.</p>
+    </div>
+
+    <div class="shot">
+      <div class="icon">📸</div>
+      <div class="label">n8n 워크플로우 A 캔버스 (Webhook → Function → Split → Telegram)</div>
+    </div>
+
+    <details>
+      <summary>워크플로우 A JSON 샘플 (복붙용)</summary>
+<pre><code>{
+  "name": "DCB Notify",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dcb-notify",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.data.recipients",
+        "options": {}
+      },
+      "name": "Split Recipients",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=...템플릿...",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [700, 300],
+      "credentials": { "telegramApi": { "name": "DCB Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Webhook":         { "main": [[{ "node": "Split Recipients", "type": "main", "index": 0 }]] },
+    "Split Recipients":{ "main": [[{ "node": "Telegram",         "type": "main", "index": 0 }]] }
+  }
+}</code></pre>
+    </details>
+  </section>
+
+  <!-- ─────────── 4단계: 워크플로우 B ─────────── -->
+  <section class="step" id="step4">
+    <h2><span class="num">4</span>워크플로우 B — 자가 등록 (DCB Link)</h2>
+
+    <p>사용자가 <code>/me/telegram</code> 에서 이름·휴대폰·소속 부서와 알림 범위를 입력한 뒤 deep-link 를 누르면 봇이 <code>/start TOKEN</code> 메시지를 받음. 이 워크플로우가 받아서 장소사용신청서 사이트에 chat_id 등록.</p>
+
+    <h3>노드 구성</h3>
+    <ol>
+      <li><strong>Telegram Trigger</strong> — Updates: <code>message</code>. 봇 메시지 수신 진입.</li>
+      <li><strong>IF</strong> — <code>{{$json.message.text}}</code> 가 <code>/start </code> 로 시작하는지 검사.</li>
+      <li><strong>Function</strong> — 메시지에서 토큰 + chat_id 추출:
+<pre><code>const text = $json.message.text || '';
+const token = text.replace(/^\/start\s+/, '').trim();
+const chat_id = String($json.message.chat.id);
+return [{ json: { token, chat_id } }];</code></pre>
+      </li>
+      <li><strong>HTTP Request</strong> — 장소사용신청서 API 호출:
+        <ul>
+          <li>Method: <code>POST</code></li>
+          <li>URL: <code>{{ $env.SITE_URL }}/api/telegram/link</code></li>
+          <li>Headers:
+            <ul>
+              <li><code>Authorization: Bearer {{ $env.TELEGRAM_LINK_SECRET }}</code></li>
+              <li><code>Content-Type: application/json</code></li>
+            </ul>
+          </li>
+          <li>Body: JSON <code>{ "token": "={{$json.token}}", "chat_id": "={{$json.chat_id}}" }</code></li>
+        </ul>
+      </li>
+      <li><strong>Telegram (답장)</strong> — 성공 시:
+        <pre><code>chatId: {{ $('Function').first().json.chat_id }}
+text: ✅ {{ $json.name }}님, {{ $json.scope_label }} 알림이 연결됐어요! 첫 메시지를 곧 보내드릴게요.</code></pre>
+      </li>
+      <li><strong>오류 분기</strong> — HTTP 4xx/5xx 시 사용자에게 안내 ("토큰 만료" 등). HTTP Request 노드의 <em>Continue On Fail</em> 켜고 IF 로 분기.</li>
+    </ol>
+
+    <div class="shot">
+      <div class="icon">📸</div>
+      <div class="label">n8n 워크플로우 B 캔버스</div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>중요:</strong> 봇이 메시지 받으려면 텔레그램 측에서 webhook 또는 polling 모드 활성. n8n Telegram Trigger 는 자동으로 webhook 등록하니 워크플로우 활성화만 하면 됩니다.</p>
+    </div>
+
+    <details>
+      <summary>워크플로우 B JSON 샘플 (복붙용)</summary>
+<pre><code>{
+  "name": "DCB Link",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"] },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "credentials": { "telegramApi": { "name": "DCB Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$json.message.text}}", "operation": "startsWith", "value2": "/start " }
+          ]
+        }
+      },
+      "name": "Is /start?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "const text=$json.message.text||'';\nconst token=text.replace(/^\\/start\\s+/, '').trim();\nconst chat_id=String($json.message.chat.id);\nreturn [{ json: { token, chat_id } }];"
+      },
+      "name": "Parse Token",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SITE_URL}}/api/telegram/link",
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "options": { "responseFormat": "json" },
+        "headerParametersJson": "{\"Authorization\": \"Bearer \" + $env.TELEGRAM_LINK_SECRET}",
+        "bodyParametersJson": "={ \"token\": $json.token, \"chat_id\": $json.chat_id }"
+      },
+      "name": "POST /api/telegram/link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse Token').first().json.chat_id }}",
+        "text": "=✅ {{ $json.name }}님, {{ $json.scope_label }} 알림이 연결됐어요! 첫 메시지를 곧 보내드릴게요."
+      },
+      "name": "Reply Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "credentials": { "telegramApi": { "name": "DCB Telegram Bot" } }
+    }
+  ]
+}</code></pre>
+    </details>
+  </section>
+
+  <!-- ─────────── 5단계: env ─────────── -->
+  <section class="step" id="step5">
+    <h2><span class="num">5</span>환경 변수 설정</h2>
+
+    <p>Vercel 프로젝트 + 로컬 <code>.env.local</code> 양쪽 모두.</p>
+
+    <table class="env">
+      <thead>
+        <tr><th>변수</th><th>위치</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code></td><td>Vercel + 로컬</td><td>BotFather username (@ 빼고). 비면 자동 흐름 비활성.</td></tr>
+        <tr><td><code>TELEGRAM_LINK_SECRET</code></td><td>Vercel + 로컬 + n8n</td><td>32자 임의 문자열. <code>openssl rand -hex 32</code></td></tr>
+        <tr><td><code>WEBHOOK_TARGETS</code></td><td>Vercel + 로컬</td><td>n8n 워크플로우 A 의 Webhook URL (콤마 구분 여러 개 가능)</td></tr>
+        <tr><td><code>WEBHOOK_SECRET</code></td><td>Vercel + 로컬 + n8n</td><td>16자 이상. HMAC 검증용. 양쪽 동일해야.</td></tr>
+        <tr><td><code>SITE_URL</code> (n8n 내)</td><td>n8n env</td><td>장소사용신청서 호스트. 예: <code>https://dcbookspace.vercel.app</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      <p><strong>n8n self-hosted 의 경우:</strong> env 는 docker-compose 또는 systemd 서비스의 environment 섹션에 추가. 변경 후 n8n 재시작 필요.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 6단계: 검증 ─────────── -->
+  <section class="step" id="step6">
+    <h2><span class="num">6</span>검증</h2>
+
+    <h3>자동 흐름 (모바일 권장)</h3>
+    <ol>
+      <li><code>/me/telegram</code> 접속</li>
+      <li>본인 정보 입력 → 이름·휴대폰·소속 대분류/중분류</li>
+      <li>알림 범위 선택 → 내 부서만 또는 모든 부서</li>
+      <li><strong>"텔레그램으로 자동 연결"</strong> 큰 버튼 클릭</li>
+      <li>텔레그램 앱이 열리며 <code>/start TOKEN</code> 자동 전송</li>
+      <li>봇이 "✅ 연결됐어요" 답장</li>
+      <li>웹 화면이 "✅ 등록 완료" 로 전환</li>
+    </ol>
+
+    <h3>수동 흐름</h3>
+    <ol>
+      <li><code>/me/telegram</code> → 수동 입력 탭</li>
+      <li>chat_id 입력 (<code>@userinfobot</code> 으로 확인 가능)</li>
+      <li>"등록하고 테스트 메시지 받기" 클릭 → 텔레그램 도착 확인</li>
+    </ol>
+
+    <h3>실 신청 알림</h3>
+    <ol>
+      <li>등록 후 새 신청서를 만들어 본다</li>
+      <li>봇이 같은 chat_id 로 "🆕 새 신청 접수" 알림 발송하는지 확인</li>
+      <li>결재 완료 시 "✅ 결재 완료 (확정)" 알림 확인</li>
+    </ol>
+
+    <div class="callout ok">
+      <p><strong>성공 신호:</strong> Supabase <code>telegram_subscribers</code> 테이블에 row 들어가고, n8n 실행 로그(Executions) 에 status=success 가 찍히면 정상.</p>
+    </div>
+  </section>
+
+  <!-- ─────────── 트러블슈팅 ─────────── -->
+  <section class="step" id="trouble">
+    <h2><span class="num">!</span>트러블슈팅</h2>
+
+    <h3>봇이 답장 안 함</h3>
+    <ul>
+      <li>n8n 워크플로우 B 가 <strong>Active</strong> 상태인지 확인</li>
+      <li>n8n 실행 로그 (Executions) 에 trigger 가 찍히는지 확인</li>
+      <li>BotFather 에서 <code>/setprivacy → DISABLE</code> — 그룹에서 봇이 메시지 읽을 수 있도록 (1:1 채팅엔 영향 없음)</li>
+    </ul>
+
+    <h3>HTTP 401 unauthorized</h3>
+    <ul>
+      <li>n8n env <code>TELEGRAM_LINK_SECRET</code> 와 Vercel env 값이 정확히 같은지 비교</li>
+      <li>n8n HTTP Request 노드의 <code>Authorization</code> 헤더에 <code>Bearer </code> 접두사 포함됐는지 (스페이스 1개)</li>
+    </ul>
+
+    <h3>HTTP 410 token_expired</h3>
+    <ul>
+      <li>토큰 발급 후 10분 안에 시작 안 함 → 사이트로 돌아가 새로 발급</li>
+    </ul>
+
+    <h3>발송이 안 됨 (메시지 도착 X)</h3>
+    <ul>
+      <li>n8n 실행 로그에서 워크플로우 A 가 트리거됐는지 확인</li>
+      <li><code>recipients[]</code> 가 비어있다면 → Supabase RPC <code>get_telegram_recipients</code> 가 매칭 안 함. 구독자의 <code>active</code>, 이벤트 종류, 부서 필터 확인.</li>
+      <li>Telegram 노드 실패 시 → chat_id 형식 (개인 양수, 그룹 -100…) 확인. 봇이 그룹에서 메시지 보내려면 그룹 멤버여야.</li>
+    </ul>
+
+    <h3>HMAC 검증 실패 (Webhook 401)</h3>
+    <ul>
+      <li><code>WEBHOOK_SECRET</code> 양쪽 정확히 같은지</li>
+      <li>n8n Function 노드의 검증 코드가 raw body 를 사용하는지 (JSON 파싱 전 원본)</li>
+    </ul>
+  </section>
+
+  <!-- ─────────── 페이로드 스펙 ─────────── -->
+  <section class="step" id="payload">
+    <h2><span class="num">i</span>참고: 페이로드 스펙</h2>
+
+    <p>장소사용신청서 → n8n 워크플로우 A 가 받는 POST body:</p>
+
+<pre><code>{
+  "event": "reservation.created",       // 또는 series.created · step_approved · approved · rejected · cancelled · print_failed · test.message
+  "delivery": "uuid",                   // 멱등키
+  "occurred_at": "2026-05-13T10:00:00.000Z",
+  "data": {
+    "kind": "reservation",              // 또는 "series" · "test"
+    "id": "...",
+    "ref_no": "...",
+    "status": "pending",                // pending · approved · rejected · cancelled
+    "start_at": "...", "end_at": "...", // reservation
+    "start_date": "...", "end_date": "...", "weekday": 0,  // series
+    "purpose": "...",
+    "applicant": { "name": "...", "phone": "...", "telegram_chat_id": null },
+    "dept_name": "...",
+    "room": { "name": "...", "floor_label": "...", "building_name": "..." },
+    "next_approvers": [ /* step_approved 시에만 */ ],
+    "recipients": [
+      { "chat_id": "123456789", "name": "홍길동", "dept_name": "모든 부서" },
+      ...
+    ]
+  }
+}</code></pre>
+
+    <p>각 요청 헤더:</p>
+    <ul>
+      <li><code>X-DCB-Event: reservation.created</code></li>
+      <li><code>X-DCB-Delivery: &lt;uuid&gt;</code></li>
+      <li><code>X-DCB-Signature: sha256=&lt;base64url HMAC&gt;</code> (WEBHOOK_SECRET 설정 시)</li>
+    </ul>
+  </section>
+
+  <footer class="footer">
+    장소사용신청서 · 등촌교회 장소사용 신청 시스템 · n8n + 텔레그램 연동 가이드
+  </footer>
+
+</div>
+</body>
+</html>

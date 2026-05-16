@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Megaphone, ShieldCheck } from "lucide-react";
+import {
+  ClipboardList,
+  LayoutDashboard,
+  type LucideIcon,
+  Megaphone,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -39,80 +46,113 @@ export function CurrentSectionLabel() {
 }
 
 /**
- * 상단 네비게이션. 현재 페이지는 brand 색으로 강하게 표시 + 아래쪽 underline.
- * 어르신도 "지금 어디 있나" 한눈에 알도록 대비 강조.
+ * 상단/하단 네비게이션.
+ * - 모바일: 화면 하단 고정 탭바. 엄지 접근성이 좋고 헤더 가로 스크롤을 없앤다.
+ * - 데스크톱: 기존처럼 헤더 오른쪽의 상단 네비게이션.
  */
 export function SiteNav({ isAdmin }: Props) {
   const pathname = usePathname() ?? "/";
 
   return (
-    <div className="order-3 -mx-1 w-full flex-none overflow-x-auto px-1 pb-1 md:order-none md:mx-0 md:w-auto md:overflow-visible md:px-0 md:pb-0">
+    <>
       <nav
         aria-label="주요 메뉴"
-        className="flex min-w-max items-center gap-1 text-sm sm:gap-1.5 sm:text-base"
+        className="hidden items-center gap-[2ch] text-base md:flex"
       >
-        <NavLink href="/" active={isActive(pathname, "/")}>
-          <span className="sm:hidden">현황판</span>
-          <span className="hidden sm:inline">현황판보기</span>
-        </NavLink>
+        <div className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white/85 p-1 shadow-sm">
+          <DesktopNavLink href="/" active={isActive(pathname, "/")}>
+            현황판보기
+          </DesktopNavLink>
 
-        <NavLink
-          href="/reservations"
-          active={isActive(pathname, "/reservations")}
-        >
-          <span className="sm:hidden">신청내역</span>
-          <span className="hidden sm:inline">모든 신청내역</span>
-        </NavLink>
-
-        <NavLink href="/notices" active={isActive(pathname, "/notices")}>
-          <Megaphone className="h-4 w-4 sm:hidden" aria-hidden />
-          <span className="sm:hidden">공지</span>
-          <span className="hidden sm:inline">공지사항</span>
-        </NavLink>
-
-        {isAdmin ? (
-          // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
-          // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
-          <Link
-            href="/admin"
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 font-medium text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:min-h-12 sm:px-4 sm:py-3"
-            title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
+          <DesktopNavLink
+            href="/reservations"
+            active={isActive(pathname, "/reservations")}
           >
-            <ShieldCheck className="h-4 w-4" aria-hidden />
-            <span>관리자</span>
-            <span className="hidden text-xs font-normal text-emerald-700 sm:inline">
-              · 활성화중
-            </span>
-          </Link>
-        ) : (
-          <NavLink href="/admin" active={isActive(pathname, "/admin")}>
-            관리자
-          </NavLink>
-        )}
+            모든 신청내역
+          </DesktopNavLink>
 
-        {/* 장소신청 — primary CTA. brand color, 약간 더 두꺼운 글씨로 한눈에 띄게.
-            현재 페이지일 때는 더 진하게 + 아래 underline 으로 "여기 보고 있어요" 신호. */}
+          <DesktopNavLink href="/notices" active={isActive(pathname, "/notices")}>
+            공지사항
+          </DesktopNavLink>
+
+          {isAdmin ? (
+            // 활성화 상태에서도 누르면 그냥 /admin 으로 이동 — 로그아웃은 /admin
+            // 페이지 안의 별도 버튼에서만 가능하게 해서 실수로 풀리는 걸 막는다.
+            <Link
+              href="/admin"
+              className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-3 font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+              title="관리자 모드 활성 — 누르면 관리 메뉴로 이동"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span>관리자</span>
+              <span className="text-xs font-normal text-emerald-700">
+                · 활성화중
+              </span>
+            </Link>
+          ) : (
+            <DesktopNavLink href="/admin" active={isActive(pathname, "/admin")}>
+              관리자
+            </DesktopNavLink>
+          )}
+        </div>
+
+        {/* 장소신청 — 데스크톱 primary CTA. 모바일에서는 별도 FAB 로 노출한다. */}
         <Link
           href="/apply"
           className={cn(
-            "relative inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 font-semibold text-white shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:min-h-12 sm:px-4 sm:py-3",
+            "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full px-4 py-3 font-bold text-white shadow-lg ring-1 ring-brand-700/20 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
             isActive(pathname, "/apply")
-              ? "bg-brand-800 ring-2 ring-brand-300"
-              : "bg-brand-600 hover:bg-brand-700",
+              ? "bg-brand-700 ring-2 ring-brand-200"
+              : "bg-brand-600 hover:bg-brand-700 hover:shadow-xl",
           )}
         >
-          장소신청
-          {isActive(pathname, "/apply") && <ActiveDot />}
+          <Plus className="h-4 w-4" aria-hidden />
+          장소사용신청서
         </Link>
       </nav>
-    </div>
+
+      <nav
+        aria-label="모바일 주요 메뉴"
+        className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 grid grid-cols-4 gap-1 rounded-2xl border border-stone-200 bg-white/95 p-1.5 text-[0.8rem] shadow-[0_12px_32px_rgba(28,25,23,0.18)] backdrop-blur md:hidden"
+      >
+        <MobileTabLink
+          href="/"
+          active={isActive(pathname, "/")}
+          icon={LayoutDashboard}
+        >
+          현황판
+        </MobileTabLink>
+
+        <MobileTabLink
+          href="/reservations"
+          active={isActive(pathname, "/reservations")}
+          icon={ClipboardList}
+        >
+          신청내역
+        </MobileTabLink>
+
+        <MobileTabLink
+          href="/notices"
+          active={isActive(pathname, "/notices")}
+          icon={Megaphone}
+        >
+          공지
+        </MobileTabLink>
+
+        <MobileTabLink
+          href="/admin"
+          active={isActive(pathname, "/admin")}
+          icon={ShieldCheck}
+          adminActive={isAdmin}
+        >
+          관리자
+        </MobileTabLink>
+      </nav>
+    </>
   );
 }
 
-/**
- * 일반 (회색 톤) nav 링크. 현재 페이지면 brand 색 배경 + 흰 글씨 + 아래 점.
- */
-function NavLink({
+function DesktopNavLink({
   href,
   active,
   children,
@@ -126,26 +166,48 @@ function NavLink({
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 sm:min-h-12 sm:px-4 sm:py-3",
+        "inline-flex min-h-12 items-center justify-center rounded-full px-4 py-3 font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
         active
-          ? "border-brand-200 bg-brand-50 font-bold text-brand-800 shadow-sm"
-          : "border-transparent font-semibold text-stone-700 hover:border-stone-200 hover:bg-stone-100",
+          ? "bg-brand-50 text-brand-700 ring-1 ring-brand-100"
+          : "text-stone-700 hover:bg-stone-100 hover:text-stone-950",
       )}
     >
       {children}
-      {active && <ActiveDot />}
     </Link>
   );
 }
 
-/** 현재 페이지 표시 — 버튼 아래쪽 작은 ▾. 컬러 대비만으로 부족한 어르신께 추가 신호. */
-function ActiveDot() {
+function MobileTabLink({
+  href,
+  active,
+  icon: Icon,
+  adminActive = false,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  icon: LucideIcon;
+  adminActive?: boolean;
+  children: React.ReactNode;
+}) {
+  const highlighted = active || adminActive;
+
   return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 text-xs leading-none text-brand-600"
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "inline-flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 font-bold leading-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
+        adminActive
+          ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100"
+          : highlighted
+            ? "bg-brand-50 text-brand-700 ring-1 ring-brand-100"
+            : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
+      )}
+      title={adminActive ? "관리자 모드 활성" : undefined}
     >
-      ▾
-    </span>
+      <Icon className="h-5 w-5" aria-hidden />
+      <span>{children}</span>
+    </Link>
   );
 }
