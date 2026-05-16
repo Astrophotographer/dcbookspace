@@ -15,6 +15,7 @@ import { weekdayLabel } from "@/lib/recurrence";
 import { OwnerActions } from "./owner-actions";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { KioskAutoReturn } from "@/components/kiosk-auto-return";
 import { getPrintEnabled } from "@/lib/site-settings";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 
@@ -26,7 +27,7 @@ function timeBlocksLabel(blocks: { start: string; end: string }[]): string {
 
 type PageArgs = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ just?: string }>;
+  searchParams: Promise<{ just?: string; kiosk?: string }>;
 };
 
 export default async function SeriesPage(props: PageArgs) {
@@ -43,6 +44,7 @@ export default async function SeriesPage(props: PageArgs) {
   const { id } = await props.params;
   const sp = await props.searchParams;
   const justSubmitted = sp.just === "1";
+  const isKiosk = sp.kiosk === "1";
 
   const series = await getSeries(id);
   if (!series) notFound();
@@ -53,7 +55,7 @@ export default async function SeriesPage(props: PageArgs) {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader kiosk={isKiosk} />
       {/* 결재 진행 시 화면 자동 갱신 — 자기 시리즈 행만 필터.
           자식 reservations 변경(인쇄 상태 등) 은 series_id 컬럼으로 묶어서 같은 트리거. */}
       <RealtimeRefresh
@@ -78,10 +80,17 @@ export default async function SeriesPage(props: PageArgs) {
           )
         )}
 
-        {justSubmitted && series.applicant.phone && (
+        {justSubmitted && !isKiosk && series.applicant.phone && (
           <div className="mb-4">
             <PushPermissionPrompt applicantPhone={series.applicant.phone} />
           </div>
+        )}
+
+        {isKiosk && (
+          <KioskAutoReturn
+            printStatus={series.print_status}
+            printEnabled={printEnabled}
+          />
         )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -106,7 +115,7 @@ export default async function SeriesPage(props: PageArgs) {
           totalRows={totalRows}
         />
 
-        {!justSubmitted && series.applicant.phone && (
+        {!justSubmitted && !isKiosk && series.applicant.phone && (
           <div className="mb-4">
             <PushPermissionPrompt applicantPhone={series.applicant.phone} />
           </div>

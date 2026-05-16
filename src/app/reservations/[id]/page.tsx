@@ -132,10 +132,12 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
           </Link>
         )}
 
-        {/* 키오스크 자동 복귀 — 인쇄 상태 기반이라 print 비활성 시엔 의미 없음.
-            (인쇄 OFF 면 키오스크 흐름 자체도 함께 비활성으로 가정) */}
-        {isKiosk && printEnabled && (
-          <KioskAutoReturn printStatus={r.print_status} />
+        {/* 키오스크 자동 복귀 — 프린트 OFF/완료는 10초 후 신청 폼으로, 문제 시 버튼만 유지. */}
+        {isKiosk && (
+          <KioskAutoReturn
+            printStatus={r.print_status}
+            printEnabled={printEnabled}
+          />
         )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
