@@ -18,6 +18,7 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { KioskAutoReturn } from "@/components/kiosk-auto-return";
 import { getPrintEnabled } from "@/lib/site-settings";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { isAdmin } from "@/lib/admin-server";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,10 @@ export default async function SeriesPage(props: PageArgs) {
 
   const totalRows = series.reservations.length;
   const occurrenceCount = totalRows / Math.max(1, series.time_blocks.length);
-  const printEnabled = await getPrintEnabled();
+  const [printEnabled, viewerIsAdmin] = await Promise.all([
+    getPrintEnabled(),
+    isAdmin(),
+  ]);
 
   return (
     <>
@@ -201,24 +205,26 @@ export default async function SeriesPage(props: PageArgs) {
         </section>
 
         <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold">결재 진행 방법</h2>
+          <h2 className="mb-3 text-lg font-semibold">
+            {viewerIsAdmin ? "서류 출력" : "결재 진행 방법"}
+          </h2>
           <p className="mb-4 text-stone-700">
             결재 1회로 모든 회차가 함께 확정됩니다.{" "}
-            {printEnabled
-              ? "인쇄해서 회람하시거나 디지털 링크로 전달하세요."
+            {viewerIsAdmin
+              ? "결재 서류를 출력하여 결재자에게 회람하거나, 디지털 링크를 직접 전달하세요."
               : "결재자에게 아래 디지털 링크를 전달하세요."}
           </p>
           <div className="flex flex-wrap gap-2">
-            {printEnabled && (
+            {viewerIsAdmin && (
               <Link href={`/series/${series.id}/print`} target="_blank">
                 <Button size="lg" variant="primary">
                   <Printer className="h-5 w-5" />
-                  결재 서류 인쇄
+                  결재 서류 출력
                 </Button>
               </Link>
             )}
             <Link href={`/sign/${series.qr_token}`}>
-              <Button size="lg" variant={printEnabled ? "secondary" : "primary"}>
+              <Button size="lg" variant={viewerIsAdmin ? "secondary" : "primary"}>
                 <FileText className="h-5 w-5" />
                 디지털 링크 보기
               </Button>

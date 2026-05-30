@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   LinkIcon,
+  MessageCircle,
   Send,
 } from "lucide-react";
 import type { Department } from "@/lib/supabase/types";
@@ -21,6 +22,7 @@ import {
 type Props = {
   departments: Department[];
   botUsername: string;
+  inviteUrl: string;
   autoEnabled: boolean;
   prefillName?: string;
   prefillPhone?: string;
@@ -28,6 +30,7 @@ type Props = {
 
 type Mode = "auto" | "manual";
 type DeptScope = "home" | "all";
+type TargetType = "dm" | "channel";
 type EventChoiceId = "created" | "step_approved" | "approved" | "rejected";
 
 const EVENT_OPTIONS: Array<{
@@ -64,7 +67,7 @@ const DEFAULT_EVENT_CHOICES: EventChoiceId[] = [
 ];
 
 const inputClass =
-  "h-[50px] w-full rounded-lg border border-[#c9c1b2] bg-white px-3 text-base text-[#1f2726] outline-none transition focus:border-[#0b6f70] focus:ring-4 focus:ring-[#0b6f70]/15 disabled:bg-[#ece8df] disabled:text-[#8a928f]";
+  "h-[50px] w-full rounded-lg border border-[#c9c1b2] bg-white px-3 text-base text-[#1f2726] outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-600/15 disabled:bg-[#ece8df] disabled:text-[#8a928f]";
 
 const selectClass = inputClass;
 
@@ -74,9 +77,10 @@ function normalizePhone(raw: string, prev?: string) {
   return next;
 }
 
-export function TelegramRegisterForm({
+export function DiscordRegisterForm({
   departments,
   botUsername,
+  inviteUrl,
   autoEnabled,
   prefillName = "",
   prefillPhone = "",
@@ -132,9 +136,11 @@ export function TelegramRegisterForm({
       .map((option) => option.label)
       .join(", ") || "미선택";
 
-  const [chatId, setChatId] = useState("");
+  const [targetType, setTargetType] = useState<TargetType>("dm");
+  const [recipientId, setRecipientId] = useState("");
   const [link, setLink] = useState<{
-    deepLinkUrl: string;
+    inviteUrl?: string;
+    command: string;
     token: string;
     expiresAt: string;
   } | null>(null);
@@ -150,7 +156,7 @@ export function TelegramRegisterForm({
       if (stop) return;
       try {
         const res = await fetch(
-          `/api/telegram/link/status?token=${encodeURIComponent(link.token)}`,
+          `/api/discord/link/status?token=${encodeURIComponent(link.token)}`,
         );
         const json = await res.json();
         if (stop) return;
@@ -180,11 +186,11 @@ export function TelegramRegisterForm({
     phone.replace(/\D/g, "").length === 11 &&
     !!deptId &&
     selectedEventIds.length > 0;
-  const currentChatId = linked
+  const currentDiscordId = linked
     ? "등록 완료"
     : link
       ? "자동 연결 대기 중"
-      : chatId.trim() || "대기 중";
+      : recipientId.trim() || "대기 중";
 
   const buildFormData = (): FormData => {
     const fd = new FormData();
@@ -215,21 +221,16 @@ export function TelegramRegisterForm({
     setError(null);
     startTransition(async () => {
       const res = await requestAutoLink(buildFormData());
-      if (!res.ok || !res.deepLinkUrl || !res.token || !res.expiresAt) {
+      if (!res.ok || !res.command || !res.token || !res.expiresAt) {
         setError(res.error ?? "자동 연결 준비에 실패했습니다.");
         return;
       }
       setLink({
-        deepLinkUrl: res.deepLinkUrl,
+        inviteUrl: res.inviteUrl,
+        command: res.command,
         token: res.token,
         expiresAt: res.expiresAt,
       });
-      if (
-        typeof window !== "undefined" &&
-        /Mobi|Android/i.test(navigator.userAgent)
-      ) {
-        window.location.href = res.deepLinkUrl;
-      }
     });
   };
 
@@ -238,14 +239,15 @@ export function TelegramRegisterForm({
       setError("이름, 휴대폰, 소속 부서, 이벤트 알림을 모두 선택해 주세요.");
       return;
     }
-    if (!/^-?\d+$/.test(chatId.trim())) {
-      setError("텔레그램 숫자 ID는 숫자만 입력해 주세요.");
+    if (!/^\d{15,25}$/.test(recipientId.trim())) {
+      setError("디스코드 ID는 15~25자리 숫자로 입력해 주세요.");
       return;
     }
     setError(null);
     startTransition(async () => {
       const fd = buildFormData();
-      fd.set("chat_id", chatId.trim());
+      fd.set("target_type", targetType);
+      fd.set("recipient_id", recipientId.trim());
       const res = await submitManual(fd);
       if (!res.ok) {
         setError(res.error ?? "등록에 실패했습니다.");
@@ -258,7 +260,7 @@ export function TelegramRegisterForm({
 
   const onSendTestMessage = () => {
     if (!linked) {
-      setError("텔레그램 연결 완료 후 테스트 메시지를 보낼 수 있습니다.");
+      setError("디스코드 연결 완료 후 테스트 메시지를 보낼 수 있습니다.");
       return;
     }
     setError(null);
@@ -277,14 +279,14 @@ export function TelegramRegisterForm({
     <div className="space-y-5 text-[#1f2726]">
       <RegistrationHeader botUsername={botUsername} name={name} phone={phone} />
 
-      <section className="rounded-lg border border-[#ded9cd] border-l-[7px] border-l-[#0b6f70] bg-white p-4 shadow-[0_12px_30px_rgba(31,39,38,0.07)]">
+      <section className="rounded-lg border border-[#ded9cd] border-l-[7px] border-l-blue-600 bg-white p-4 shadow-[0_12px_30px_rgba(31,39,38,0.07)]">
         <div>
           <p className="mb-1 font-black text-[#1f2726]">
-            텔레그램을 통한 신청 현황 실시간 알림 서비스
+            디스코드를 통한 신청 현황 실시간 알림 서비스
           </p>
           <p className="m-0 text-[#65706d]">
             부서별 신청서의 진행 상태(접수, 반려, 완료)를 실시간으로
-            확인하고 싶으시다면, 등록하기 페이지에서 텔레그램 봇 아이디를
+            확인하고 싶으시다면, 등록하기 페이지에서 디스코드 알림 대상을
             등록해 주세요.
           </p>
         </div>
@@ -385,11 +387,10 @@ export function TelegramRegisterForm({
             </div>
           </StepCard>
 
-          <StepCard number={3} title="텔레그램 연결">
+          <StepCard number={3} title="디스코드 연결">
             <p className="mb-4 text-[#65706d]">
-              추천 방식은 텔레그램 앱에서 교회 알림봇을 직접 시작하는
-              것입니다. Start를 누르면 n8n이 대화 정보를 받아 자동으로
-              저장합니다.
+              추천 방식은 디스코드에서 교회 알림봇에게 등록 명령어를 보내는
+              것입니다. 봇이 명령어를 처리하면 자동으로 저장됩니다.
             </p>
             <div className="mb-4 inline-flex rounded-full bg-[#ebe7dd] p-1">
               <ModeTab
@@ -409,6 +410,7 @@ export function TelegramRegisterForm({
             {mode === "auto" ? (
               <AutoFlow
                 link={link}
+                inviteUrl={inviteUrl}
                 onAutoConnect={onAutoConnect}
                 pending={pending}
                 disabled={!sharedValid || !autoEnabled}
@@ -416,8 +418,10 @@ export function TelegramRegisterForm({
               />
             ) : (
               <ManualFlow
-                chatId={chatId}
-                onChange={setChatId}
+                targetType={targetType}
+                recipientId={recipientId}
+                onTargetTypeChange={setTargetType}
+                onRecipientIdChange={setRecipientId}
                 onSubmit={onManualSubmit}
                 pending={pending}
                 disabled={!sharedValid || !autoEnabled}
@@ -429,14 +433,14 @@ export function TelegramRegisterForm({
 
           <StepCard number={4} title="테스트 메시지">
             <p className="mb-4 text-[#65706d]">
-              자동 연결은 봇 시작 후 확인 메시지가 도착합니다. 수동 입력은
+              자동 연결은 봇 처리 후 확인 메시지가 도착합니다. 수동 입력은
               등록 버튼을 누르면 테스트 메시지를 바로 보냅니다.
             </p>
             <TestStatusCard
               name={name}
               scope={selectedScopeLabel}
               events={selectedEventSummary}
-              telegramStatus={currentChatId}
+              discordStatus={currentDiscordId}
               onSendTest={onSendTestMessage}
               pending={testPending}
               disabled={!linked}
@@ -448,7 +452,7 @@ export function TelegramRegisterForm({
             <Callout tone="ok">
               {linked
                 ? `${linked.name} 님의 ${linked.scopeLabel} 알림 연결이 완료됐습니다. 테스트 메시지는 위 버튼으로 다시 확인할 수 있습니다.`
-                : "아직 등록 전입니다. 텔레그램 연결이 끝나면 완료 상태로 전환되고 이후 신청 현황 알림을 계속 받을 수 있습니다."}
+                : "아직 등록 전입니다. 디스코드 연결이 끝나면 완료 상태로 전환되고 이후 신청 현황 알림을 계속 받을 수 있습니다."}
             </Callout>
           </StepCard>
         </main>
@@ -459,7 +463,7 @@ export function TelegramRegisterForm({
           dept={selectedDeptName}
           scope={selectedScopeLabel}
           events={selectedEventSummary}
-          chatId={currentChatId}
+          discordId={currentDiscordId}
         />
       </div>
     </div>
@@ -478,25 +482,23 @@ function RegistrationHeader({
   return (
     <header className="flex flex-col gap-4 pb-1 md:flex-row md:items-end md:justify-between">
       <div className="max-w-2xl">
-        <p className="mb-1 text-sm font-black text-[#0b6f70]">
+        <p className="mb-1 text-sm font-black text-blue-700">
           장소사용신청서 알림 연결
         </p>
-        <ChannelSwitch active="telegram" name={name} phone={phone} />
+        <ChannelSwitch active="discord" name={name} phone={phone} />
         <h1 className="m-0 text-[1.65rem] font-black leading-tight text-[#15201f] md:text-[2.35rem]">
           알림봇 등록하기
         </h1>
         <p className="mt-2 text-base leading-relaxed text-[#65706d]">
-          이름, 휴대폰, 소속 부서, 알림 범위를 입력하고 텔레그램 봇을
-          시작한 뒤 테스트 메시지까지 한 번에 확인합니다.
+          이름, 휴대폰, 소속 부서, 알림 범위를 입력하고 디스코드 알림
+          대상까지 한 번에 확인합니다.
         </p>
       </div>
-      <div className="inline-flex items-center gap-3 font-black text-[#084f50]">
-        <span className="grid h-11 w-11 place-items-center rounded-[10px] border border-[#0b6f70]/25 bg-white shadow-[0_10px_22px_rgba(11,111,112,0.12)]">
+      <div className="inline-flex items-center gap-3 font-black text-blue-800">
+        <span className="grid h-11 w-11 place-items-center rounded-[10px] border border-blue-600/25 bg-white shadow-[0_10px_22px_rgba(37,99,235,0.12)]">
           <Bot className="h-6 w-6" aria-hidden />
         </span>
-        {botUsername
-          ? `알림봇 확인됨 @${botUsername.replace(/^@/, "")}`
-          : "알림봇 설정 필요"}
+        {botUsername ? `알림봇 확인됨 ${botUsername}` : "알림봇 설정 필요"}
       </div>
     </header>
   );
@@ -565,7 +567,7 @@ function StepCard({
         !last && "border-b border-[#ded9cd]",
       )}
     >
-      <div className="grid h-[54px] w-[54px] place-items-center rounded-[14px] border border-[#ded9cd] bg-white text-xl font-black text-[#0b6f70]">
+      <div className="grid h-[54px] w-[54px] place-items-center rounded-[14px] border border-[#ded9cd] bg-white text-xl font-black text-blue-700">
         {number}
       </div>
       <div className="min-w-0">
@@ -619,13 +621,13 @@ function EventChoicePanel({
               className={cn(
                 "flex min-h-[72px] cursor-pointer items-center gap-3 rounded-lg border bg-white p-3 transition",
                 checked
-                  ? "border-[#0b6f70] ring-4 ring-[#0b6f70]/10"
-                  : "border-[#c9c1b2] hover:border-[#0b6f70]/55",
+                  ? "border-blue-600 ring-4 ring-blue-600/10"
+                  : "border-[#c9c1b2] hover:border-blue-600/55",
               )}
             >
               <input
                 type="checkbox"
-                className="h-5 w-5 accent-[#0b6f70]"
+                className="h-5 w-5 accent-blue-600"
                 checked={checked}
                 onChange={() => onToggle(option.id)}
               />
@@ -662,7 +664,7 @@ function ModeTab({
       className={cn(
         "min-h-11 rounded-full px-4 font-black transition",
         active
-          ? "bg-white text-[#084f50] shadow-[0_4px_14px_rgba(31,39,38,0.08)]"
+          ? "bg-white text-blue-800 shadow-[0_4px_14px_rgba(31,39,38,0.08)]"
           : "text-[#65706d] hover:bg-white/50",
       )}
     >
@@ -673,12 +675,19 @@ function ModeTab({
 
 function AutoFlow({
   link,
+  inviteUrl,
   onAutoConnect,
   pending,
   disabled,
   autoEnabled,
 }: {
-  link: { deepLinkUrl: string; token: string; expiresAt: string } | null;
+  link: {
+    inviteUrl?: string;
+    command: string;
+    token: string;
+    expiresAt: string;
+  } | null;
+  inviteUrl: string;
   onAutoConnect: () => void;
   pending: boolean;
   disabled: boolean;
@@ -688,15 +697,13 @@ function AutoFlow({
     return (
       <div>
         <Callout tone="info">
-          사이트가 등록 정보를 임시 저장하고 텔레그램 연결 링크를 만듭니다.
-          텔레그램 앱에서 Start를 누르면 n8n이 대화 정보를 받아 등록을
-          완료합니다.
+          사이트가 등록 정보를 임시 저장하고 디스코드 연결 명령어를 만듭니다.
+          디스코드에서 교회 알림봇에게 명령어를 보내면 등록을 완료합니다.
         </Callout>
         {!autoEnabled && (
           <Callout tone="warn">
-            현재 교회 알림봇 주소가 설정되지 않아 연결 링크를 만들 수
-            없습니다. 운영자가 알림봇 주소 설정을 완료하면 이 버튼이
-            활성화됩니다.
+            현재 교회 디스코드 알림봇 이름이 설정되지 않아 연결 명령어를 만들 수
+            없습니다. 운영자가 알림봇 설정을 완료하면 이 버튼이 활성화됩니다.
           </Callout>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -706,44 +713,54 @@ function AutoFlow({
             disabled={pending || disabled}
           >
             <LinkIcon className="h-5 w-5" aria-hidden />
-            {pending ? "준비 중..." : "텔레그램 등록 링크 만들기"}
+            {pending ? "준비 중..." : "디스코드 등록 명령어 만들기"}
           </PrimaryButton>
-          <span className="text-sm font-bold text-[#8a928f]">
-            모바일에서는 생성 후 텔레그램 앱을 바로 열면 됩니다.
-          </span>
+          {inviteUrl && (
+            <a
+              href={inviteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 font-black text-blue-700 transition hover:bg-blue-50"
+            >
+              <ExternalLink className="h-5 w-5" aria-hidden />
+              디스코드 열기
+            </a>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 grid gap-4 rounded-lg border border-[#b7d8d4] bg-[#f1fbf8] p-4 md:grid-cols-[170px_minmax(0,1fr)] md:items-center">
-      <div className="grid min-h-[170px] place-items-center rounded-lg border border-[#c7d2ce] bg-white">
-        <QrCode value={link.deepLinkUrl} size={146} />
+    <div className="mt-4 grid gap-4 rounded-lg border border-blue-200 bg-blue-50 p-4 md:grid-cols-[170px_minmax(0,1fr)] md:items-center">
+      <div className="grid min-h-[170px] place-items-center rounded-lg border border-blue-100 bg-white text-blue-700">
+        <MessageCircle className="h-16 w-16" aria-hidden />
       </div>
       <div className="min-w-0">
         <Callout tone="warn" className="mt-0">
-          텔레그램 앱에서 교회 알림봇이 열리면 Start를 눌러 주세요.
-          연결 링크는 10분 동안 사용할 수 있습니다.
+          디스코드에서 교회 알림봇에게 아래 명령어를 보내 주세요. 연결
+          명령어는 10분 동안 사용할 수 있습니다.
         </Callout>
         <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
           <input
             className={cn(inputClass, "font-mono text-sm")}
-            value={link.deepLinkUrl}
+            value={link.command}
             readOnly
           />
-          <CopyButton value={link.deepLinkUrl} />
+          <CopyButton value={link.command} />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <a
-            href={link.deepLinkUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-blue-700"
-          >
-            <ExternalLink className="h-5 w-5" aria-hidden />
-            텔레그램 앱 열기
-          </a>
+          {(link.inviteUrl ?? inviteUrl) && (
+            <a
+              href={link.inviteUrl ?? inviteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-blue-700"
+            >
+              <ExternalLink className="h-5 w-5" aria-hidden />
+              디스코드 열기
+            </a>
+          )}
           <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-[#65706d]">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             연결 대기 중
@@ -762,14 +779,18 @@ function AutoFlow({
 }
 
 function ManualFlow({
-  chatId,
-  onChange,
+  targetType,
+  recipientId,
+  onTargetTypeChange,
+  onRecipientIdChange,
   onSubmit,
   pending,
   disabled,
 }: {
-  chatId: string;
-  onChange: (v: string) => void;
+  targetType: TargetType;
+  recipientId: string;
+  onTargetTypeChange: (v: TargetType) => void;
+  onRecipientIdChange: (v: string) => void;
   onSubmit: () => void;
   pending: boolean;
   disabled: boolean;
@@ -777,28 +798,29 @@ function ManualFlow({
   return (
     <div>
       <Callout tone="warn">
-        텔레그램 앱 검색창에서{" "}
-        <a
-          href="https://t.me/userinfobot"
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono font-black underline"
-        >
-          @userinfobot
-        </a>
-        을 찾아 Start를 누르면 등록에 필요한 숫자 ID를 확인할 수
-        있습니다.
+        개인 DM은 사용자 ID, 단체 알림은 채널 ID를 입력합니다. 디스코드 개발자
+        모드에서 사용자나 채널을 우클릭하면 ID를 복사할 수 있습니다.
       </Callout>
       <div className="grid gap-3 md:grid-cols-2">
-        <FieldBlock label="텔레그램 숫자 ID">
+        <FieldBlock label="알림 대상">
+          <select
+            className={selectClass}
+            value={targetType}
+            onChange={(e) => onTargetTypeChange(e.target.value as TargetType)}
+          >
+            <option value="dm">개인 DM</option>
+            <option value="channel">채널</option>
+          </select>
+        </FieldBlock>
+        <FieldBlock label={targetType === "dm" ? "디스코드 사용자 ID" : "디스코드 채널 ID"}>
           <input
             className={inputClass}
             type="text"
             inputMode="numeric"
-            value={chatId}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="예: 123456789"
-            pattern="^-?\\d+$"
+            value={recipientId}
+            onChange={(e) => onRecipientIdChange(e.target.value)}
+            placeholder="예: 123456789012345678"
+            pattern="\\d{15,25}"
           />
         </FieldBlock>
       </div>
@@ -806,7 +828,7 @@ function ManualFlow({
         <PrimaryButton
           type="button"
           onClick={onSubmit}
-          disabled={pending || disabled || !chatId}
+          disabled={pending || disabled || !recipientId}
         >
           <Send className="h-5 w-5" aria-hidden />
           {pending ? "등록 중..." : "수동 등록하고 테스트 메시지 보내기"}
@@ -822,14 +844,14 @@ function SummaryPanel({
   dept,
   scope,
   events,
-  chatId,
+  discordId,
 }: {
   name: string;
   phone: string;
   dept: string;
   scope: string;
   events: string;
-  chatId: string;
+  discordId: string;
 }) {
   const rows = [
     ["이름", name.trim() || "미입력"],
@@ -838,7 +860,7 @@ function SummaryPanel({
     ["권한", "일반 사용자"],
     ["알림 범위", scope],
     ["이벤트", events],
-    ["텔레그램", chatId],
+    ["디스코드", discordId],
   ];
 
   return (
@@ -865,7 +887,7 @@ function TestStatusCard({
   name,
   scope,
   events,
-  telegramStatus,
+  discordStatus,
   onSendTest,
   pending,
   disabled,
@@ -874,7 +896,7 @@ function TestStatusCard({
   name: string;
   scope: string;
   events: string;
-  telegramStatus: string;
+  discordStatus: string;
   onSendTest: () => void;
   pending: boolean;
   disabled: boolean;
@@ -886,7 +908,7 @@ function TestStatusCard({
       receiver: name.trim() || "이름 입력 전",
       scope,
       subscriptions: events,
-      telegram: telegramStatus,
+      discord: discordStatus,
       message: "등록이 완료되면 교회 알림봇이 이 정보로 테스트 메시지를 보냅니다.",
     },
     null,
@@ -928,7 +950,7 @@ function Callout({
     <div
       className={cn(
         "my-4 rounded-lg border p-3.5 text-sm leading-relaxed",
-        tone === "info" && "border-[#a7d8d3] bg-[#e3f2ef] text-[#084f50]",
+        tone === "info" && "border-blue-200 bg-blue-50 text-blue-900",
         tone === "warn" && "border-[#f5c879] bg-[#fff3d7] text-[#713f12]",
         tone === "ok" && "border-emerald-300 bg-emerald-50 text-emerald-900",
         tone === "error" && "border-red-300 bg-red-50 text-red-800",
@@ -948,29 +970,13 @@ function PrimaryButton({
   return (
     <button
       className={cn(
-        "inline-flex min-h-[50px] items-center justify-center gap-2 rounded-lg bg-[#0b6f70] px-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-[#084f50] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+        "inline-flex min-h-[50px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 font-black text-white transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
         className,
       )}
       {...props}
     >
       {children}
     </button>
-  );
-}
-
-function QrCode({ value, size }: { value: string; size: number }) {
-  const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(
-    value,
-  )}`;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt="텔레그램 봇 QR"
-      width={size}
-      height={size}
-      className="rounded-md bg-white"
-    />
   );
 }
 

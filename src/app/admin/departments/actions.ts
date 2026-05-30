@@ -14,8 +14,45 @@ import {
 
 type Result<T = unknown> = T & { error?: string };
 
+type DepartmentImportItem = {
+  group: string;
+  leaf?: string;
+  head_name?: string;
+  head_phone?: string;
+  head_pin_hash?: string;
+  elder_name?: string;
+  elder_phone?: string;
+  elder_pin_hash?: string;
+};
+
+type ExistingElder = Pick<AppUser, "id" | "name" | "phone" | "pin_hash">;
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
 function phoneTail(phone: string): string {
-  return phone.replace(/\D/g, "").slice(-4);
+  return normalizePhone(phone).slice(-4);
+}
+
+function elderIdentityKey(name: string, phone: string): string {
+  return `${name.trim()}\u0000${normalizePhone(phone)}`;
+}
+
+function contactHashKey(role: UserRole, name: string, phone: string): string {
+  return `${role}\u0000${elderIdentityKey(name, phone)}`;
+}
+
+function makePinHashCache() {
+  const cache = new Map<string, Promise<string>>();
+  return (key: string, phone: string) => {
+    let promise = cache.get(key);
+    if (!promise) {
+      promise = hashPin(phoneTail(phone));
+      cache.set(key, promise);
+    }
+    return promise;
+  };
 }
 
 function revalidateAll() {
@@ -119,17 +156,7 @@ export async function bulkImportDepartments(text: string): Promise<{
   const get = makeRowAccessor(parsed.headers);
   const errors: BulkRowError[] = [];
 
-  type Item = {
-    group: string;
-    leaf?: string;
-    head_name?: string;
-    head_phone?: string;
-    head_pin_hash?: string;
-    elder_name?: string;
-    elder_phone?: string;
-    elder_pin_hash?: string;
-  };
-  const items: Item[] = [];
+  const items: DepartmentImportItem[] = [];
 
   // 부서장·장로 둘 중 하나라도 phone 검증 실패하면 그 행 자체를 에러로 보내고
   // 나머지 처리 중단 (한 줄이라도 오류 시 전체 중단 정책).
@@ -147,7 +174,7 @@ export async function bulkImportDepartments(text: string): Promise<{
       continue;
     }
 
-    const item: Item = { group };
+    const item: DepartmentImportItem = { group };
     if (leaf) item.leaf = leaf;
 
     // 부서장·장로는 leaf 가 있을 때만 의미 있음
@@ -170,7 +197,6 @@ export async function bulkImportDepartments(text: string): Promise<{
         }
         item.head_name = headName;
         item.head_phone = phone;
-        item.head_pin_hash = await hashPin(phoneTail(phone));
       }
 
       // 담당장로
@@ -191,7 +217,6 @@ export async function bulkImportDepartments(text: string): Promise<{
         }
         item.elder_name = elderName;
         item.elder_phone = phone;
-        item.elder_pin_hash = await hashPin(phoneTail(phone));
       }
     } else if (headName || headPhoneRaw || elderName || elderPhoneRaw) {
       // leaf 비어있는데 부서장/장로 채워진 경우 — 명확히 알려줌
@@ -208,6 +233,51 @@ export async function bulkImportDepartments(text: string): Promise<{
   if (errors.length > 0) return { ok: false, count: 0, errors };
 
   const supabase = createServiceClient();
+  const getPinHash = makePinHashCache();
+
+  for (const item of items) {
+    if (item.head_name && item.head_phone) {
+      item.head_pin_hash = await getPinHash(
+        contactHashKey("dept_head", item.head_name, item.head_phone),
+        item.head_phone,
+      );
+    }
+  }
+
+  const elderItems = items.filter(
+    (item): item is DepartmentImportItem & { elder_name: string; elder_phone: string } =>
+      !!item.elder_name && !!item.elder_phone,
+  );
+  if (elderItems.length > 0) {
+    const elderNames = [...new Set(elderItems.map((item) => item.elder_name))];
+    const { data: existingElders, error: existingError } = await supabase
+      .from("users")
+      .select("id, name, phone, pin_hash")
+      .eq("role", "elder")
+      .eq("active", true)
+      .in("name", elderNames);
+    if (existingError) {
+      return { ok: false, count: 0, errors: [{ row: 1, message: existingError.message }] };
+    }
+
+    const existingByIdentity = new Map<string, ExistingElder>();
+    for (const elder of (existingElders ?? []) as ExistingElder[]) {
+      existingByIdentity.set(elderIdentityKey(elder.name, elder.phone ?? ""), elder);
+    }
+
+    for (const item of elderItems) {
+      const existing = existingByIdentity.get(
+        elderIdentityKey(item.elder_name, item.elder_phone),
+      );
+      if (!existing?.pin_hash) {
+        item.elder_pin_hash = await getPinHash(
+          contactHashKey("elder", item.elder_name, item.elder_phone),
+          item.elder_phone,
+        );
+      }
+    }
+  }
+
   const { data, error } = await supabase.rpc("bulk_insert_departments", {
     items,
   });
@@ -280,27 +350,84 @@ async function assignContact(
 ): Promise<Result<{ user?: AppUser; pin?: string }>> {
   const name = String(fd.get("name") ?? "").trim();
   const phone = String(fd.get("phone") ?? "").trim();
+  const normalizedPhone = normalizePhone(phone);
   if (!name || !phone) return { error: "이름과 휴대폰을 모두 입력해주세요." };
-  if (!isValidPhone(phone)) return { error: PHONE_INVALID_MESSAGE };
+  if (!isValidPhone(normalizedPhone)) return { error: PHONE_INVALID_MESSAGE };
 
-  const tail = phoneTail(phone);
+  const tail = phoneTail(normalizedPhone);
   if (tail.length !== 4) {
     return {
-      error: "휴대폰 뒷 4자리가 초기 PIN 입니다. 휴대폰 번호를 정확히 입력해주세요.",
+      error:
+        "휴대폰 뒷 4자리가 초기 비밀번호입니다. 휴대폰 번호를 정확히 입력해주세요.",
     };
   }
 
   const supabase = createServiceClient();
-  const pinHash = await hashPin(tail);
+  let pinHash: string | null = null;
+  const getPinHash = async () => {
+    pinHash ??= await hashPin(tail);
+    return pinHash;
+  };
 
+  if (role === "elder") {
+    const { data: exactExisting, error: exactFindError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("name", name)
+      .eq("role", "elder")
+      .eq("active", true)
+      .eq("phone", normalizedPhone)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (exactFindError) return { error: exactFindError.message };
+
+    let existing = exactExisting as AppUser | null;
+    if (!existing) {
+      const { data: existingUsers, error: findError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("name", name)
+        .eq("role", "elder")
+        .eq("active", true)
+        .order("created_at", { ascending: true });
+      if (findError) return { error: findError.message };
+
+      existing = ((existingUsers ?? []) as AppUser[]).find(
+        (u) => normalizePhone(u.phone ?? "") === normalizedPhone,
+      ) ?? null;
+    }
+    if (existing) {
+      if (!existing.pin_hash) {
+        const nextPinHash = await getPinHash();
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ pin_hash: nextPinHash })
+          .eq("id", existing.id);
+        if (updateError) return { error: updateError.message };
+        existing.pin_hash = nextPinHash;
+      }
+
+      const { error: e2 } = await supabase
+        .from("departments")
+        .update({ [field]: existing.id })
+        .eq("id", deptId);
+      if (e2) return { error: e2.message };
+
+      revalidateAll();
+      return { user: existing, pin: tail };
+    }
+  }
+
+  const nextPinHash = await getPinHash();
   const { data: user, error } = await supabase
     .from("users")
     .insert({
       name,
-      phone,
+      phone: role === "elder" ? normalizedPhone : phone,
       role,
       dept_id: deptId,
-      pin_hash: pinHash,
+      pin_hash: nextPinHash,
     })
     .select("*")
     .single();

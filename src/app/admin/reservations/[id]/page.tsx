@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
@@ -23,6 +23,14 @@ import { getPrintEnabled } from "@/lib/site-settings";
 import { PrintProgress } from "@/components/print-progress";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { BackLink } from "@/components/back-link";
+import { getAdminSession } from "@/lib/admin-server";
+import { isFullAdminSession } from "@/lib/admin-session";
+import {
+  canGuideElderAccessRow,
+  canGuideElderApplySignatures,
+} from "@/lib/guide-elder-access";
+import { getGuideElderIdsForSession } from "@/lib/guide-elder-identity";
+import { SignatureApplyButton } from "./signature-apply-button";
 
 export default async function AdminReservationDetail(
   props: PageProps<"/admin/reservations/[id]">,
@@ -56,7 +64,40 @@ export default async function AdminReservationDetail(
   });
   const qrUrl = `${baseUrl}/sign/${r.qr_token}`;
   const qr = await qrDataUrl(qrUrl, 220);
-  const printEnabled = await getPrintEnabled();
+  const [printEnabled, adminSession] = await Promise.all([
+    getPrintEnabled(),
+    getAdminSession(),
+  ]);
+  if (!adminSession) {
+    redirect(`/admin/login?next=/admin/reservations/${id}`);
+  }
+  if (!canGuideElderAccessRow(r, adminSession)) notFound();
+  const fullAdmin = isFullAdminSession(adminSession);
+  const guideElderIds = fullAdmin
+    ? []
+    : await getGuideElderIdsForSession(supabase, adminSession);
+  const targetDeptSignaturesReady = Boolean(
+    r.dept?.dept_head_signature_data_url && r.dept?.elder_signature_data_url,
+  );
+  const ownDept = canGuideElderApplySignatures(
+    r,
+    adminSession,
+    guideElderIds,
+  );
+  let signaturesReady = targetDeptSignaturesReady;
+  if (!fullAdmin && adminSession.kind === "user" && !signaturesReady) {
+    const { data: signatureSource } = await supabase
+      .from("departments")
+      .select("id")
+      .not("dept_head_signature_data_url", "is", null)
+      .not("elder_signature_data_url", "is", null)
+      .order("display_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    signaturesReady = Boolean(signatureSource);
+  }
+  const outsideDeptConfirmRequired =
+    !fullAdmin && adminSession.kind === "user" && !ownDept;
 
   return (
     <>
@@ -72,13 +113,15 @@ export default async function AdminReservationDetail(
         <div className="mb-3 flex items-center justify-between gap-3 text-sm">
           {/* 뒤로가기 — 직전 entry 가 홈(?room=...) 이면 모달 복원, 아니면 /admin/reservations 로 */}
           <BackLink label="뒤로" fallbackHref="/admin/reservations" />
-          <Link
-            href="/admin/reservations/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            새 신청서 직접 등록
-          </Link>
+          {fullAdmin && (
+            <Link
+              href="/admin/reservations/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              새 신청서 직접 등록
+            </Link>
+          )}
         </div>
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -138,6 +181,15 @@ export default async function AdminReservationDetail(
           </dl>
         </section>
 
+        <div className="mb-6">
+          <SignatureApplyButton
+            reservationId={r.id}
+            enabled={signaturesReady}
+            savedAt={r.signature_snapshot_at}
+            outsideDeptConfirmRequired={outsideDeptConfirmRequired}
+          />
+        </div>
+
         {/* 프린트 진행 상황 — /reservations/[id] 와 동일하게 인쇄 ON 일 때만 노출 */}
         {printEnabled && (
           <div className="mb-6">
@@ -151,22 +203,24 @@ export default async function AdminReservationDetail(
         )}
 
         {/* 관리자 작업 — 결재 진행 위에 노출해서 강제 처리 액션을 가장 먼저 눈에 띄게 */}
-        <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
-          <h2 className="mb-1 text-lg font-semibold text-amber-900">
-            관리자 작업
-          </h2>
-          <p className="mb-4 text-sm text-amber-800">
-            결재 없이 즉시 예약 확정·반려 처리하거나, 신청서 자체를 삭제할 수
-            있습니다.
-          </p>
-          <AdminActions
-            reservationId={r.id}
-            canForceApprove={r.status === "pending"}
-            canForceReject={r.status === "pending" || r.status === "approved"}
-            canRevive={r.status === "rejected"}
-            isPostApproval={r.status === "approved"}
-          />
-        </section>
+        {fullAdmin && (
+          <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
+            <h2 className="mb-1 text-lg font-semibold text-amber-900">
+              관리자 작업
+            </h2>
+            <p className="mb-4 text-sm text-amber-800">
+              결재 없이 즉시 예약 확정·반려 처리하거나, 신청서 자체를 삭제할 수
+              있습니다.
+            </p>
+            <AdminActions
+              reservationId={r.id}
+              canForceApprove={r.status === "pending"}
+              canForceReject={r.status === "pending" || r.status === "approved"}
+              canRevive={r.status === "rejected"}
+              isPostApproval={r.status === "approved"}
+            />
+          </section>
+        )}
 
         {/* 결재 진행 상황 */}
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">

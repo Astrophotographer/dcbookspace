@@ -17,7 +17,9 @@ import { formatPhone } from "@/lib/phone";
 import { createServiceClient } from "@/lib/supabase/server";
 import { DeleteSubscriberButton } from "./delete-subscriber-button";
 
-type SubscriberRow = {
+type Channel = "telegram" | "discord";
+
+type BaseSubscriberRow = {
   id: string;
   name: string;
   phone: string;
@@ -29,6 +31,11 @@ type SubscriberRow = {
   registered_by_admin: boolean;
   created_at: string;
   updated_at: string;
+};
+
+type DiscordSubscriberRow = BaseSubscriberRow & {
+  target_type: "dm" | "channel";
+  recipient_id: string;
 };
 
 type SubscriberDeptRow = {
@@ -48,7 +55,10 @@ type DepartmentRow = {
   display_order: number;
 };
 
-type TelegramSubscriberView = SubscriberRow & {
+type NotificationSubscriberView = BaseSubscriberRow & {
+  channel: Channel;
+  channelLabel: string;
+  targetLabel: string | null;
   homeDeptLabel: string;
   watchDeptLabel: string;
   eventLabels: string[];
@@ -61,7 +71,7 @@ const EVENT_LABEL: Record<string, string> = {
   "reservation.step_approved": "결재 진행",
   "reservation.approved": "예약 확정",
   "reservation.rejected": "반려",
-  "reservation.cancelled": "취소",
+  "reservation.cancelled": "반려",
   "reservation.print_failed": "출력 실패",
 };
 
@@ -91,69 +101,53 @@ function groupBySubscriber<T extends { subscriber_id: string }>(
   return map;
 }
 
-async function fetchTelegramSubscribers(): Promise<{
-  rows: TelegramSubscriberView[];
-  error: string | null;
-}> {
-  const supabase = createServiceClient();
+function isMissingDiscordSchema(message?: string): boolean {
+  return !!message && /discord_|schema cache|does not exist/i.test(message);
+}
 
-  const [subscribersR, subscriberDeptsR, subscriberEventsR, departmentsR] =
-    await Promise.all([
-      supabase
-        .from("telegram_subscribers")
-        .select(
-          "id, name, phone, bot_username, scope_label, home_dept_id, watch_all, active, registered_by_admin, created_at, updated_at",
-        )
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("telegram_subscriber_depts")
-        .select("subscriber_id, dept_id"),
-      supabase
-        .from("telegram_subscriber_events")
-        .select("subscriber_id, event_type"),
-      supabase
-        .from("departments")
-        .select("id, name, parent_id, display_order")
-        .order("display_order", { ascending: true }),
-    ]);
-
-  const error =
-    subscribersR.error?.message ??
-    subscriberDeptsR.error?.message ??
-    subscriberEventsR.error?.message ??
-    departmentsR.error?.message ??
-    null;
-  if (error) return { rows: [], error };
-
-  const departments = ((departmentsR.data ?? []) as DepartmentRow[]).sort(
-    (a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name),
-  );
-  const departmentById = new Map(departments.map((d) => [d.id, d]));
-  const deptsBySubscriber = groupBySubscriber(
-    (subscriberDeptsR.data ?? []) as SubscriberDeptRow[],
-  );
-  const eventsBySubscriber = groupBySubscriber(
-    (subscriberEventsR.data ?? []) as SubscriberEventRow[],
-  );
+function buildRows(args: {
+  channel: Channel;
+  subscribers: BaseSubscriberRow[];
+  subscriberDepts: SubscriberDeptRow[];
+  subscriberEvents: SubscriberEventRow[];
+  departmentById: Map<string, DepartmentRow>;
+}): NotificationSubscriberView[] {
+  const deptsBySubscriber = groupBySubscriber(args.subscriberDepts);
+  const eventsBySubscriber = groupBySubscriber(args.subscriberEvents);
 
   const deptLabel = (id: string | null): string => {
     if (!id) return "미지정";
-    const dept = departmentById.get(id);
+    const dept = args.departmentById.get(id);
     if (!dept) return "부서 정보 없음";
-    const parent = dept.parent_id ? departmentById.get(dept.parent_id) : null;
+    const parent = dept.parent_id
+      ? args.departmentById.get(dept.parent_id)
+      : null;
     return parent ? `${parent.name} / ${dept.name}` : dept.name;
   };
 
-  const rows = ((subscribersR.data ?? []) as SubscriberRow[]).map((row) => {
+  return args.subscribers.map((row) => {
     const watchDeptIds = (deptsBySubscriber.get(row.id) ?? []).map(
       (d) => d.dept_id,
     );
-    const eventLabels = (eventsBySubscriber.get(row.id) ?? []).map(
-      (e) => EVENT_LABEL[e.event_type] ?? e.event_type,
-    );
+    const eventLabels = [
+      ...new Set(
+        (eventsBySubscriber.get(row.id) ?? []).map(
+          (e) => EVENT_LABEL[e.event_type] ?? e.event_type,
+        ),
+      ),
+    ];
+    const discord = row as DiscordSubscriberRow;
 
     return {
       ...row,
+      channel: args.channel,
+      channelLabel: args.channel === "discord" ? "디스코드" : "텔레그램",
+      targetLabel:
+        args.channel === "discord"
+          ? discord.target_type === "channel"
+            ? `채널 ${discord.recipient_id}`
+            : `개인 DM ${discord.recipient_id}`
+          : null,
       homeDeptLabel: deptLabel(row.home_dept_id),
       watchDeptLabel: row.watch_all
         ? "모든 부서"
@@ -164,6 +158,93 @@ async function fetchTelegramSubscribers(): Promise<{
       createdLabel: formatKstDateTime(row.created_at),
     };
   });
+}
+
+async function fetchNotificationSubscribers(): Promise<{
+  rows: NotificationSubscriberView[];
+  error: string | null;
+}> {
+  const supabase = createServiceClient();
+
+  const [
+    telegramSubscribersR,
+    telegramDeptsR,
+    telegramEventsR,
+    discordSubscribersR,
+    discordDeptsR,
+    discordEventsR,
+    departmentsR,
+  ] = await Promise.all([
+    supabase
+      .from("telegram_subscribers")
+      .select(
+        "id, name, phone, bot_username, scope_label, home_dept_id, watch_all, active, registered_by_admin, created_at, updated_at",
+      ),
+    supabase.from("telegram_subscriber_depts").select("subscriber_id, dept_id"),
+    supabase
+      .from("telegram_subscriber_events")
+      .select("subscriber_id, event_type"),
+    supabase
+      .from("discord_subscribers")
+      .select(
+        "id, name, phone, bot_username, scope_label, home_dept_id, target_type, recipient_id, watch_all, active, registered_by_admin, created_at, updated_at",
+      ),
+    supabase.from("discord_subscriber_depts").select("subscriber_id, dept_id"),
+    supabase
+      .from("discord_subscriber_events")
+      .select("subscriber_id, event_type"),
+    supabase
+      .from("departments")
+      .select("id, name, parent_id, display_order")
+      .order("display_order", { ascending: true }),
+  ]);
+
+  const telegramError =
+    telegramSubscribersR.error?.message ??
+    telegramDeptsR.error?.message ??
+    telegramEventsR.error?.message ??
+    null;
+  if (telegramError) return { rows: [], error: telegramError };
+
+  const discordError =
+    discordSubscribersR.error?.message ??
+    discordDeptsR.error?.message ??
+    discordEventsR.error?.message ??
+    null;
+  if (discordError && !isMissingDiscordSchema(discordError)) {
+    return { rows: [], error: discordError };
+  }
+
+  if (departmentsR.error) {
+    return { rows: [], error: departmentsR.error.message };
+  }
+
+  const departments = ((departmentsR.data ?? []) as DepartmentRow[]).sort(
+    (a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name),
+  );
+  const departmentById = new Map(departments.map((d) => [d.id, d]));
+
+  const telegramRows = buildRows({
+    channel: "telegram",
+    subscribers: (telegramSubscribersR.data ?? []) as BaseSubscriberRow[],
+    subscriberDepts: (telegramDeptsR.data ?? []) as SubscriberDeptRow[],
+    subscriberEvents: (telegramEventsR.data ?? []) as SubscriberEventRow[],
+    departmentById,
+  });
+  const discordRows = discordError
+    ? []
+    : buildRows({
+        channel: "discord",
+        subscribers: (discordSubscribersR.data ?? []) as DiscordSubscriberRow[],
+        subscriberDepts: (discordDeptsR.data ?? []) as SubscriberDeptRow[],
+        subscriberEvents: (discordEventsR.data ?? []) as SubscriberEventRow[],
+        departmentById,
+      });
+
+  const rows = [...telegramRows, ...discordRows].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 
   return { rows, error: null };
 }
@@ -180,7 +261,7 @@ export default async function AdminTelegramPage() {
     );
   }
 
-  const { rows, error } = await fetchTelegramSubscribers();
+  const { rows, error } = await fetchNotificationSubscribers();
   const activeCount = rows.filter((r) => r.active).length;
   const allDeptCount = rows.filter((r) => r.active && r.watch_all).length;
 
@@ -198,19 +279,28 @@ export default async function AdminTelegramPage() {
                 ← 관리
               </Link>
             </div>
-            <h1 className="text-2xl font-bold">텔레그램 알림봇 신청자</h1>
+            <h1 className="text-2xl font-bold">알림봇 신청자</h1>
             <p className="mt-1 text-sm leading-relaxed text-stone-600">
               알림봇을 연결한 사람의 소속 부서, 이름, 전화번호, 신청한 부서와
               알림 내용을 확인합니다.
             </p>
           </div>
-          <Link
-            href="/me/telegram"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
-          >
-            <Bot className="h-4 w-4" aria-hidden />
-            알림봇 신청
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/me/telegram"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2"
+            >
+              <Bot className="h-4 w-4" aria-hidden />
+              텔레그램 신청
+            </Link>
+            <Link
+              href="/me/discord"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+            >
+              <Bot className="h-4 w-4" aria-hidden />
+              디스코드 신청
+            </Link>
+          </div>
         </div>
 
         <section className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -236,12 +326,12 @@ export default async function AdminTelegramPage() {
 
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-relaxed text-red-800">
-            텔레그램 신청자 목록을 불러오지 못했습니다. {error}
+            알림봇 신청자 목록을 불러오지 못했습니다. {error}
           </div>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title="아직 텔레그램 알림봇 신청자가 없습니다."
+            title="아직 알림봇 신청자가 없습니다."
             description="신청자가 연결을 마치면 이곳에 목록이 표시됩니다."
           />
         ) : (
@@ -262,11 +352,12 @@ export default async function AdminTelegramPage() {
                 <tbody className="divide-y divide-stone-100">
                   {rows.map((row) => (
                     <tr
-                      key={row.id}
+                      key={`${row.channel}-${row.id}`}
                       className={row.active ? "bg-white" : "bg-stone-50/70"}
                     >
                       <td className="whitespace-nowrap px-4 py-4 align-top">
                         <StatusBadge active={row.active} />
+                        <ChannelBadge channel={row.channel} label={row.channelLabel} />
                       </td>
                       <td className="max-w-[12rem] px-4 py-4 align-top font-medium text-stone-800">
                         {row.homeDeptLabel}
@@ -279,6 +370,11 @@ export default async function AdminTelegramPage() {
                           <Phone className="h-3.5 w-3.5" aria-hidden />
                           {formatPhone(row.phone)}
                         </div>
+                        {row.targetLabel && (
+                          <div className="mt-1 max-w-[12rem] break-all text-xs font-medium text-stone-500">
+                            {row.targetLabel}
+                          </div>
+                        )}
                       </td>
                       <td className="max-w-[14rem] px-4 py-4 align-top text-stone-700">
                         {row.watchDeptLabel}
@@ -291,6 +387,7 @@ export default async function AdminTelegramPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 align-top">
                         <DeleteSubscriberButton
+                          channel={row.channel}
                           subscriberId={row.id}
                           name={row.name}
                         />
@@ -304,7 +401,7 @@ export default async function AdminTelegramPage() {
             <div className="space-y-3 md:hidden">
               {rows.map((row) => (
                 <article
-                  key={row.id}
+                  key={`${row.channel}-${row.id}`}
                   className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
@@ -319,12 +416,20 @@ export default async function AdminTelegramPage() {
                     </div>
                     <StatusBadge active={row.active} />
                   </div>
+                  <ChannelBadge channel={row.channel} label={row.channelLabel} />
 
                   <MobileInfo
                     icon={Building2}
                     label="소속 부서"
                     value={row.homeDeptLabel}
                   />
+                  {row.targetLabel && (
+                    <MobileInfo
+                      icon={BellRing}
+                      label="알림 대상"
+                      value={row.targetLabel}
+                    />
+                  )}
                   <MobileInfo
                     icon={BellRing}
                     label="신청한 부서"
@@ -341,6 +446,7 @@ export default async function AdminTelegramPage() {
                   </div>
                   <div className="mt-4">
                     <DeleteSubscriberButton
+                      channel={row.channel}
                       subscriberId={row.id}
                       name={row.name}
                     />
@@ -398,6 +504,26 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
+function ChannelBadge({
+  channel,
+  label,
+}: {
+  channel: Channel;
+  label: string;
+}) {
+  return (
+    <span
+      className={
+        channel === "discord"
+          ? "mt-2 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100"
+          : "mt-2 inline-flex items-center rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700 ring-1 ring-brand-100"
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
 function EventPills({ labels }: { labels: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -428,7 +554,7 @@ function MobileInfo({
         <Icon className="h-3.5 w-3.5" aria-hidden />
         {label}
       </div>
-      <div className="text-sm font-semibold leading-snug text-stone-800">
+      <div className="break-all text-sm font-semibold leading-snug text-stone-800">
         {value}
       </div>
     </div>

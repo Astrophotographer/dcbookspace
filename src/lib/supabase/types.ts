@@ -70,6 +70,10 @@ export type Department = {
   parent_id: string | null;
   dept_head_id: string | null;
   elder_id: string | null;
+  dept_head_signature_data_url: string | null;
+  dept_head_signature_updated_at: string | null;
+  elder_signature_data_url: string | null;
+  elder_signature_updated_at: string | null;
   created_at: string;
 };
 
@@ -127,6 +131,19 @@ export type Reservation = {
   print_status: PrintStatus;
   /** print_status 가 마지막으로 변경된 시각. 30초 타임아웃 계산 기준. */
   print_status_at: string;
+  /** 프린터 에이전트나 관리자가 출력 완료로 보고한 누적 횟수. */
+  print_completed_count: number;
+  /** 부서장/지도장로 사인이 신청서에 적용된 시점의 이미지 스냅샷. */
+  signature_snapshot: {
+    dept_head_signature_data_url?: string;
+    elder_signature_data_url?: string;
+    elder_name?: string | null;
+    dept_id?: string | null;
+    signature_source_dept_id?: string | null;
+    outside_dept_confirmed?: boolean;
+  } | null;
+  signature_snapshot_at: string | null;
+  signature_snapshot_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +186,7 @@ export type ReservationSeries = {
   current_step: number;
   print_status: PrintStatus;
   print_status_at: string;
+  print_completed_count: number;
   created_at: string;
   updated_at: string;
 };

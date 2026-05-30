@@ -147,6 +147,7 @@ export default async function ReservationsListPage(
         route: s.route,
         approvals: s.approvals,
         print_status: s.print_status,
+        print_completed_count: s.print_completed_count,
       },
       conflictGroupIndex: indexFor(bySeries.get(s.id)),
     })),

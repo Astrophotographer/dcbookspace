@@ -6,6 +6,13 @@ import {
   emitReservationEventAfter,
   emitSeriesEventAfter,
 } from "@/lib/webhook";
+import { getAdminSession, isFullAdmin } from "@/lib/admin-server";
+import { isFullAdminSession } from "@/lib/admin-session";
+import {
+  canGuideElderAccessRow,
+  canGuideElderApplySignatures,
+} from "@/lib/guide-elder-access";
+import { getGuideElderIdsForSession } from "@/lib/guide-elder-identity";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import type {
   ApprovalRoute,
@@ -22,10 +29,178 @@ import {
 type Result = { error?: string; ok?: true };
 type SubmitResult = { id?: string; error?: string };
 
+async function fullAdminError(): Promise<string | null> {
+  return (await isFullAdmin()) ? null : "전체 관리자 권한이 필요합니다.";
+}
+
+type SignatureDept = {
+  id: string;
+  elder_id: string | null;
+  dept_head_signature_data_url: string | null;
+  elder_signature_data_url: string | null;
+  elder?: { name: string | null } | { name: string | null }[] | null;
+};
+
+type CompleteSignatureDept = SignatureDept & {
+  dept_head_signature_data_url: string;
+  elder_signature_data_url: string;
+};
+
+type ReservationSignatureRow = {
+  id: string;
+  dept_id: string | null;
+  status: string;
+  current_step: number;
+  route: Pick<ApprovalRoute, "steps"> | null;
+  dept: SignatureDept | null;
+};
+
+type ApplySignatureOptions = {
+  confirmOutsideDept?: boolean;
+};
+
+function hasCompleteSignatures(
+  source: SignatureDept | null,
+): source is CompleteSignatureDept {
+  return Boolean(
+    source?.dept_head_signature_data_url && source.elder_signature_data_url,
+  );
+}
+
+function asCompleteSignatureDept(source: unknown): CompleteSignatureDept | null {
+  const dept = source as SignatureDept | null;
+  return hasCompleteSignatures(dept) ? dept : null;
+}
+
+function getSignatureElderName(source: SignatureDept | null): string | null {
+  const elder = source?.elder;
+  if (!elder) return null;
+  return Array.isArray(elder) ? elder[0]?.name ?? null : elder.name;
+}
+
+async function findCompleteSignatureSource(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  guideElderIds: readonly string[] = [],
+): Promise<CompleteSignatureDept | null> {
+  const select =
+    "id, elder_id, dept_head_signature_data_url, elder_signature_data_url, elder:users!elder_id (name)";
+  const baseQuery = () =>
+    supabase
+      .from("departments")
+      .select(select)
+      .not("dept_head_signature_data_url", "is", null)
+      .not("elder_signature_data_url", "is", null)
+      .order("display_order", { ascending: true })
+      .limit(1);
+
+  const ownIds = guideElderIds.length ? guideElderIds : [userId];
+  const { data: ownDept } = await baseQuery()
+    .in("elder_id", ownIds)
+    .maybeSingle();
+  const completeOwnDept = asCompleteSignatureDept(ownDept);
+  if (completeOwnDept) return completeOwnDept;
+
+  const { data: anyDept } = await baseQuery().maybeSingle();
+  return asCompleteSignatureDept(anyDept);
+}
+
+export async function applyReservationSignatures(
+  id: string,
+  options: ApplySignatureOptions = {},
+): Promise<Result> {
+  if (!id) return { error: "잘못된 요청입니다." };
+
+  const session = await getAdminSession();
+  if (!session) return { error: "로그인이 필요합니다." };
+
+  const supabase = createServiceClient();
+  const { data, error: e0 } = await supabase
+    .from("reservations")
+    .select(
+      `id, dept_id, status, current_step,
+       route:approval_routes (steps),
+       dept:departments (
+         id, elder_id, dept_head_signature_data_url, elder_signature_data_url,
+         elder:users!elder_id (name)
+       )`,
+    )
+    .eq("id", id)
+    .single();
+  if (e0 || !data) return { error: "신청서를 찾을 수 없습니다." };
+
+  const row = data as unknown as ReservationSignatureRow;
+  const dept = row.dept;
+  if (!dept) return { error: "신청서에 연결된 부서가 없습니다." };
+
+  const fullAdmin = isFullAdminSession(session);
+  const guideElderIds =
+    !fullAdmin && session.kind === "user"
+      ? await getGuideElderIdsForSession(supabase, session)
+      : [];
+  const ownDept = canGuideElderApplySignatures(row, session, guideElderIds);
+
+  if (
+    !fullAdmin &&
+    !canGuideElderAccessRow(row, session)
+  ) {
+    return {
+      error: "차장 결재 전 신청서만 확인할 수 있습니다.",
+    };
+  }
+
+  if (!fullAdmin && !ownDept && !options.confirmOutsideDept) {
+    return { error: "담당부서가 아닌데도 확인하시겠습니까?" };
+  }
+
+  const source = hasCompleteSignatures(dept)
+    ? dept
+    : !fullAdmin && session.kind === "user"
+      ? await findCompleteSignatureSource(
+          supabase,
+          session.userId,
+          guideElderIds,
+        )
+      : null;
+
+  if (!source) {
+    return { error: "등록된 부서장과 지도장로 사인 세트가 없습니다." };
+  }
+
+  const elderName =
+    session.kind === "user"
+      ? session.name
+      : getSignatureElderName(source) ?? getSignatureElderName(dept);
+
+  const { error: e1 } = await supabase
+    .from("reservations")
+    .update({
+      signature_snapshot: {
+        dept_id: row.dept_id,
+        signature_source_dept_id: source.id,
+        outside_dept_confirmed: !fullAdmin && !ownDept,
+        dept_head_signature_data_url: source.dept_head_signature_data_url,
+        elder_signature_data_url: source.elder_signature_data_url,
+        elder_name: elderName,
+      },
+      signature_snapshot_at: new Date().toISOString(),
+      signature_snapshot_by: session.kind === "user" ? session.userId : null,
+    })
+    .eq("id", id);
+  if (e1) return { error: e1.message };
+
+  revalidatePath("/admin/reservations");
+  revalidatePath(`/admin/reservations/${id}`);
+  revalidatePath(`/reservations/${id}/print`);
+  return { ok: true };
+}
+
 /**
  * 신청서 hard delete. approvals는 ON DELETE CASCADE 되어 있어 같이 삭제됨.
  */
 export async function deleteReservation(id: string): Promise<Result> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   if (!id) return { error: "잘못된 요청입니다." };
   const supabase = createServiceClient();
 
@@ -42,6 +217,8 @@ export async function deleteReservation(id: string): Promise<Result> {
  * 미처리 approvals는 'skipped'로 표시.
  */
 export async function forceReserve(id: string): Promise<Result> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   if (!id) return { error: "잘못된 요청입니다." };
   const supabase = createServiceClient();
 
@@ -91,6 +268,8 @@ export async function forceReserve(id: string): Promise<Result> {
  *   바꾸면 displayStatus 가 자동으로 '결재 진행중' 으로 표시됨
  */
 export async function reviveReservation(id: string): Promise<Result> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   if (!id) return { error: "잘못된 요청입니다." };
   const supabase = createServiceClient();
 
@@ -152,6 +331,8 @@ export async function reviveReservation(id: string): Promise<Result> {
  *   webhook 이벤트의 admin_forced=true 로 사후 강제 반려임을 외부에 알림.
  */
 export async function forceReject(id: string): Promise<Result> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   if (!id) return { error: "잘못된 요청입니다." };
   const supabase = createServiceClient();
 
@@ -206,6 +387,8 @@ export async function submitAdminReservation(
   fd: FormData,
   options?: { forceOverlap?: boolean },
 ): Promise<SubmitResult> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   const supabase = createServiceClient();
 
   const applicantName = String(fd.get("applicant_name") ?? "").trim();
@@ -345,6 +528,8 @@ export async function submitAdminSeriesReservation(
   fd: FormData,
   options?: { forceOverlap?: boolean },
 ): Promise<SeriesSubmitResult> {
+  const authError = await fullAdminError();
+  if (authError) return { error: authError };
   const supabase = createServiceClient();
 
   const applicantName = String(fd.get("applicant_name") ?? "").trim();

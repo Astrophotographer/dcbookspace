@@ -33,7 +33,7 @@ export default async function AdminLoginPage(props: {
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-bold text-stone-900">관리자 로그인</h1>
           <p className="mt-1 text-sm text-stone-500">
-            ID와 비밀번호를 입력해주세요.
+            관리자 ID 또는 담당장로 이름과 비밀번호를 입력해주세요.
           </p>
 
           {errorMsg && (

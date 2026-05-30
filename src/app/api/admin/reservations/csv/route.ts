@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-server";
+import { isFullAdmin } from "@/lib/admin-server";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { ReservationDetail, SeriesDetail } from "@/lib/repo";
 import { displayStatus, STATUS_LABEL } from "@/lib/reservation-status";
@@ -57,8 +57,8 @@ function row(values: (string | number | null | undefined)[]): string {
 }
 
 export async function GET() {
-  if (!(await isAdmin())) {
-    return new NextResponse("관리자 권한이 필요합니다.", { status: 401 });
+  if (!(await isFullAdmin())) {
+    return new NextResponse("전체 관리자 권한이 필요합니다.", { status: 401 });
   }
 
   const supabase = createServiceClient();

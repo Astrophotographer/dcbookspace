@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_COOKIE_NAME,
+  canAccessAdminPath,
   getAdminSecret,
-  verifyAdminToken,
+  verifyAdminSession,
 } from "@/lib/admin-session";
 
 /**
@@ -34,8 +35,20 @@ export async function proxy(req: NextRequest) {
   }
 
   const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
-  if (token && (await verifyAdminToken(token))) {
-    return NextResponse.next();
+  const session = token ? await verifyAdminSession(token) : null;
+  if (session) {
+    if (canAccessAdminPath(session, pathname)) {
+      return NextResponse.next();
+    }
+    if (req.method === "GET" || req.method === "HEAD") {
+      const adminUrl = req.nextUrl.clone();
+      adminUrl.pathname = "/admin";
+      adminUrl.search = "";
+      return NextResponse.redirect(adminUrl);
+    }
+    return new NextResponse("전체 관리자 권한이 필요합니다.", {
+      status: 403,
+    });
   }
 
   // 미인증 → 로그인으로 redirect (next 에 원래 가려던 경로 보존)

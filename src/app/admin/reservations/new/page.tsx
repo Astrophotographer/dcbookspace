@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { SetupNeeded } from "@/components/setup-needed";
 import { isSupabaseConfigured } from "@/lib/config";
@@ -10,6 +11,7 @@ import {
 } from "@/lib/repo";
 import { getPrintEnabled } from "@/lib/site-settings";
 import { ApplyForm } from "@/app/apply/apply-form";
+import { isFullAdmin } from "@/lib/admin-server";
 
 /**
  * 종이 신청서를 본 관리자가 직접 등록하는 셀프-등록 페이지.
@@ -27,6 +29,7 @@ export default async function AdminNewReservationPage() {
       </>
     );
   }
+  if (!(await isFullAdmin())) redirect("/admin");
 
   const [buildings, floors, rooms, departments, printEnabled] =
     await Promise.all([

@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isValidPhone, PHONE_INVALID_MESSAGE } from "@/lib/phone";
 import { isAdmin } from "@/lib/admin-server";
-import { emitTestMessage } from "@/lib/webhook";
-import { getTelegramBotUsername } from "@/lib/telegram";
+import { emitDiscordTestMessage } from "@/lib/webhook";
+import { getDiscordBotUsername, getDiscordInviteUrl } from "@/lib/discord";
 import type { WebhookEvent } from "@/lib/webhook";
 
 const ALLOWED_EVENT_TYPES: WebhookEvent[] = [
@@ -19,7 +19,6 @@ const ALLOWED_EVENT_TYPES: WebhookEvent[] = [
   "reservation.print_failed",
 ];
 
-// 일반 사용자가 선택할 수 없는 (관리자 전용) 이벤트.
 const ADMIN_ONLY_EVENTS = new Set<WebhookEvent>(["reservation.print_failed"]);
 
 const DEFAULT_EVENTS: WebhookEvent[] = [
@@ -27,6 +26,7 @@ const DEFAULT_EVENTS: WebhookEvent[] = [
   "series.created",
   "reservation.approved",
   "reservation.rejected",
+  "reservation.cancelled",
 ];
 
 const EVENT_TYPES_BY_FORM_ID: Record<string, WebhookEvent[]> = {
@@ -36,8 +36,10 @@ const EVENT_TYPES_BY_FORM_ID: Record<string, WebhookEvent[]> = {
   rejected: ["reservation.rejected", "reservation.cancelled"],
 };
 
-const TOKEN_TTL_MS = 10 * 60 * 1000; // 10분
-const TOKEN_BYTES = 12; // base64url 16자 ≈ 96bit
+const TOKEN_TTL_MS = 10 * 60 * 1000;
+const TOKEN_BYTES = 12;
+
+type DiscordTargetType = "dm" | "channel";
 
 type Draft = {
   name: string;
@@ -54,15 +56,10 @@ type Draft = {
 type ValidateOk = { ok: true; draft: Draft };
 type ValidateErr = { ok: false; error: string };
 
-/**
- * 폼 데이터 → 정규화된 draft. 관리자 검증·권한 제한 모두 여기서.
- * - 일반 사용자도 본인 부서/모든 부서 범위를 선택할 수 있다.
- * - 이벤트 종류는 사용자가 체크한 값만 허용 목록으로 정규화한다.
- */
 async function validateAndNormalize(fd: FormData): Promise<ValidateOk | ValidateErr> {
   const name = String(fd.get("name") ?? "").trim();
   const phoneRaw = String(fd.get("phone") ?? "").replace(/\D/g, "");
-  const botUsername = await getTelegramBotUsername();
+  const botUsername = await getDiscordBotUsername();
 
   if (!name) return { ok: false, error: "이름을 입력해 주세요." };
   if (!isValidPhone(phoneRaw)) return { ok: false, error: PHONE_INVALID_MESSAGE };
@@ -71,7 +68,7 @@ async function validateAndNormalize(fd: FormData): Promise<ValidateOk | Validate
     return {
       ok: false,
       error:
-        "교회 알림봇 연결 설정이 아직 완료되지 않았습니다. 관리자에게 문의해 주세요.",
+        "교회 디스코드 알림봇 설정이 아직 완료되지 않았습니다. 관리자에게 문의해 주세요.",
     };
   }
 
@@ -100,7 +97,6 @@ async function validateAndNormalize(fd: FormData): Promise<ValidateOk | Validate
     watchDeptIds.push(homeDeptId);
   }
 
-  // ── 이벤트 종류
   const rawEventIds = fd
     .getAll("event_ids")
     .map((v) => String(v).trim())
@@ -140,28 +136,22 @@ async function validateAndNormalize(fd: FormData): Promise<ValidateOk | Validate
   };
 }
 
-/**
- * Deep-link 자동 등록용 토큰 발급.
- * draft 를 telegram_link_tokens 에 저장 → 텔레그램 봇 웹훅이 /start TOKEN 을 받으면
- * /api/telegram/link 로 token+chat_id 를 보내고, 그쪽에서 draft 를 꺼내 인서트.
- */
 export async function requestAutoLink(fd: FormData): Promise<{
   ok: boolean;
   error?: string;
-  deepLinkUrl?: string;
+  inviteUrl?: string;
+  command?: string;
   token?: string;
   expiresAt?: string;
 }> {
   const v = await validateAndNormalize(fd);
   if (!v.ok) return { ok: false, error: v.error };
 
-  const botUsername = v.draft.bot_username;
-
   const token = randomBytes(TOKEN_BYTES).toString("base64url");
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
 
   const supabase = createServiceClient();
-  const { error } = await supabase.from("telegram_link_tokens").insert({
+  const { error } = await supabase.from("discord_link_tokens").insert({
     token,
     subscriber_draft: v.draft,
     expires_at: expiresAt,
@@ -170,15 +160,13 @@ export async function requestAutoLink(fd: FormData): Promise<{
 
   return {
     ok: true,
-    deepLinkUrl: `https://t.me/${botUsername}?start=${token}`,
+    inviteUrl: getDiscordInviteUrl() ?? undefined,
+    command: `/알림등록 ${token}`,
     token,
     expiresAt,
   };
 }
 
-/**
- * 수동 입력 흐름. 텔레그램 숫자 ID를 직접 받아서 곧장 등록 + 테스트 메시지.
- */
 export async function submitManual(fd: FormData): Promise<{
   ok: boolean;
   error?: string;
@@ -186,30 +174,39 @@ export async function submitManual(fd: FormData): Promise<{
   const v = await validateAndNormalize(fd);
   if (!v.ok) return { ok: false, error: v.error };
 
-  const chatId = String(fd.get("chat_id") ?? "").trim();
-  if (!/^-?\d+$/.test(chatId)) {
+  const recipientId = String(fd.get("recipient_id") ?? "").trim();
+  const targetType = String(fd.get("target_type") ?? "dm").trim();
+  if (targetType !== "dm" && targetType !== "channel") {
+    return { ok: false, error: "디스코드 알림 대상 종류를 확인해 주세요." };
+  }
+  if (!/^\d{15,25}$/.test(recipientId)) {
     return {
       ok: false,
-      error: "텔레그램 숫자 ID는 숫자만 입력해 주세요. (그룹은 -100… 형식)",
+      error: "디스코드 ID는 15~25자리 숫자로 입력해 주세요.",
     };
   }
 
-  const result = await upsertSubscriberFromDraft(v.draft, chatId);
+  const result = await upsertDiscordSubscriberFromDraft(
+    v.draft,
+    targetType,
+    recipientId,
+  );
   if (!result.ok) return result;
 
-  emitTestMessage(
-    { chat_id: chatId, name: v.draft.name, dept_name: v.draft.scope_label },
+  emitDiscordTestMessage(
+    {
+      recipient_id: recipientId,
+      target_type: targetType,
+      name: v.draft.name,
+      dept_name: v.draft.scope_label,
+    },
     { reason: "manual_register", scope_label: v.draft.scope_label },
   );
 
-  revalidatePath("/me/telegram");
+  revalidatePath("/me/discord");
   return { ok: true };
 }
 
-/**
- * 이미 등록된 구독자에게 테스트 메시지를 다시 보낸다.
- * 자동 연결 완료 후 사용자가 화면에서 직접 눌러 확인하는 용도.
- */
 export async function sendRegisteredTestMessage(fd: FormData): Promise<{
   ok: boolean;
   error?: string;
@@ -219,8 +216,8 @@ export async function sendRegisteredTestMessage(fd: FormData): Promise<{
 
   const supabase = createServiceClient();
   let query = supabase
-    .from("telegram_subscribers")
-    .select("chat_id, name, scope_label")
+    .from("discord_subscribers")
+    .select("recipient_id, target_type, name, scope_label")
     .eq("phone", v.draft.phone)
     .eq("active", true)
     .order("updated_at", { ascending: false })
@@ -232,16 +229,18 @@ export async function sendRegisteredTestMessage(fd: FormData): Promise<{
 
   const { data, error } = await query.maybeSingle();
   if (error) return { ok: false, error: error.message };
-  if (!data?.chat_id) {
+  if (!data?.recipient_id) {
     return {
       ok: false,
-      error: "텔레그램 연결 완료 후 테스트 메시지를 보낼 수 있습니다.",
+      error: "디스코드 연결 완료 후 테스트 메시지를 보낼 수 있습니다.",
     };
   }
 
-  emitTestMessage(
+  const targetType = data.target_type === "channel" ? "channel" : "dm";
+  emitDiscordTestMessage(
     {
-      chat_id: data.chat_id as string,
+      recipient_id: data.recipient_id as string,
+      target_type: targetType,
       name: (data.name as string | null) ?? v.draft.name,
       dept_name: (data.scope_label as string | null) ?? v.draft.scope_label,
     },
@@ -251,31 +250,25 @@ export async function sendRegisteredTestMessage(fd: FormData): Promise<{
   return { ok: true };
 }
 
-/**
- * draft + chat_id → telegram_subscribers + 자식 테이블 upsert.
- * - chat_id unique 충돌 시 active=true 로 되살리고 메타데이터 갱신.
- * - 자식 테이블(*_depts, *_events) 은 delete-then-insert 로 단순화.
- *
- * /api/telegram/link 라우트와 공유 — export.
- */
-export async function upsertSubscriberFromDraft(
+export async function upsertDiscordSubscriberFromDraft(
   draft: Draft,
-  chatId: string,
+  targetType: DiscordTargetType,
+  recipientId: string,
 ): Promise<{ ok: true; subscriberId: string } | { ok: false; error: string }> {
   const supabase = createServiceClient();
 
-  // 1) 부모 row upsert
   const { data: existing } = await supabase
-    .from("telegram_subscribers")
+    .from("discord_subscribers")
     .select("id")
     .eq("phone", draft.phone)
-    .eq("chat_id", chatId)
+    .eq("target_type", targetType)
+    .eq("recipient_id", recipientId)
     .maybeSingle();
 
   let subscriberId: string;
   if (existing) {
     const { error } = await supabase
-      .from("telegram_subscribers")
+      .from("discord_subscribers")
       .update({
         name: draft.name,
         phone: draft.phone,
@@ -291,14 +284,15 @@ export async function upsertSubscriberFromDraft(
     subscriberId = existing.id as string;
   } else {
     const { data, error } = await supabase
-      .from("telegram_subscribers")
+      .from("discord_subscribers")
       .insert({
         name: draft.name,
         phone: draft.phone,
         bot_username: draft.bot_username,
         scope_label: draft.scope_label,
         home_dept_id: draft.home_dept_id,
-        chat_id: chatId,
+        target_type: targetType,
+        recipient_id: recipientId,
         registered_by_admin: draft.registered_by_admin,
         watch_all: draft.watch_all,
         active: true,
@@ -311,9 +305,8 @@ export async function upsertSubscriberFromDraft(
     subscriberId = data.id as string;
   }
 
-  // 2) 자식: depts — clear & insert
   await supabase
-    .from("telegram_subscriber_depts")
+    .from("discord_subscriber_depts")
     .delete()
     .eq("subscriber_id", subscriberId);
   if (!draft.watch_all && draft.watch_dept_ids.length > 0) {
@@ -322,14 +315,13 @@ export async function upsertSubscriberFromDraft(
       dept_id,
     }));
     const { error: e2 } = await supabase
-      .from("telegram_subscriber_depts")
+      .from("discord_subscriber_depts")
       .insert(rows);
     if (e2) return { ok: false, error: e2.message };
   }
 
-  // 3) 자식: events — clear & insert
   await supabase
-    .from("telegram_subscriber_events")
+    .from("discord_subscriber_events")
     .delete()
     .eq("subscriber_id", subscriberId);
   const eventRows = draft.event_types.map((event_type) => ({
@@ -337,7 +329,7 @@ export async function upsertSubscriberFromDraft(
     event_type,
   }));
   const { error: e3 } = await supabase
-    .from("telegram_subscriber_events")
+    .from("discord_subscriber_events")
     .insert(eventRows);
   if (e3) return { ok: false, error: e3.message };
 

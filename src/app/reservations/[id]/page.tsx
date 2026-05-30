@@ -239,15 +239,17 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
         </section>
 
         <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold">결재 진행 방법</h2>
+          <h2 className="mb-3 text-lg font-semibold">
+            {viewerIsAdmin ? "서류 출력" : "결재 진행 방법"}
+          </h2>
           <p className="mb-4 text-stone-700">
-            {printEnabled
-              ? "결재 서류를 인쇄하여 결재자에게 회람하거나, 디지털 링크를 직접 전달하세요."
+            {viewerIsAdmin
+              ? "결재 서류를 출력하여 결재자에게 회람하거나, 디지털 링크를 직접 전달하세요."
               : "결재자에게 아래 디지털 링크를 전달하세요."}
           </p>
           {/* 모바일에서도 한 줄 — admin/reservations/[id] 와 동일 패턴 */}
           <div className="flex gap-2">
-            {printEnabled && (
+            {viewerIsAdmin && (
               <Link
                 href={`/reservations/${r.id}/print`}
                 target="_blank"
@@ -259,7 +261,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
                   className="w-full whitespace-nowrap"
                 >
                   <Printer className="h-5 w-5" />
-                  결재서류
+                  결재서류 출력
                 </Button>
               </Link>
             )}
@@ -269,7 +271,7 @@ export default async function Page(props: PageProps<"/reservations/[id]">) {
             >
               <Button
                 size="lg"
-                variant={printEnabled ? "secondary" : "primary"}
+                variant={viewerIsAdmin ? "secondary" : "primary"}
                 className="w-full whitespace-nowrap"
               >
                 <FileText className="h-5 w-5" />

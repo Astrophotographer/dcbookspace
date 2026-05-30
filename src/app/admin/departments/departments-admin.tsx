@@ -35,10 +35,10 @@ const BULK_COLUMNS_DEPT = [
   {
     name: "부서장전화번호",
     required: false,
-    help: "010 + 8자리. 뒷 4자리가 초기 PIN 으로 자동 발급",
+    help: "010 + 8자리. 이름은 아이디, 뒷 4자리는 초기 비밀번호",
   },
-  { name: "장로이름", required: false, help: "담당장로 이름" },
-  { name: "장로전화번호", required: false, help: "010 + 8자리. PIN 자동 발급" },
+  { name: "장로이름", required: false, help: "담당장로 이름. 결재 아이디로 사용" },
+  { name: "장로전화번호", required: false, help: "010 + 8자리. 뒷 4자리가 초기 비밀번호" },
 ];
 
 type Props = {
@@ -65,6 +65,7 @@ export function DepartmentsAdmin({
   const [issuedPin, setIssuedPin] = useState<{
     name: string;
     pin: string;
+    roleLabel: string;
   } | null>(null);
 
   // 좌측 사이드바에서 선택된 그룹. null 이면 첫 그룹 자동 선택.
@@ -186,15 +187,26 @@ export function DepartmentsAdmin({
       {issuedPin && (
         <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-5">
           <h3 className="mb-2 text-base font-semibold text-amber-900">
-            {issuedPin.name} 님의 초기 PIN (휴대폰 뒷 4자리)
+            {issuedPin.name} 님의 결재 로그인 정보
           </h3>
           <p className="mb-2 text-sm text-amber-800">
-            본인 휴대폰 뒷 4자리가 PIN으로 등록되었습니다. 첫 결재 시 변경하도록
-            안내해 주세요.
+            {issuedPin.roleLabel} 결재 시 이름이 아이디이고, 휴대폰 뒷 4자리가
+            초기 비밀번호입니다.
           </p>
-          <div className="rounded bg-white p-3 text-center font-mono text-3xl tracking-widest text-stone-900">
-            {issuedPin.pin}
-          </div>
+          <dl className="grid gap-2 rounded bg-white p-3 text-stone-900 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold text-stone-500">아이디</dt>
+              <dd className="mt-1 text-xl font-bold">{issuedPin.name}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold text-stone-500">
+                초기 비밀번호
+              </dt>
+              <dd className="mt-1 font-mono text-3xl tracking-widest">
+                {issuedPin.pin}
+              </dd>
+            </div>
+          </dl>
           <Button
             variant="ghost"
             className="mt-3"
@@ -505,7 +517,11 @@ export function DepartmentsAdmin({
                                 const res = await setDeptHead(d.id, fd);
                                 if (res.error) setError(res.error);
                                 else if (res.user) {
-                                  setContacts((arr) => [...arr, res.user!]);
+                                  setContacts((arr) =>
+                                    arr.some((u) => u.id === res.user!.id)
+                                      ? arr
+                                      : [...arr, res.user!],
+                                  );
                                   setDepts((arr) =>
                                     arr.map((x) =>
                                       x.id === d.id
@@ -521,6 +537,7 @@ export function DepartmentsAdmin({
                                     setIssuedPin({
                                       name: res.user.name,
                                       pin: res.pin,
+                                      roleLabel: "부서장",
                                     });
                                 }
                               });
@@ -561,7 +578,11 @@ export function DepartmentsAdmin({
                                 const res = await setDeptElder(d.id, fd);
                                 if (res.error) setError(res.error);
                                 else if (res.user) {
-                                  setContacts((arr) => [...arr, res.user!]);
+                                  setContacts((arr) =>
+                                    arr.some((u) => u.id === res.user!.id)
+                                      ? arr
+                                      : [...arr, res.user!],
+                                  );
                                   setDepts((arr) =>
                                     arr.map((x) =>
                                       x.id === d.id
@@ -574,6 +595,7 @@ export function DepartmentsAdmin({
                                     setIssuedPin({
                                       name: res.user.name,
                                       pin: res.pin,
+                                      roleLabel: "담당장로",
                                     });
                                 }
                               });
@@ -909,10 +931,10 @@ function ContactRow({
             setPhone("");
           }}
         >
-          <Field label="이름">
+          <Field label="이름 (아이디)">
             <Input name="name" required placeholder={`${label} 이름`} />
           </Field>
-          <Field label="휴대폰 (뒷 4자리가 초기 PIN)">
+          <Field label="휴대폰 (뒷 4자리가 초기 비밀번호)">
             <Input
               name="phone"
               required

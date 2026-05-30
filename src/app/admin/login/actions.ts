@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { verifyAdminCredentials } from "@/lib/admin-credentials";
+import { authenticateAdminLogin } from "@/lib/admin-credentials";
 import {
   ADMIN_COOKIE_MAX_AGE,
   ADMIN_COOKIE_NAME,
@@ -21,8 +21,8 @@ export async function loginAdmin(fd: FormData): Promise<void> {
   // open redirect 방어: 로컬 경로(/...) 만 허용
   const safeNext = /^\/[^/]/.test(next) ? next : "/admin";
 
-  const ok = await verifyAdminCredentials(username, password);
-  if (!ok) {
+  const session = await authenticateAdminLogin(username, password);
+  if (!session) {
     redirect(
       `/admin/login?error=invalid&next=${encodeURIComponent(safeNext)}`,
     );
@@ -33,7 +33,7 @@ export async function loginAdmin(fd: FormData): Promise<void> {
     redirect("/admin/login?error=secret");
   }
 
-  const token = await signAdminToken(secret);
+  const token = await signAdminToken(secret, session);
   const c = await cookies();
   c.set({
     name: ADMIN_COOKIE_NAME,

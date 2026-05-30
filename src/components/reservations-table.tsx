@@ -47,6 +47,7 @@ export type SeriesRowItem = {
   route: ApprovalRoute;
   approvals: ApprovalWithApprover[];
   print_status: PrintStatus;
+  print_completed_count: number;
 };
 
 export type ReservationRowItem = {
@@ -63,6 +64,7 @@ export type ReservationRowItem = {
   route: ApprovalRoute;
   approvals: ApprovalWithApprover[];
   print_status: PrintStatus;
+  print_completed_count: number;
 };
 
 export type TableEntry =
@@ -181,6 +183,28 @@ function statusInputFor(e: TableEntry) {
   return { status: e.data.status, approvals: e.data.approvals };
 }
 
+function PrintCount({ count }: { count: number }) {
+  if (!Number.isFinite(count) || count <= 0) {
+    return (
+      <span
+        className="inline-flex min-w-8 justify-center rounded-full bg-stone-100 px-2 py-1 text-xs font-bold text-stone-500 ring-1 ring-stone-200"
+        title="아직 출력 완료 기록이 없습니다."
+      >
+        X
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex min-w-8 justify-center rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold tabular-nums text-emerald-800 ring-1 ring-emerald-200"
+      title={`${count}회 출력 완료`}
+    >
+      {count}
+    </span>
+  );
+}
+
 function compareField(a: TableEntry, b: TableEntry, field: SortField): number {
   switch (field) {
     case "ref_no":
@@ -280,7 +304,7 @@ export function ReservationsTable({
     setVisibleCount(LOAD_CHUNK_SIZE);
   };
 
-  const colSpan = 7 + (extraColumn ? 1 : 0);
+  const colSpan = 8 + (extraColumn ? 1 : 0);
 
   return (
     <div className="space-y-3">
@@ -321,8 +345,8 @@ export function ReservationsTable({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm md:hidden">
-        <table className="min-w-[60rem] table-fixed text-base">
-          {/* 모바일 컬럼 순서: 부서·작성자 / 장소 / 사용일시 / 상태 / 신청번호 / 결재 라인 / 작성일 / (extra) */}
+        <table className="min-w-[66rem] table-fixed text-base">
+          {/* 모바일 컬럼 순서: 부서·작성자 / 장소 / 사용일시 / 상태 / 신청번호 / 결재 라인 / 작성일 / 서류출력 / (extra) */}
           <colgroup>
             <col className="w-[7.5rem]" />
             <col className="w-[9rem]" />
@@ -331,6 +355,7 @@ export function ReservationsTable({
             <col className="w-[7.5rem]" />
             <col className="w-[6.5rem]" />
             <col className="w-[9.5rem]" />
+            <col className="w-[6rem]" />
             {extraColumn && <col className="w-[7rem]" />}
           </colgroup>
           <thead className="bg-stone-50 text-stone-700">
@@ -344,6 +369,9 @@ export function ReservationsTable({
               <SortTh field="ref_no" sortField={sortField} sortDir={sortDir} onSort={handleSort}>신청번호</SortTh>
               <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
               <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={handleSort}>작성일</SortTh>
+              <th className="px-2 py-2 text-left font-semibold text-stone-700">
+                서류출력
+              </th>
               {extraColumn && (
                 <th className="px-2 py-2 text-left font-semibold text-stone-700">
                   {extraColumn.header}
@@ -492,6 +520,9 @@ export function ReservationsTable({
                     <Link {...linkProps} className="block">
                       {formatDateTime(data.created_at)}
                     </Link>
+                  </Td>
+                  <Td>
+                    <PrintCount count={data.print_completed_count} />
                   </Td>
                   {extraColumn && <Td>{extraColumn.render(entry)}</Td>}
                 </tr>
@@ -518,7 +549,7 @@ export function ReservationsTable({
             내용이 달라져도 너비가 들썩이지 않게. 결재 라인은 가장 가변적이라
             폭 미지정으로 두고 나머지 fixed 폭의 잔여 공간을 가져가게 함. */}
         <table className="w-full table-fixed text-base">
-          {/* 컬럼 순서: 신청번호 / 작성일 / 사용일시 / 장소 / 부서·신청자 / 상태 / 결재 라인 / (extra) */}
+          {/* 컬럼 순서: 신청번호 / 작성일 / 사용일시 / 장소 / 부서·신청자 / 상태 / 결재 라인 / 서류출력 / (extra) */}
           <colgroup>
             <col className="w-[7.5rem]" />
             <col className="w-[9.5rem]" />
@@ -527,6 +558,7 @@ export function ReservationsTable({
             <col className="w-[7.5rem]" />
             <col className="w-[7.5rem]" />
             <col className="w-[6.5rem]" />
+            <col className="w-[6rem]" />
             {extraColumn && <col className="w-[7rem]" />}
           </colgroup>
           <thead className="bg-stone-50 text-stone-700">
@@ -540,6 +572,9 @@ export function ReservationsTable({
               </SortTh>
               <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>상태</SortTh>
               <SortTh field="approval" sortField={sortField} sortDir={sortDir} onSort={handleSort}>결재 라인</SortTh>
+              <th className="px-2 py-2 text-left font-semibold text-stone-700">
+                서류출력
+              </th>
               {extraColumn && (
                 <th className="px-2 py-2 text-left font-semibold text-stone-700">
                   {extraColumn.header}
@@ -688,6 +723,9 @@ export function ReservationsTable({
                       currentStep={data.current_step}
                       compact
                     />
+                  </Td>
+                  <Td>
+                    <PrintCount count={data.print_completed_count} />
                   </Td>
                   {extraColumn && <Td>{extraColumn.render(entry)}</Td>}
                 </tr>

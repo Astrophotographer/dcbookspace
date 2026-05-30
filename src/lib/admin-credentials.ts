@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { hashPin, verifyPin } from "@/lib/auth"; // bcrypt 헬퍼 — 이름은 PIN 이지만 임의 길이 문자열에도 동작
+import type { AdminLoginSession } from "@/lib/admin-session";
 
 /**
  * 사이트 관리자 로그인 자격증명 검증.
@@ -35,6 +36,46 @@ export async function verifyAdminCredentials(
   if (error || !data) return false;
 
   return verifyPin(password, data.password_hash);
+}
+
+/**
+ * /admin/login 에서 사용하는 통합 로그인.
+ * - 사이트 관리자: 기존 ADMIN_USERNAME/ADMIN_PASSWORD 또는 admin_credentials
+ * - 담당장로: users.role='elder' 이고 이름이 ID, 휴대폰 뒷 4자리 PIN hash 가 비밀번호
+ */
+export async function authenticateAdminLogin(
+  username: string,
+  password: string,
+): Promise<AdminLoginSession | null> {
+  const trimmed = username.trim();
+  if (!trimmed || !password) return null;
+
+  if (await verifyAdminCredentials(trimmed, password)) {
+    return { kind: "site_admin" };
+  }
+
+  const supabase = createServiceClient();
+  const { data: elders, error } = await supabase
+    .from("users")
+    .select("id, name, role, pin_hash, active")
+    .eq("name", trimmed)
+    .eq("role", "elder")
+    .eq("active", true)
+    .not("pin_hash", "is", null);
+  if (error || !elders?.length) return null;
+
+  for (const elder of elders) {
+    if (elder.pin_hash && (await verifyPin(password, elder.pin_hash))) {
+      return {
+        kind: "user",
+        userId: elder.id,
+        name: elder.name,
+        role: "elder",
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

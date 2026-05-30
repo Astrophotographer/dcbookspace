@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrintEnabled } from "@/lib/site-settings";
+import { getAdminSession } from "@/lib/admin-server";
+import { isFullAdminSession } from "@/lib/admin-session";
 
 type AdminMenuItem = {
   href: string;
@@ -94,7 +96,7 @@ const ADMIN_SECTIONS: AdminSection[] = [
       },
       {
         href: "/admin/telegram",
-        label: "텔레그램 알림봇",
+        label: "알림봇",
         desc: "알림봇 신청자와 알림 범위 확인",
         Icon: MessageCircle,
       },
@@ -147,6 +149,28 @@ const ADMIN_SECTIONS: AdminSection[] = [
         label: "키오스크 설치",
         desc: "사무실 단말에 신청 전용 PWA 설치",
         Icon: Maximize2,
+      },
+    ],
+  },
+];
+
+const ELDER_ADMIN_SECTIONS: AdminSection[] = [
+  {
+    title: "담당장로 메뉴",
+    desc: "담당 결재와 신청 내역만 확인합니다.",
+    Icon: ShieldCheck,
+    items: [
+      {
+        href: "/admin/signs",
+        label: "사인관리",
+        desc: "내 결재 차례인 신청서 확인",
+        Icon: ShieldCheck,
+      },
+      {
+        href: "/admin/reservations",
+        label: "신청서 관리",
+        desc: "전체 신청 내역과 결재 상태 확인",
+        Icon: FileText,
       },
     ],
   },
@@ -229,17 +253,26 @@ export default async function AdminHome() {
     );
   }
 
-  const [stats, printEnabled] = await Promise.all([
-    fetchStats(),
-    getPrintEnabled(),
-  ]);
+  const session = await getAdminSession();
+  const fullAdmin = isFullAdminSession(session);
+  const [stats, printEnabled] = fullAdmin
+    ? await Promise.all([fetchStats(), getPrintEnabled()])
+    : [null, false] as const;
+  const sections = fullAdmin ? ADMIN_SECTIONS : ELDER_ADMIN_SECTIONS;
 
   return (
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">관리</h1>
+          <div>
+            <h1 className="text-2xl font-bold">관리</h1>
+            {!fullAdmin && session?.kind === "user" && (
+              <p className="mt-1 text-sm text-stone-500">
+                {session.name} 담당장로님으로 로그인 중입니다.
+              </p>
+            )}
+          </div>
           {/* 로그아웃 — admin 쿠키 클리어. 사이트 어디서든 헤더 "관리자 · 활성화중"
               은 단순 링크로만 작동하고, 실제 모드 해제는 여기서만 가능. */}
           <form action={adminLogout}>
@@ -255,46 +288,48 @@ export default async function AdminHome() {
         </div>
 
         {/* 한눈에 보는 운영 지표 — count 쿼리 4개로 가볍게 */}
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard
-            label="결재 대기"
-            value={stats.pending}
-            unit="건"
-            href="/admin/reservations"
-            Icon={Clock}
-            tone="amber"
-          />
-          <StatCard
-            label="이번 주 신규 신청"
-            value={stats.newThisWeek}
-            unit="건"
-            href="/admin/reservations"
-            Icon={Inbox}
-            tone="sky"
-          />
-          <StatCard
-            label="2주 내 확정 예약"
-            value={stats.upcoming}
-            unit="건"
-            href="/admin/reservations"
-            Icon={CalendarCheck}
-            tone="emerald"
-          />
-          {printEnabled && (
+        {stats && (
+          <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
-              label="인쇄 실패"
-              value={stats.printFail}
+              label="결재 대기"
+              value={stats.pending}
               unit="건"
               href="/admin/reservations"
-              Icon={AlertTriangle}
-              tone={stats.printFail > 0 ? "red" : "stone"}
-              emphasized={stats.printFail > 0}
+              Icon={Clock}
+              tone="amber"
             />
-          )}
-        </section>
+            <StatCard
+              label="이번 주 신규 신청"
+              value={stats.newThisWeek}
+              unit="건"
+              href="/admin/reservations"
+              Icon={Inbox}
+              tone="sky"
+            />
+            <StatCard
+              label="2주 내 확정 예약"
+              value={stats.upcoming}
+              unit="건"
+              href="/admin/reservations"
+              Icon={CalendarCheck}
+              tone="emerald"
+            />
+            {printEnabled && (
+              <StatCard
+                label="인쇄 실패"
+                value={stats.printFail}
+                unit="건"
+                href="/admin/reservations"
+                Icon={AlertTriangle}
+                tone={stats.printFail > 0 ? "red" : "stone"}
+                emphasized={stats.printFail > 0}
+              />
+            )}
+          </section>
+        )}
 
         <div className="space-y-7">
-          {ADMIN_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <AdminSectionBlock key={section.title} section={section} />
           ))}
         </div>

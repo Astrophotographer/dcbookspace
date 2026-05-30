@@ -5,8 +5,12 @@ import { isAdmin } from "@/lib/admin-server";
 import { createServiceClient } from "@/lib/supabase/server";
 
 type Result = { ok: true } | { ok: false; error: string };
+type Channel = "telegram" | "discord";
 
-export async function deleteTelegramSubscriber(id: string): Promise<Result> {
+export async function deleteNotificationSubscriber(
+  channel: Channel,
+  id: string,
+): Promise<Result> {
   if (!(await isAdmin())) {
     return { ok: false, error: "관리자 권한이 필요합니다." };
   }
@@ -17,8 +21,10 @@ export async function deleteTelegramSubscriber(id: string): Promise<Result> {
   }
 
   const supabase = createServiceClient();
+  const table =
+    channel === "discord" ? "discord_subscribers" : "telegram_subscribers";
   const { error } = await supabase
-    .from("telegram_subscribers")
+    .from(table)
     .delete()
     .eq("id", subscriberId);
 

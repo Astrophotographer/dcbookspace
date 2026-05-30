@@ -7,14 +7,19 @@ import {
   isTelegramDirectEnabled,
   sendTelegramNotification,
 } from "@/lib/telegram";
+import {
+  isDiscordDirectEnabled,
+  sendDiscordNotification,
+} from "@/lib/discord";
 
 /**
- * 외부 webhook 과 Telegram direct 로 이벤트를 발사하는 fire-and-forget 알림 허브.
+ * 외부 webhook 과 direct sender 로 이벤트를 발사하는 fire-and-forget 알림 허브.
  *
  * 환경변수
  *   - WEBHOOK_TARGETS: 콤마 구분 URL 목록 (예: "https://n8n.example/hook,https://other/hook")
  *   - WEBHOOK_SECRET:  HMAC-SHA256 서명에 쓰는 비밀 (16자 이상). 비어 있으면 서명 없이 발사.
  *   - TELEGRAM_BOT_TOKEN: 설정하면 n8n 없이 Telegram Bot API 로 직접 발송.
+ *   - DISCORD_BOT_TOKEN: 설정하면 n8n 없이 Discord HTTP API 로 직접 발송.
  *
  * 받는 쪽이 검증할 헤더
  *   - X-DCB-Event:    이벤트 타입
@@ -37,6 +42,7 @@ export type WebhookEvent =
   | "test.message";
 
 type Payload = Record<string, unknown>;
+const KST_TIME_ZONE = "Asia/Seoul";
 
 /**
  * Telegram 발송 대상 1명. n8n 과 direct sender 가 같은 shape 를 공유한다.
@@ -46,6 +52,18 @@ type Payload = Record<string, unknown>;
  */
 export type TelegramRecipient = {
   chat_id: string;
+  name: string;
+  dept_name: string | null;
+};
+
+/**
+ * Discord 발송 대상 1곳.
+ * - target_type=dm: recipient_id 는 Discord user id
+ * - target_type=channel: recipient_id 는 Discord channel id
+ */
+export type DiscordRecipient = {
+  recipient_id: string;
+  target_type: "dm" | "channel";
   name: string;
   dept_name: string | null;
 };
@@ -60,7 +78,11 @@ function getTargets(): string[] {
 }
 
 function hasNotificationTargets(): boolean {
-  return getTargets().length > 0 || isTelegramDirectEnabled();
+  return (
+    getTargets().length > 0 ||
+    isTelegramDirectEnabled() ||
+    isDiscordDirectEnabled()
+  );
 }
 
 function getSecret(): string | null {
@@ -135,6 +157,7 @@ async function deliverEvent(
   await Promise.allSettled([
     dispatchWebhook(event, data),
     sendTelegramNotification(event, data),
+    sendDiscordNotification(event, data),
   ]);
 }
 
@@ -159,6 +182,69 @@ type ReservationSummaryRow = {
     floor: { label: string; building: { name: string } };
   };
 };
+
+const kstDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: KST_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+const kstDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: KST_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const kstTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: KST_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function getKstPartMap(iso: string): Record<string, string> | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return Object.fromEntries(
+    kstDateTimeFormatter
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+}
+
+function toKstOffsetIso(iso: string): string {
+  const parts = getKstPartMap(iso);
+  if (!parts) return iso;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+09:00`;
+}
+
+function formatKstDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
+  return kstDateFormatter.format(date);
+}
+
+function formatKstTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(11, 16);
+  return kstTimeFormatter.format(date);
+}
+
+function formatReservationWhenLabel(startAt: string, endAt: string): string {
+  const startDate = formatKstDate(startAt);
+  const endDate = formatKstDate(endAt);
+  const startTime = formatKstTime(startAt);
+  const endTime = formatKstTime(endAt);
+  return startDate === endDate
+    ? `${startDate} ${startTime}-${endTime}`
+    : `${startDate} ${startTime} ~ ${endDate} ${endTime}`;
+}
 
 type SeriesSummaryRow = {
   id: string;
@@ -283,13 +369,17 @@ async function buildReservationPayload(id: string): Promise<Payload | null> {
     .single();
   if (!data) return null;
   const r = data as unknown as ReservationSummaryRow;
+  const startAt = toKstOffsetIso(r.start_at);
+  const endAt = toKstOffsetIso(r.end_at);
   return {
     kind: "reservation",
     id: r.id,
     ref_no: r.ref_no,
     status: r.status,
-    start_at: r.start_at,
-    end_at: r.end_at,
+    timezone: KST_TIME_ZONE,
+    start_at: startAt,
+    end_at: endAt,
+    when_label: formatReservationWhenLabel(startAt, endAt),
     purpose: r.purpose,
     is_recurring_child: r.series_id != null,
     applicant: {
@@ -325,8 +415,13 @@ async function buildSeriesPayload(id: string): Promise<Payload | null> {
     id: s.id,
     ref_no: s.ref_no,
     status: s.status,
+    timezone: KST_TIME_ZONE,
     start_date: s.start_date,
     end_date: s.end_date,
+    when_label:
+      s.start_date === s.end_date
+        ? s.start_date
+        : `${s.start_date} ~ ${s.end_date}`,
     weekday: s.weekday,
     purpose: s.purpose,
     applicant: {
@@ -383,6 +478,24 @@ async function buildRecipients(
   return (data ?? []) as TelegramRecipient[];
 }
 
+async function buildDiscordRecipients(
+  event: WebhookEvent,
+  deptId: string | null,
+): Promise<DiscordRecipient[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("get_discord_recipients", {
+    p_event_type: event,
+    p_dept_id: deptId,
+  });
+  if (error) {
+    console.error(
+      `[webhook] get_discord_recipients failed for ${event}: ${error.message}`,
+    );
+    return [];
+  }
+  return (data ?? []) as DiscordRecipient[];
+}
+
 // ---- 호출자 편의 래퍼 ---------------------------------------------------------
 
 /**
@@ -418,11 +531,15 @@ export function emitReservationEventAfter(
     ]);
     if (!base) return;
     const payload = await withNextApprovers("reservations", id, base);
-    const recipients = await buildRecipients(event, deptId);
+    const [recipients, discordRecipients] = await Promise.all([
+      buildRecipients(event, deptId),
+      buildDiscordRecipients(event, deptId),
+    ]);
     await deliverEvent(event, {
       ...payload,
       ...(extras ?? {}),
       recipients,
+      discord_recipients: discordRecipients,
     });
   });
 }
@@ -440,11 +557,15 @@ export function emitSeriesEventAfter(
     ]);
     if (!base) return;
     const payload = await withNextApprovers("reservation_series", id, base);
-    const recipients = await buildRecipients(event, deptId);
+    const [recipients, discordRecipients] = await Promise.all([
+      buildRecipients(event, deptId),
+      buildDiscordRecipients(event, deptId),
+    ]);
     await deliverEvent(event, {
       ...payload,
       ...(extras ?? {}),
       recipients,
+      discord_recipients: discordRecipients,
     });
   });
 }
@@ -471,25 +592,27 @@ export function emitApprovalAfter(
     ]);
     if (!base) return;
     const payload = await withNextApprovers(table, id, base);
-    const stepRecipients = await buildRecipients(
-      "reservation.step_approved",
-      deptId,
-    );
+    const [stepRecipients, stepDiscordRecipients] = await Promise.all([
+      buildRecipients("reservation.step_approved", deptId),
+      buildDiscordRecipients("reservation.step_approved", deptId),
+    ]);
     await deliverEvent("reservation.step_approved", {
       ...payload,
       ...stepInfo,
       recipients: stepRecipients,
+      discord_recipients: stepDiscordRecipients,
     });
     // record_approval RPC 가 마지막 단계 통과 시 status 를 'approved' 로 올림.
     // approved 상태에선 next_approvers 가 빈 배열이라 안전.
     if (payload.status === "approved") {
-      const approvedRecipients = await buildRecipients(
-        "reservation.approved",
-        deptId,
-      );
+      const [approvedRecipients, approvedDiscordRecipients] = await Promise.all([
+        buildRecipients("reservation.approved", deptId),
+        buildDiscordRecipients("reservation.approved", deptId),
+      ]);
       await deliverEvent("reservation.approved", {
         ...payload,
         recipients: approvedRecipients,
+        discord_recipients: approvedDiscordRecipients,
       });
     }
   });
@@ -508,6 +631,20 @@ export function emitTestMessage(
     await deliverEvent("test.message", {
       kind: "test",
       recipients: [recipient],
+      ...(extras ?? {}),
+    });
+  });
+}
+
+export function emitDiscordTestMessage(
+  recipient: DiscordRecipient,
+  extras?: Payload,
+): void {
+  if (!hasNotificationTargets()) return;
+  after(async () => {
+    await deliverEvent("test.message", {
+      kind: "test",
+      discord_recipients: [recipient],
       ...(extras ?? {}),
     });
   });

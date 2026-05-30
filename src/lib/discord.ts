@@ -1,17 +1,15 @@
 import "server-only";
 
-import type { TelegramRecipient, WebhookEvent } from "@/lib/webhook";
+import type { DiscordRecipient, WebhookEvent } from "@/lib/webhook";
 
 type Payload = Record<string, unknown>;
 
-const TELEGRAM_TIMEOUT_MS = 3_000;
-const TELEGRAM_MAX_TEXT_LENGTH = 3900;
+const DISCORD_API_BASE = "https://discord.com/api/v10";
+const DISCORD_TIMEOUT_MS = 4_000;
+const DISCORD_MAX_TEXT_LENGTH = 1900;
 const BOT_PROFILE_CACHE_MS = 10 * 60 * 1000;
 
-type TelegramSendOptions = {
-  parseMode?: "HTML" | "Markdown";
-};
-
+type DiscordTargetType = "dm" | "channel";
 type BotProfileCache = {
   username: string | null;
   checkedAt: number;
@@ -20,20 +18,17 @@ type BotProfileCache = {
 let botProfileCache: BotProfileCache | null = null;
 
 function getBotToken(): string | null {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = process.env.DISCORD_BOT_TOKEN?.trim();
   return token || null;
 }
 
-export function isTelegramDirectEnabled(): boolean {
+export function isDiscordDirectEnabled(): boolean {
   return getBotToken() !== null;
 }
 
-export async function getTelegramBotUsername(): Promise<string | null> {
-  const envUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim();
-  if (envUsername) return envUsername.replace(/^@/, "");
-
-  const token = getBotToken();
-  if (!token) return null;
+export async function getDiscordBotUsername(): Promise<string | null> {
+  const username = process.env.NEXT_PUBLIC_DISCORD_BOT_USERNAME?.trim();
+  if (username) return username;
 
   const now = Date.now();
   if (
@@ -43,97 +38,112 @@ export async function getTelegramBotUsername(): Promise<string | null> {
     return botProfileCache.username;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, {
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      console.warn(`[telegram] getMe returned ${res.status}`);
-      botProfileCache = { username: null, checkedAt: now };
-      return null;
-    }
-
-    const json = (await res.json()) as {
-      ok?: boolean;
-      result?: { username?: unknown };
-    };
-    const username =
-      json.ok && typeof json.result?.username === "string"
-        ? json.result.username.replace(/^@/, "")
-        : null;
-    botProfileCache = { username, checkedAt: now };
-    return username;
-  } catch (e) {
-    console.warn(`[telegram] getMe failed: ${(e as Error).message}`);
+  const json = await discordFetch<{
+    username?: unknown;
+    discriminator?: unknown;
+    global_name?: unknown;
+  }>("/users/@me", { method: "GET" });
+  if (!json || typeof json.username !== "string") {
     botProfileCache = { username: null, checkedAt: now };
     return null;
-  } finally {
-    clearTimeout(timer);
   }
+
+  const label =
+    typeof json.discriminator === "string" && json.discriminator !== "0"
+      ? `${json.username}#${json.discriminator}`
+      : json.username;
+  botProfileCache = { username: label, checkedAt: now };
+  return label;
 }
 
-function maskChatId(chatId: string): string {
-  if (chatId.length <= 4) return "****";
-  return `${chatId.slice(0, 2)}***${chatId.slice(-4)}`;
+export function getDiscordInviteUrl(): string | null {
+  const url = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL?.trim();
+  return url && /^https?:\/\//.test(url) ? url : null;
 }
 
-function truncateTelegramText(text: string): string {
-  if (text.length <= TELEGRAM_MAX_TEXT_LENGTH) return text;
-  return `${text.slice(0, TELEGRAM_MAX_TEXT_LENGTH - 3)}...`;
+function truncateDiscordText(text: string): string {
+  if (text.length <= DISCORD_MAX_TEXT_LENGTH) return text;
+  return `${text.slice(0, DISCORD_MAX_TEXT_LENGTH - 3)}...`;
 }
 
-async function postTelegramMessage(
-  token: string,
-  chatId: string,
-  text: string,
-  options?: TelegramSendOptions,
-): Promise<boolean> {
+function maskId(id: string): string {
+  if (id.length <= 6) return "******";
+  return `${id.slice(0, 3)}***${id.slice(-4)}`;
+}
+
+async function discordFetch<T>(
+  path: string,
+  init: RequestInit,
+): Promise<T | null> {
+  const token = getBotToken();
+  if (!token) return null;
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), DISCORD_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: truncateTelegramText(text),
-        parse_mode: options?.parseMode ?? "HTML",
-        disable_web_page_preview: true,
-      }),
+    const res = await fetch(`${DISCORD_API_BASE}${path}`, {
+      ...init,
+      headers: {
+        authorization: `Bot ${token}`,
+        "content-type": "application/json; charset=utf-8",
+        ...(init.headers ?? {}),
+      },
       signal: controller.signal,
     });
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.warn(
-        `[telegram] sendMessage ${maskChatId(chatId)} returned ${res.status}: ${body.slice(0, 200)}`,
+        `[discord] ${path} returned ${res.status}: ${body.slice(0, 200)}`,
       );
-      return false;
+      return null;
     }
 
-    return true;
+    if (res.status === 204) return {} as T;
+    return (await res.json()) as T;
   } catch (e) {
-    console.warn(
-      `[telegram] sendMessage ${maskChatId(chatId)} failed: ${(e as Error).message}`,
-    );
-    return false;
+    console.warn(`[discord] ${path} failed: ${(e as Error).message}`);
+    return null;
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function sendTelegramText(
-  chatId: string,
+async function createDmChannel(userId: string): Promise<string | null> {
+  const json = await discordFetch<{ id?: unknown }>("/users/@me/channels", {
+    method: "POST",
+    body: JSON.stringify({ recipient_id: userId }),
+  });
+  return typeof json?.id === "string" ? json.id : null;
+}
+
+async function postDiscordMessage(
+  channelId: string,
   text: string,
-  options?: TelegramSendOptions,
 ): Promise<boolean> {
-  const token = getBotToken();
-  if (!token) return false;
-  return postTelegramMessage(token, chatId, text, options);
+  const json = await discordFetch<{ id?: unknown }>(
+    `/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({ content: truncateDiscordText(text) }),
+    },
+  );
+  return !!json?.id;
+}
+
+export async function sendDiscordText(
+  recipientId: string,
+  targetType: DiscordTargetType,
+  text: string,
+): Promise<boolean> {
+  const channelId =
+    targetType === "dm" ? await createDmChannel(recipientId) : recipientId;
+  if (!channelId) {
+    console.warn(`[discord] cannot resolve target ${targetType}:${maskId(recipientId)}`);
+    return false;
+  }
+  return postDiscordMessage(channelId, text);
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -146,25 +156,28 @@ function stringValue(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
-function escapeHtml(v: string): string {
-  return v
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function extractRecipients(data: Payload): TelegramRecipient[] {
-  const raw = Array.isArray(data.recipients) ? data.recipients : [];
+function extractRecipients(data: Payload): DiscordRecipient[] {
+  const raw = Array.isArray(data.discord_recipients)
+    ? data.discord_recipients
+    : [];
   const seen = new Set<string>();
-  const recipients: TelegramRecipient[] = [];
+  const recipients: DiscordRecipient[] = [];
 
   for (const item of raw) {
     const r = asRecord(item);
-    const chatId = stringValue(r?.chat_id);
-    if (!chatId || seen.has(chatId)) continue;
-    seen.add(chatId);
+    const recipientId = stringValue(r?.recipient_id);
+    const targetType = stringValue(r?.target_type);
+    if (
+      !recipientId ||
+      (targetType !== "dm" && targetType !== "channel") ||
+      seen.has(`${targetType}:${recipientId}`)
+    ) {
+      continue;
+    }
+    seen.add(`${targetType}:${recipientId}`);
     recipients.push({
-      chat_id: chatId,
+      recipient_id: recipientId,
+      target_type: targetType,
       name: stringValue(r?.name) ?? "",
       dept_name: stringValue(r?.dept_name),
     });
@@ -257,7 +270,7 @@ function getEventTitle(event: WebhookEvent): string {
     case "reservation.rejected":
       return "신청이 반려되었습니다";
     case "reservation.cancelled":
-      return "예약이 취소되었습니다";
+      return "신청이 반려되었습니다";
     case "reservation.print_failed":
       return "프린트 출력에 실패했습니다";
     case "test.message":
@@ -265,13 +278,13 @@ function getEventTitle(event: WebhookEvent): string {
   }
 }
 
-function buildTelegramText(event: WebhookEvent, data: Payload): string {
+function buildDiscordText(event: WebhookEvent, data: Payload): string {
   if (event === "test.message") {
     const scope = stringValue(data.scope_label) ?? stringValue(data.dept_name);
     return [
-      "<b>장소사용신청서 알림 연결 확인</b>",
+      "**장소사용신청서 알림 연결 확인**",
       "",
-      `${escapeHtml(scope ?? "선택한 범위")} 알림이 연결되었습니다.`,
+      `${scope ?? "선택한 범위"} 알림이 연결되었습니다.`,
     ].join("\n");
   }
 
@@ -286,18 +299,18 @@ function buildTelegramText(event: WebhookEvent, data: Payload): string {
   const approverName = stringValue(data.approver_name);
 
   const lines = [
-    `<b>${escapeHtml(title)}</b> #${escapeHtml(refNo)}`,
+    `**${title}** #${refNo}`,
     "",
-    `부서/신청자: ${escapeHtml(deptName)} / ${escapeHtml(applicantName)}`,
+    `부서/신청자: ${deptName} / ${applicantName}`,
   ];
 
-  if (roomLabel) lines.push(`장소: ${escapeHtml(roomLabel)}`);
-  if (whenLabel) lines.push(`일시: ${escapeHtml(whenLabel)}`);
-  if (purpose) lines.push(`목적: ${escapeHtml(purpose)}`);
+  if (roomLabel) lines.push(`장소: ${roomLabel}`);
+  if (whenLabel) lines.push(`일시: ${whenLabel}`);
+  if (purpose) lines.push(`목적: ${purpose}`);
 
   if (event === "reservation.step_approved") {
     const stepText = [stepLabel, approverName].filter(Boolean).join(" ");
-    if (stepText) lines.push("", `결재 단계: ${escapeHtml(stepText)}`);
+    if (stepText) lines.push("", `결재 단계: ${stepText}`);
   }
 
   if (data.admin_forced) {
@@ -307,20 +320,19 @@ function buildTelegramText(event: WebhookEvent, data: Payload): string {
   return lines.join("\n");
 }
 
-export async function sendTelegramNotification(
+export async function sendDiscordNotification(
   event: WebhookEvent,
   data: Payload,
 ): Promise<void> {
-  const token = getBotToken();
-  if (!token) return;
+  if (!isDiscordDirectEnabled()) return;
 
   const recipients = extractRecipients(data);
   if (recipients.length === 0) return;
 
-  const text = buildTelegramText(event, data);
+  const text = buildDiscordText(event, data);
   await Promise.allSettled(
     recipients.map((recipient) =>
-      postTelegramMessage(token, recipient.chat_id, text),
+      sendDiscordText(recipient.recipient_id, recipient.target_type, text),
     ),
   );
 }

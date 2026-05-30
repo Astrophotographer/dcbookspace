@@ -85,6 +85,8 @@ function formatKstTime(value) {
 }
 
 function formatWhen(data) {
+  if (data.when_label) return String(data.when_label);
+
   if (data.start_at && data.end_at) {
     const startDate = formatKstDate(data.start_at);
     const endDate = formatKstDate(data.end_at);

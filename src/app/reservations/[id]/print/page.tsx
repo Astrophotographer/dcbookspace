@@ -54,6 +54,10 @@ export default async function PrintPage(
   const apprByOrder = new Map(r.approvals.map((a) => [a.step_order, a]));
   const steps = r.route.steps as ApprovalStep[];
   const createdLabel = formatDate(r.created_at, "yyyy 년   MM 월   dd 일");
+  const deptHeadSignature =
+    r.signature_snapshot?.dept_head_signature_data_url ?? null;
+  const elderSignature = r.signature_snapshot?.elder_signature_data_url ?? null;
+  const elderName = r.signature_snapshot?.elder_name ?? elder?.name ?? "";
 
   return (
     <>
@@ -135,12 +139,16 @@ export default async function PrintPage(
           {/* 신청자 정보 (우측 하단) */}
           <div className="signature-section">
             <SigRow label="신청부서">{r.dept?.name ?? ""}</SigRow>
-            <SigRow label="신청자" stamp>
+            <SigRow
+              label="신청자"
+              stamp
+              signatureDataUrl={deptHeadSignature}
+            >
               {r.applicant.name}
             </SigRow>
             <SigRow label="전화번호">{r.applicant.phone ?? ""}</SigRow>
-            <SigRow label="지도장로" stamp>
-              {elder?.name ?? ""}
+            <SigRow label="지도장로" stamp signatureDataUrl={elderSignature}>
+              {elderName}
             </SigRow>
           </div>
 
@@ -324,6 +332,16 @@ export default async function PrintPage(
             justify-content: center;
             font-size: 8pt;
           }
+          .sig-image {
+            position: absolute;
+            right: -10px;
+            bottom: -10px;
+            width: 56px;
+            height: 36px;
+            object-fit: contain;
+            z-index: 2;
+            mix-blend-mode: multiply;
+          }
 
           .date-section {
             text-align: center;
@@ -392,10 +410,12 @@ function SigRow({
   label,
   children,
   stamp,
+  signatureDataUrl,
 }: {
   label: string;
   children: React.ReactNode;
   stamp?: boolean;
+  signatureDataUrl?: string | null;
 }) {
   return (
     <div className="sig-row">
@@ -403,6 +423,10 @@ function SigRow({
       <div className="sig-line">
         {children}
         {stamp && <div className="sig-stamp">인</div>}
+        {signatureDataUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- 저장된 사인 data URL 을 인쇄 양식에 그대로 합성
+          <img src={signatureDataUrl} alt="" className="sig-image" />
+        )}
       </div>
     </div>
   );
