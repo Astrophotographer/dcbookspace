@@ -139,7 +139,7 @@ const ADMIN_SECTIONS: AdminSection[] = [
       {
         href: "/admin/settings",
         label: "프린트ON/OFF",
-        desc: "자동 출력·진행상태·재출력 버튼 설정",
+        desc: "자동 출력·진행상태 표시 설정",
         Icon: SettingsIcon,
       },
       {

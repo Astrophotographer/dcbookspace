@@ -178,45 +178,43 @@ export default async function AdminReservationDetail(
           />
         </section>
 
-        {/* 출력 / 다운로드 — 프린트 기능 OFF 면 섹션 자체 미렌더 */}
-        {printEnabled && (
-          <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-3 text-lg font-semibold">서류 출력</h2>
-            <p className="mb-3 text-sm text-stone-600">
-              결재 서류를 다시 출력하거나 PDF로 저장할 수 있습니다. 신청 확정 ·
-              취소는 위 QR을 스캔해 진행하세요.
-            </p>
-            {/* 모바일에서도 한 줄 — 각 Link 가 flex-1, Button w-full */}
-            <div className="flex gap-2">
-              <Link
-                href={`/reservations/${r.id}/print`}
-                target="_blank"
-                className="flex-1 sm:flex-none"
+        {/* 출력 / 다운로드 — 자동 출력 OFF 여도 관리자는 수동 재출력 가능 */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold">서류 출력</h2>
+          <p className="mb-3 text-sm text-stone-600">
+            결재 서류를 다시 출력하거나 PDF로 저장할 수 있습니다. 신청 확정 ·
+            취소는 위 QR을 스캔해 진행하세요.
+          </p>
+          {/* 모바일에서도 한 줄 — 각 Link 가 flex-1, Button w-full */}
+          <div className="flex gap-2">
+            <Link
+              href={`/reservations/${r.id}/print`}
+              target="_blank"
+              className="flex-1 sm:flex-none"
+            >
+              <Button
+                size="lg"
+                variant="primary"
+                className="w-full whitespace-nowrap"
               >
-                <Button
-                  size="lg"
-                  variant="primary"
-                  className="w-full whitespace-nowrap"
-                >
-                  <Printer className="h-5 w-5" />
-                  결재서류
-                </Button>
-              </Link>
-              <Link
-                href={`/reservations/${r.id}/digital`}
-                className="flex-1 sm:flex-none"
+                <Printer className="h-5 w-5" />
+                결재서류 재출력
+              </Button>
+            </Link>
+            <Link
+              href={`/reservations/${r.id}/digital`}
+              className="flex-1 sm:flex-none"
+            >
+              <Button
+                size="lg"
+                variant="secondary"
+                className="w-full whitespace-nowrap"
               >
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="w-full whitespace-nowrap"
-                >
-                  링크 보기
-                </Button>
-              </Link>
-            </div>
-          </section>
-        )}
+                링크 보기
+              </Button>
+            </Link>
+          </div>
+        </section>
       </main>
     </>
   );
