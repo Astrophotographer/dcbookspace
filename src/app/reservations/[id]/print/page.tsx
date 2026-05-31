@@ -6,7 +6,7 @@ import { SetupNeeded } from "@/components/setup-needed";
 import { qrDataUrl } from "@/lib/qr";
 import { formatDate, formatUsageRange, resolveBaseUrl } from "@/lib/utils";
 import type { ReservationDetail } from "@/lib/repo";
-import type { ApprovalStep, AppUser } from "@/lib/supabase/types";
+import type { ApprovalStep } from "@/lib/supabase/types";
 import { PrintAuto } from "./print-auto";
 
 export default async function PrintPage(
@@ -31,17 +31,6 @@ export default async function PrintPage(
   if (error || !data) notFound();
   const r = data as unknown as ReservationDetail;
 
-  let elder: AppUser | null = null;
-  if (r.dept_id) {
-    const { data: dep } = await supabase
-      .from("departments")
-      .select("*, elder:users!elder_id (*)")
-      .eq("id", r.dept_id)
-      .single();
-    elder =
-      ((dep as unknown as { elder: AppUser | null } | null)?.elder) ?? null;
-  }
-
   const h = await headers();
   const baseUrl = resolveBaseUrl({
     envUrl: process.env.NEXT_PUBLIC_APP_URL,
@@ -57,7 +46,7 @@ export default async function PrintPage(
   const deptHeadSignature =
     r.signature_snapshot?.dept_head_signature_data_url ?? null;
   const elderSignature = r.signature_snapshot?.elder_signature_data_url ?? null;
-  const elderName = r.signature_snapshot?.elder_name ?? elder?.name ?? "";
+  const elderName = r.signature_snapshot?.elder_name ?? "";
 
   return (
     <>

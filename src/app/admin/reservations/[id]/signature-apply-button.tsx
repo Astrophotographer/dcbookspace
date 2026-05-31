@@ -2,9 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileSignature } from "lucide-react";
+import { CheckCircle2, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { applyReservationSignatures } from "../actions";
+import { cn } from "@/lib/utils";
+import {
+  applyReservationSignatures,
+  clearReservationSignatures,
+} from "../actions";
 
 type Props = {
   reservationId: string;
@@ -22,9 +26,23 @@ export function SignatureApplyButton({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const signed = Boolean(savedAt);
+  const canClick = signed || enabled;
 
-  function apply() {
+  function handleClick() {
     setError(null);
+    if (signed) {
+      startTransition(async () => {
+        const res = await clearReservationSignatures(reservationId);
+        if (res.error) {
+          setError(res.error);
+          return;
+        }
+        router.refresh();
+      });
+      return;
+    }
+
     if (
       outsideDeptConfirmRequired &&
       !confirm("담당부서가 아닌데도 확인하시겠습니까?")
@@ -50,25 +68,42 @@ export function SignatureApplyButton({
           <h2 className="text-lg font-semibold text-stone-900">
             지도장로 확인
           </h2>
-          <p className="mt-1 text-sm text-stone-500">
-            {enabled
-              ? savedAt
-                ? "저장된 사인이 출력 서류에 반영되어 있습니다."
-                : "부서장과 지도장로 사인이 모두 준비되었습니다."
-              : "사인관리에서 부서장과 지도장로 사인을 먼저 등록해 주세요."}
+          <p
+            className={cn(
+              "mt-1 text-sm",
+              signed ? "font-medium text-red-600" : "text-stone-500",
+            )}
+          >
+            {signed
+              ? "취소하려면 다시한번 버튼을 눌러주세요"
+              : enabled
+                ? "부서장과 지도장로 사인이 모두 준비되었습니다."
+                : "사인관리에서 부서장과 지도장로 사인을 먼저 등록해 주세요."}
           </p>
         </div>
         <Button
           type="button"
           size="lg"
-          disabled={!enabled || pending}
-          onClick={apply}
-          className="w-full whitespace-nowrap sm:w-auto"
+          disabled={!canClick || pending}
+          onClick={handleClick}
+          className={cn(
+            "w-full whitespace-nowrap sm:w-auto",
+            signed &&
+              "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500",
+          )}
         >
-          <FileSignature className="h-5 w-5" />
+          {signed ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <FileSignature className="h-5 w-5" />
+          )}
           {pending
-            ? "저장 중..."
-            : "신청서확인"}
+            ? signed
+              ? "취소 중..."
+              : "저장 중..."
+            : signed
+              ? "사인넣기 완료"
+              : "사인 넣기"}
         </Button>
       </div>
       {error && (

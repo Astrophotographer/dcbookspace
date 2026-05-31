@@ -195,6 +195,47 @@ export async function applyReservationSignatures(
   return { ok: true };
 }
 
+export async function clearReservationSignatures(id: string): Promise<Result> {
+  if (!id) return { error: "잘못된 요청입니다." };
+
+  const session = await getAdminSession();
+  if (!session) return { error: "로그인이 필요합니다." };
+
+  const supabase = createServiceClient();
+  const { data, error: e0 } = await supabase
+    .from("reservations")
+    .select(
+      `id, dept_id, status, current_step,
+       route:approval_routes (steps),
+       dept:departments (id, elder_id)`,
+    )
+    .eq("id", id)
+    .single();
+  if (e0 || !data) return { error: "신청서를 찾을 수 없습니다." };
+
+  const row = data as unknown as ReservationSignatureRow;
+  const fullAdmin = isFullAdminSession(session);
+  if (!fullAdmin && !canGuideElderAccessRow(row, session)) {
+    return { error: "차장 결재 전 신청서만 취소할 수 있습니다." };
+  }
+
+  const { error: e1 } = await supabase
+    .from("reservations")
+    .update({
+      signature_snapshot: null,
+      signature_snapshot_at: null,
+      signature_snapshot_by: null,
+    })
+    .eq("id", id);
+  if (e1) return { error: e1.message };
+
+  revalidatePath("/admin/reservations");
+  revalidatePath(`/admin/reservations/${id}`);
+  revalidatePath(`/reservations/${id}`);
+  revalidatePath(`/reservations/${id}/print`);
+  return { ok: true };
+}
+
 /**
  * 신청서 hard delete. approvals는 ON DELETE CASCADE 되어 있어 같이 삭제됨.
  */
